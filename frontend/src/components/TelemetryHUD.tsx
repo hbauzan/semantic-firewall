@@ -3,19 +3,22 @@ import { useStore } from '../store';
 
 const FRAMES = [
     `
-  /\\_/\\
- ( o.o )
-  > ^ <
+  .---.
+ /_____\\
+ ( x.o )
+  > m <
   `,
     `
-  /\\_/\\
- ( -.- )
-  > ^ <
+  .---.
+ /_____\\
+ ( x.- )
+  > m <
   `,
     `
-  /\\_/\\
- ( o.o )
-  > ~ <
+  .---.
+ /_____\\
+ ( x.o )
+  > O <
   `
 ];
 
@@ -59,8 +62,8 @@ export const TelemetryHUD: React.FC = () => {
                 <span>{telemetry.ram.toFixed(0)} MB</span>
             </div>
             <div className="stat-item">
-                <span>GPU VRAM:</span>
-                <span>{telemetry.gpu.toFixed(0)} MB</span>
+                <span>GPU %:</span>
+                <span>{telemetry.gpu.toFixed(1)}%</span>
             </div>
         </div>
     );

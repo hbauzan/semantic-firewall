@@ -15,7 +15,7 @@ while true; do
     [Ss]* ) ./run_server.sh; read -p "Press Enter to continue..." ;;
     [Uu]* ) ./run_ui.sh; read -p "Press Enter to continue..." ;;
     [Tt]* ) ./run_tests.sh; read -p "Press Enter to continue..." ;;
-    [Oo]* ) echo "Starting Ollama serve..."; ollama run llama3.1; read -p "Press Enter to continue..." ;;
+    [Oo]* ) echo "Starting Ollama serve..."; (ollama serve >/dev/null 2>&1 &); sleep 2; ollama run llama3.1; read -p "Press Enter to continue..." ;;
     [Qq]* ) exit ;;
     * ) echo "Please answer S, U, T, O, or Q."; read -p "Press Enter..." ;;
   esac

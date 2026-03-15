@@ -43,6 +43,14 @@ body {
   border-radius: 8px;
 }
 
+.main-content-area {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: hidden;
+}
+
 .main-panel {
   flex-grow: 1;
   display: flex;
@@ -51,6 +59,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
+  min-height: 0;
 }
 
 h2 {

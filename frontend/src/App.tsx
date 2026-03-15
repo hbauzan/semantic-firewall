@@ -1,7 +1,7 @@
-import React from 'react';
 import { TelemetryHUD } from './components/TelemetryHUD';
 import { ControlPanel } from './components/ControlPanel';
 import { ChatInterface } from './components/ChatInterface';
+import { AuditPanel } from './components/AuditPanel';
 
 function App() {
   return (
@@ -10,7 +10,10 @@ function App() {
         <TelemetryHUD />
         <ControlPanel />
       </div>
-      <ChatInterface />
+      <div className="main-content-area">
+        <ChatInterface />
+        <AuditPanel />
+      </div>
     </div>
   );
 }

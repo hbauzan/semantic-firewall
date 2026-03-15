@@ -38,6 +38,15 @@ async def upload_pdf(file: UploadFile = File(...)):
 async def task_status(task_id: str):
     return get_task_status(task_id)
 
+@router.get("/corpus/packs")
+async def list_packs():
+    return {"packs": storage.get_summary()}
+
+@router.delete("/corpus/packs/{filename}")
+async def delete_pack(filename: str):
+    storage.delete_pack(filename)
+    return {"status": "deleted", "filename": filename}
+
 @router.post("/galaxy/config")
 async def update_config(config: ConfigUpdate):
     config_state.excitation_threshold = config.excitation_threshold
@@ -63,7 +72,7 @@ async def audit_query(req: AuditRequest):
 
 async def stream_ollama(prompt: str, context: str):
     full_prompt = f"Context: {context}\n\nQuery: {prompt}"
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=None) as client:
         try:
             async with client.stream(
                 "POST", 
@@ -104,13 +113,26 @@ async def chat_endpoint(req: ChatRequest):
 async def system_stats():
     cpu = psutil.cpu_percent(interval=0.1)
     ram = psutil.virtual_memory().used / (1024 * 1024)
-    gpu = 0
+    gpu_percent = 0.0
     try:
         if torch.backends.mps.is_available():
-            gpu = torch.mps.current_allocated_memory() / (1024 * 1024)
+            vram = torch.mps.current_allocated_memory() / (1024 * 1024)
+            # Heuristic for GPU %:
+            # When VRAM > 1GB, we're likely doing heavy embedding inference.
+            if vram > 1000:
+                gpu_percent = min(100.0, max(20.0, vram / 20.0))
+            else:
+                gpu_percent = min(5.0, vram / 100.0)
+
         elif torch.cuda.is_available():
-            gpu = torch.cuda.memory_allocated() / (1024 * 1024)
+            # If standard CUDA: we don't have utilization out of the box without pynvml.
+            # Using same VRAM heuristic.
+            vram = torch.cuda.memory_allocated() / (1024 * 1024)
+            if vram > 1000:
+                gpu_percent = min(100.0, max(20.0, vram / 20.0))
+            else:
+                gpu_percent = min(5.0, vram / 100.0)
     except Exception:
         pass
     
-    return {"cpu": cpu, "ram": ram, "gpu": gpu}
+    return {"cpu": cpu, "ram": ram, "gpu": gpu_percent}

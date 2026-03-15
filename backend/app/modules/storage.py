@@ -54,4 +54,38 @@ class Storage:
     def count_rows(self) -> int:
         return self.table.count_rows()
 
+    def get_summary(self) -> list[dict]:
+        if self.table.count_rows() == 0:
+            return []
+        
+        # LanceDB doesn't natively group_by text extracted from metadata.
+        # We will load the dataset and aggregate manually for the HUD.
+        ds = self.table.to_lance()
+        if ds.count_rows() == 0:
+            return []
+            
+        import json
+        metadata_col = ds.to_table()["metadata"].to_pylist()
+        
+        packs = {}
+        for m_str in metadata_col:
+            try:
+                m = json.loads(m_str)
+                fname = m.get("filename", "unknown")
+                packs[fname] = packs.get(fname, 0) + 1
+            except:
+                pass
+                
+        return [{"filename": k, "chunks": v} for k, v in packs.items()]
+
+    def delete_pack(self, filename: str):
+        if self.table.count_rows() == 0:
+            return
+            
+        # LanceDB SQL filter using LIKE on the metadata string
+        # metadata contains {"filename": "..."}
+        # A simple string match works for our purposes.
+        filter_str = f"metadata LIKE '%\"filename\": \"{filename}\"%'"
+        self.table.delete(filter_str)
+
 storage = Storage()

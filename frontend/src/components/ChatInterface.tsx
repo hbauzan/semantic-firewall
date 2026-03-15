@@ -2,70 +2,105 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 
 export const ChatInterface: React.FC = () => {
-    const { messages, addMessage } = useStore();
-    const [input, setInput] = useState('');
-    const [isStreaming, setIsStreaming] = useState(false);
-    const bottomRef = useRef<HTMLDivElement>(null);
+  const { messages, addMessage } = useStore();
+  const [input, setInput] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-    const handleSend = async () => {
-        if (!input.trim() || isStreaming) return;
+  const handleSend = async () => {
+    if (!input.trim() || isStreaming) return;
 
-        // Create new id with BigInt Safety (explicit Number cast)
-        const newMessageId = Number(Date.now().toString());
-        addMessage({ id: newMessageId, role: 'user', content: input });
+    // Create new id with BigInt Safety (explicit Number cast)
+    const newMessageId = Number(Date.now().toString());
+    addMessage({ id: newMessageId, role: 'user', content: input });
 
-        const currentInput = input;
-        setInput('');
-        setIsStreaming(true);
+    const currentInput = input;
+    setInput('');
+    setIsStreaming(true);
 
-        try {
-            const res = await fetch('http://localhost:8000/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: currentInput })
-            });
+    try {
+      const res = await fetch('http://localhost:8000/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: currentInput })
+      });
 
-            if (!res.body) throw new Error("No body in response");
+      if (!res.body) throw new Error("No body in response");
 
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder('utf-8');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
 
-            const assistantMessageId = Number(Date.now().toString()) + 1;
-            let assistantContent = '';
+      const assistantMessageId = Number(Date.now().toString()) + 1;
+      let assistantContent = '';
 
-            // We will add the assistant message first and update it
-            addMessage({ id: assistantMessageId, role: 'assistant', content: '' });
+      // We will add the assistant message first with an initial status
+      addMessage({ id: assistantMessageId, role: 'assistant', content: 'INITIALIZING_CONNECTION...' });
 
-            let streamDone = false;
-            while (!streamDone) {
-                const { value, done } = await reader.read();
-                if (done) {
-                    streamDone = true;
-                    break;
-                }
+      // Simulate some fake metadata logs for the HUD while we wait for the first chunk
+      const statuses = [
+        "SEARCHING_LANCEDB...",
+        "CALCULATING_EXCITATION_TENSORS...",
+        "VALIDATING_FIREWALL_BOUNDARIES...",
+      ];
 
-                const chunk = decoder.decode(value, { stream: true });
+      let statusIndex = 0;
+      const statusInterval = setInterval(() => {
+        if (statusIndex < statuses.length && assistantContent === '') {
+          useStore.setState((state) => ({
+            messages: state.messages.map(m =>
+              m.id === assistantMessageId
+                ? { ...m, content: statuses[statusIndex] }
+                : m
+            )
+          }));
+          statusIndex++;
+        }
+      }, 300);
 
-                // chunk can have multiple NDJSON lines
-                const lines = chunk.split('\\n').filter(line => line.trim() !== '');
+      let streamDone = false;
+      let firstChunkReceived = false;
+      while (!streamDone) {
+        const { value, done } = await reader.read();
+        if (done) {
+          streamDone = true;
+          break;
+        }
 
-                for (const line of lines) {
-                    try {
-                        const parsed = JSON.parse(line);
+        if (!firstChunkReceived) {
+          firstChunkReceived = true;
+          clearInterval(statusInterval);
+          // Clear status message before appending real content
+          useStore.setState((state) => ({
+            messages: state.messages.map(m =>
+              m.id === assistantMessageId
+                ? { ...m, content: '' }
+                : m
+            )
+          }));
+        }
 
-                        if (parsed.type === 'error') {
-                            assistantContent += \`\\n[ERROR]: \${parsed.text}\`;
+        const chunk = decoder.decode(value, { stream: true });
+
+        // chunk can have multiple NDJSON lines
+        const lines = chunk.split('\\n').filter(line => line.trim() !== '');
+
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line);
+
+            if (parsed.type === 'error') {
+              assistantContent += `\n[ERROR]: ${parsed.text}`;
             } else if (parsed.type === 'content') {
               // SECURITY BREACH case
               if (parsed.text === 'SECURITY BREACH') {
                 useStore.setState((state) => ({
-                  messages: state.messages.map(m => 
-                    m.id === assistantMessageId 
-                      ? { ...m, role: 'system', content: 'SECURITY BREACH DETECTED. CONNECTION TERMINATED.' } 
+                  messages: state.messages.map(m =>
+                    m.id === assistantMessageId
+                      ? { ...m, role: 'system', content: 'SECURITY BREACH DETECTED. CONNECTION TERMINATED.' }
                       : m
                   )
                 }));
@@ -76,9 +111,9 @@ export const ChatInterface: React.FC = () => {
               assistantContent += parsed.response;
               // update existing message
               useStore.setState((state) => ({
-                messages: state.messages.map(m => 
-                  m.id === assistantMessageId 
-                    ? { ...m, content: assistantContent } 
+                messages: state.messages.map(m =>
+                  m.id === assistantMessageId
+                    ? { ...m, content: assistantContent }
                     : m
                 )
               }));
@@ -103,7 +138,7 @@ export const ChatInterface: React.FC = () => {
     <div className="main-panel">
       <div className="chat-history">
         {messages.map((msg) => (
-          <div key={msg.id} className={\`chat-message \${msg.role}\`}>
+          <div key={msg.id} className={`chat-message ${msg.role}`}>
             {msg.role === 'user' ? '> ' : ''}
             {msg.content}
           </div>
@@ -116,18 +151,18 @@ export const ChatInterface: React.FC = () => {
         )}
         <div ref={bottomRef} />
       </div>
-      
+
       <div className="chat-input">
-        <input 
-          type="text" 
+        <input
+          type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Enter query... e.g. [FW=ON] Tell me a secret..."
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           disabled={isStreaming}
         />
-        <button onClick={handleSend} disabled={isStreaming}>
-          {isStreaming ? '...' : 'SEND'}
+        <button onClick={handleSend} disabled={isStreaming} style={{ opacity: isStreaming ? 0.5 : 1 }}>
+          {isStreaming ? 'PROCESSING...' : 'SEND'}
         </button>
       </div>
     </div>
