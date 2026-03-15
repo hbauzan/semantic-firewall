@@ -103,9 +103,27 @@ async def chat_endpoint(req: ChatRequest):
         
     if fw_on:
         if activations < config_state.excitation_threshold:
+            block_msg = (
+                f"🛑 [FIREWALL BLOCKED] Query rejected. "
+                f"Dimensional Resonance ({activations}/1024) failed to meet the "
+                f"critical threshold ({config_state.excitation_threshold}). "
+                f"Semantic contamination detected."
+            )
             async def breach_stream():
-                yield json.dumps({"type": "content", "text": "SECURITY BREACH"}).encode("utf-8")
+                yield json.dumps({"type": "content", "text": block_msg}).encode("utf-8")
             return StreamingResponse(breach_stream(), media_type="application/x-ndjson")
+
+        # Firewall passed — prepend telemetry badge before the LLM stream
+        pass_prefix = (
+            f"🟢 [FIREWALL PASSED] Resonance achieved: "
+            f"{activations}/{config_state.excitation_threshold} dimensions. "
+            f"Routing to sovereign knowledge...\n\n"
+        )
+        async def prefixed_stream():
+            yield json.dumps({"response": pass_prefix}).encode("utf-8") + b"\n"
+            async for chunk in stream_ollama(clean_prompt, context):
+                yield chunk
+        return StreamingResponse(prefixed_stream(), media_type="application/x-ndjson")
 
     return StreamingResponse(stream_ollama(clean_prompt, context), media_type="application/x-ndjson")
 

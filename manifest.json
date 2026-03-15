@@ -11,7 +11,8 @@
         "commander_tui_enabled": true,
         "document_manager_pack_deletion": true,
         "global_system_action_status": true,
-        "utf8_ndjson_line_streaming": true
+        "utf8_ndjson_line_streaming": true,
+        "explicit_firewall_chat_feedback": true
     },
     "constraints": {
         "vector_dim": 1024

@@ -5,6 +5,7 @@ The firewall operates by evaluating the raw 1024D embedding layers produced by `
 - **Delta Calculation:** For each dimension `i`, we compute the absolute delta `Delta_i = abs(Q_i - C_i)`.
 - **Activation Logic:** An activation register is tripped if `Delta_i` is less than or equal to the `Noise Tolerance` configuration (default 0.005). Thus, `Activation_i = 1`.
 - **Gate:** The final dimension sum `sum(Activation_i)` must be mathematically greater than or equal to the `Excitation Threshold` (default 150) to be deemed geometrically 'SAFE'. Otherwise, the request triggers a `SECURITY BREACH` and the streaming block breaks connection.
+- **Explicit Chat Feedback:** When `[FW=ON]` is active, the chat endpoint injects human-readable telemetry into the response. A blocked query returns `🛑 [FIREWALL BLOCKED]` with the exact resonance ratio (`activations/1024`) versus the threshold. A passed query prepends `🟢 [FIREWALL PASSED]` with `activations/threshold` before routing to the LLM stream.
 
 ## 2. Backend Architecture
 Utilizes **FastAPI** for route management yielding high execution throughput.
