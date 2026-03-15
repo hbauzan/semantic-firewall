@@ -1,0 +1,16 @@
+{
+    "project": "Phase-Lock Semantic Firewall",
+    "version": "1.0.0",
+    "active_features": {
+        "dimensional_excitation_firewall": true,
+        "realtime_noise_tolerance_ui": true,
+        "local_rag_enabled": true,
+        "ollama_integration": true,
+        "async_pdf_vectorization": true,
+        "hardware_telemetry_hud": true,
+        "commander_tui_enabled": true
+    },
+    "constraints": {
+        "vector_dim": 1024
+    }
+}

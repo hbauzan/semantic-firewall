@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+lancedb
+sentence-transformers
+PyMuPDF
+psutil
+torch
+httpx
+pytest
+pydantic
+python-multipart
