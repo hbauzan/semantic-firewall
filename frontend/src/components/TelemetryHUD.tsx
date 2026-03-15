@@ -23,7 +23,7 @@ const FRAMES = [
 ];
 
 export const TelemetryHUD: React.FC = () => {
-    const { telemetry, setTelemetry } = useStore();
+    const { telemetry, setTelemetry, systemAction } = useStore();
     const [frameIdx, setFrameIdx] = useState(0);
 
     useEffect(() => {
@@ -52,7 +52,13 @@ export const TelemetryHUD: React.FC = () => {
     return (
         <div className="panel">
             <h2>Telemetry HUD</h2>
-            <div className="ascii-art">{FRAMES[frameIdx]}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                <div className="ascii-art" style={{ marginBottom: 0 }}>{FRAMES[frameIdx]}</div>
+                <div style={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-main)' }}>
+                    <div style={{ opacity: 0.5, marginBottom: '0.2rem' }}>[SYS_STATE]:</div>
+                    <div style={{ color: 'var(--accent)' }}>{systemAction}</div>
+                </div>
+            </div>
             <div className="stat-item">
                 <span>CPU:</span>
                 <span>{telemetry.cpu.toFixed(1)}%</span>

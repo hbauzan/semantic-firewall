@@ -8,7 +8,8 @@ export const ControlPanel: React.FC = () => {
     setExcitationThreshold,
     setNoiseTolerance,
     ingestionStatus,
-    setIngestionStatus
+    setIngestionStatus,
+    setSystemAction
   } = useStore();
 
   const [packs, setPacks] = useState<{ filename: string, chunks: number }[]>([]);
@@ -56,7 +57,9 @@ export const ControlPanel: React.FC = () => {
             progress: data.progress,
             message: data.message
           });
+          setSystemAction(`INGESTING_CORPUS: \${Math.round(data.progress)}%`);
           if (data.status === 'completed' || data.status === 'failed') {
+            setSystemAction('SYSTEM IDLE');
             fetchPacks();
           }
         } catch (err) {
@@ -75,6 +78,7 @@ export const ControlPanel: React.FC = () => {
 
     const formData = new FormData();
     formData.append('file', file);
+    setSystemAction("UPLOADING_PDF...");
 
     try {
       const res = await fetch('http://localhost:8000/corpus/upload-pdf', {
@@ -90,15 +94,19 @@ export const ControlPanel: React.FC = () => {
       });
     } catch (err) {
       console.error("Upload failed", err);
+      setSystemAction("SYSTEM IDLE");
     }
   };
 
   const handleDeletePack = async (filename: string) => {
+    setSystemAction("DELETING_PACK...");
     try {
       await fetch(`http://localhost:8000/corpus/packs/${filename}`, { method: 'DELETE' });
       fetchPacks();
     } catch (err) {
       console.error("Failed to delete pack", err);
+    } finally {
+      setSystemAction("SYSTEM IDLE");
     }
   };
 

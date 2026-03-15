@@ -55,7 +55,8 @@ export const ChatInterface: React.FC = () => {
               m.id === assistantMessageId
                 ? { ...m, content: statuses[statusIndex] }
                 : m
-            )
+            ),
+            systemAction: statuses[statusIndex]
           }));
           statusIndex++;
         }
@@ -63,6 +64,7 @@ export const ChatInterface: React.FC = () => {
 
       let streamDone = false;
       let firstChunkReceived = false;
+      let buffer = '';
       while (!streamDone) {
         const { value, done } = await reader.read();
         if (done) {
@@ -79,16 +81,20 @@ export const ChatInterface: React.FC = () => {
               m.id === assistantMessageId
                 ? { ...m, content: '' }
                 : m
-            )
+            ),
+            systemAction: "STREAMING_RESPONSE..."
           }));
         }
 
         const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
 
-        // chunk can have multiple NDJSON lines
-        const lines = chunk.split('\\n').filter(line => line.trim() !== '');
+        // Extract complete NDJSON lines, keeping the rest in the memory buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
+          if (!line.trim()) continue;
           try {
             const parsed = JSON.parse(line);
 
@@ -129,8 +135,10 @@ export const ChatInterface: React.FC = () => {
     } catch (err) {
       console.error(err);
       addMessage({ id: Number(Date.now()), role: 'system', content: 'Failed to connect to backend engine.' });
+      useStore.setState({ systemAction: 'CONNECTION_FAILED' });
     } finally {
       setIsStreaming(false);
+      useStore.setState({ systemAction: 'SYSTEM IDLE' });
     }
   };
 

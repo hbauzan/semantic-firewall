@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
+import { useStore } from '../store';
 
 export const AuditPanel: React.FC = () => {
     const [auditQuery, setAuditQuery] = useState('');
     const [auditResult, setAuditResult] = useState<{ activations: number, text: string } | null>(null);
+    const { setSystemAction } = useStore();
 
     const runAudit = async () => {
         if (!auditQuery.trim()) return;
+        setSystemAction("EXECUTING_STRESS_TEST...");
         try {
             const res = await fetch('http://localhost:8000/audit', {
                 method: 'POST',
@@ -16,6 +19,9 @@ export const AuditPanel: React.FC = () => {
             setAuditResult(data);
         } catch (err) {
             console.error("Audit failed", err);
+            setSystemAction("AUDIT_FAILED");
+        } finally {
+            setTimeout(() => setSystemAction("SYSTEM IDLE"), 2000);
         }
     };
 

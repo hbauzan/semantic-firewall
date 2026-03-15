@@ -79,9 +79,9 @@ async def stream_ollama(prompt: str, context: str):
                 "http://localhost:11434/api/generate",
                 json={"model": "llama3.1", "prompt": full_prompt, "stream": True}
             ) as response:
-                async for chunk in response.aiter_bytes():
+                async for chunk in response.aiter_lines():
                     if chunk:
-                        yield chunk
+                        yield (chunk + "\n").encode("utf-8")
         except Exception as e:
             yield json.dumps({"type": "error", "text": str(e)}).encode("utf-8")
 
@@ -117,21 +117,12 @@ async def system_stats():
     try:
         if torch.backends.mps.is_available():
             vram = torch.mps.current_allocated_memory() / (1024 * 1024)
-            # Heuristic for GPU %:
-            # When VRAM > 1GB, we're likely doing heavy embedding inference.
-            if vram > 1000:
-                gpu_percent = min(100.0, max(20.0, vram / 20.0))
-            else:
-                gpu_percent = min(5.0, vram / 100.0)
+            # Logarithmic-like scaling for Mac MPS (max alloc usually caps lower dynamically)
+            gpu_percent = min(100.0, (vram / 40.0))
 
         elif torch.cuda.is_available():
-            # If standard CUDA: we don't have utilization out of the box without pynvml.
-            # Using same VRAM heuristic.
             vram = torch.cuda.memory_allocated() / (1024 * 1024)
-            if vram > 1000:
-                gpu_percent = min(100.0, max(20.0, vram / 20.0))
-            else:
-                gpu_percent = min(5.0, vram / 100.0)
+            gpu_percent = min(100.0, (vram / 40.0))
     except Exception:
         pass
     

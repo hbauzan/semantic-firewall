@@ -8,7 +8,10 @@
         "ollama_integration": true,
         "async_pdf_vectorization": true,
         "hardware_telemetry_hud": true,
-        "commander_tui_enabled": true
+        "commander_tui_enabled": true,
+        "document_manager_pack_deletion": true,
+        "global_system_action_status": true,
+        "utf8_ndjson_line_streaming": true
     },
     "constraints": {
         "vector_dim": 1024

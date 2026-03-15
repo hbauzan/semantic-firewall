@@ -3366,14 +3366,17 @@ interface StoreState {
   noiseTolerance: number;
   setExcitationThreshold: (val: number) => void;
   setNoiseTolerance: (val: number) => void;
-  
+
   messages: Message[];
   addMessage: (msg: Message) => void;
   clearMessages: () => void;
-  
+
   telemetry: TelemetryData;
   setTelemetry: (data: TelemetryData) => void;
-  
+
+  systemAction: string;
+  setSystemAction: (action: string) => void;
+
   ingestionStatus: {
     taskId: string | null;
     status: string;
@@ -3388,17 +3391,20 @@ export const useStore = create<StoreState>((set) => ({
   noiseTolerance: 0.005,
   setExcitationThreshold: (val) => set({ excitationThreshold: val }),
   setNoiseTolerance: (val) => set({ noiseTolerance: val }),
-  
+
   messages: [],
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
   clearMessages: () => set({ messages: [] }),
-  
+
   telemetry: { cpu: 0, ram: 0, gpu: 0 },
   setTelemetry: (data) => set({ telemetry: data }),
-  
+
+  systemAction: 'SYSTEM IDLE',
+  setSystemAction: (action) => set({ systemAction: action }),
+
   ingestionStatus: { taskId: null, status: 'idle', progress: 0, message: '' },
-  setIngestionStatus: (status) => set((state) => ({ 
-    ingestionStatus: { ...state.ingestionStatus, ...status } 
+  setIngestionStatus: (status) => set((state) => ({
+    ingestionStatus: { ...state.ingestionStatus, ...status }
   })),
 }));
 \n\n=== ./frontend/src/components/TelemetryHUD.tsx ===\nimport React, { useEffect, useState } from 'react';
@@ -3426,7 +3432,7 @@ const FRAMES = [
 ];
 
 export const TelemetryHUD: React.FC = () => {
-    const { telemetry, setTelemetry } = useStore();
+    const { telemetry, setTelemetry, systemAction } = useStore();
     const [frameIdx, setFrameIdx] = useState(0);
 
     useEffect(() => {
@@ -3455,7 +3461,13 @@ export const TelemetryHUD: React.FC = () => {
     return (
         <div className="panel">
             <h2>Telemetry HUD</h2>
-            <div className="ascii-art">{FRAMES[frameIdx]}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                <div className="ascii-art" style={{ marginBottom: 0 }}>{FRAMES[frameIdx]}</div>
+                <div style={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-main)' }}>
+                    <div style={{ opacity: 0.5, marginBottom: '0.2rem' }}>[SYS_STATE]:</div>
+                    <div style={{ color: 'var(--accent)' }}>{systemAction}</div>
+                </div>
+            </div>
             <div className="stat-item">
                 <span>CPU:</span>
                 <span>{telemetry.cpu.toFixed(1)}%</span>
@@ -3528,7 +3540,8 @@ export const ChatInterface: React.FC = () => {
               m.id === assistantMessageId
                 ? { ...m, content: statuses[statusIndex] }
                 : m
-            )
+            ),
+            systemAction: statuses[statusIndex]
           }));
           statusIndex++;
         }
@@ -3552,7 +3565,8 @@ export const ChatInterface: React.FC = () => {
               m.id === assistantMessageId
                 ? { ...m, content: '' }
                 : m
-            )
+            ),
+            systemAction: "STREAMING_RESPONSE..."
           }));
         }
 
@@ -3602,8 +3616,10 @@ export const ChatInterface: React.FC = () => {
     } catch (err) {
       console.error(err);
       addMessage({ id: Number(Date.now()), role: 'system', content: 'Failed to connect to backend engine.' });
+      useStore.setState({ systemAction: 'CONNECTION_FAILED' });
     } finally {
       setIsStreaming(false);
+      useStore.setState({ systemAction: 'SYSTEM IDLE' });
     }
   };
 
@@ -3642,13 +3658,16 @@ export const ChatInterface: React.FC = () => {
   );
 };
 \n\n=== ./frontend/src/components/AuditPanel.tsx ===\nimport React, { useState } from 'react';
+import { useStore } from '../store';
 
 export const AuditPanel: React.FC = () => {
     const [auditQuery, setAuditQuery] = useState('');
     const [auditResult, setAuditResult] = useState<{ activations: number, text: string } | null>(null);
+    const { setSystemAction } = useStore();
 
     const runAudit = async () => {
         if (!auditQuery.trim()) return;
+        setSystemAction("EXECUTING_STRESS_TEST...");
         try {
             const res = await fetch('http://localhost:8000/audit', {
                 method: 'POST',
@@ -3659,6 +3678,9 @@ export const AuditPanel: React.FC = () => {
             setAuditResult(data);
         } catch (err) {
             console.error("Audit failed", err);
+            setSystemAction("AUDIT_FAILED");
+        } finally {
+            setTimeout(() => setSystemAction("SYSTEM IDLE"), 2000);
         }
     };
 
@@ -3697,7 +3719,8 @@ export const ControlPanel: React.FC = () => {
     setExcitationThreshold,
     setNoiseTolerance,
     ingestionStatus,
-    setIngestionStatus
+    setIngestionStatus,
+    setSystemAction
   } = useStore();
 
   const [packs, setPacks] = useState<{ filename: string, chunks: number }[]>([]);
@@ -3745,7 +3768,9 @@ export const ControlPanel: React.FC = () => {
             progress: data.progress,
             message: data.message
           });
+          setSystemAction(`INGESTING_CORPUS: \${Math.round(data.progress)}%`);
           if (data.status === 'completed' || data.status === 'failed') {
+            setSystemAction('SYSTEM IDLE');
             fetchPacks();
           }
         } catch (err) {
@@ -3764,6 +3789,7 @@ export const ControlPanel: React.FC = () => {
 
     const formData = new FormData();
     formData.append('file', file);
+    setSystemAction("UPLOADING_PDF...");
 
     try {
       const res = await fetch('http://localhost:8000/corpus/upload-pdf', {
@@ -3779,15 +3805,19 @@ export const ControlPanel: React.FC = () => {
       });
     } catch (err) {
       console.error("Upload failed", err);
+      setSystemAction("SYSTEM IDLE");
     }
   };
 
   const handleDeletePack = async (filename: string) => {
+    setSystemAction("DELETING_PACK...");
     try {
       await fetch(`http://localhost:8000/corpus/packs/${filename}`, { method: 'DELETE' });
       fetchPacks();
     } catch (err) {
       console.error("Failed to delete pack", err);
+    } finally {
+      setSystemAction("SYSTEM IDLE");
     }
   };
 
@@ -4035,9 +4065,9 @@ async def stream_ollama(prompt: str, context: str):
                 "http://localhost:11434/api/generate",
                 json={"model": "llama3.1", "prompt": full_prompt, "stream": True}
             ) as response:
-                async for chunk in response.aiter_bytes():
+                async for chunk in response.aiter_lines():
                     if chunk:
-                        yield chunk
+                        yield (chunk + "\n").encode("utf-8")
         except Exception as e:
             yield json.dumps({"type": "error", "text": str(e)}).encode("utf-8")
 
@@ -4073,21 +4103,12 @@ async def system_stats():
     try:
         if torch.backends.mps.is_available():
             vram = torch.mps.current_allocated_memory() / (1024 * 1024)
-            # Heuristic for GPU %:
-            # When VRAM > 1GB, we're likely doing heavy embedding inference.
-            if vram > 1000:
-                gpu_percent = min(100.0, max(20.0, vram / 20.0))
-            else:
-                gpu_percent = min(5.0, vram / 100.0)
+            # Logarithmic-like scaling for Mac MPS (max alloc usually caps lower dynamically)
+            gpu_percent = min(100.0, (vram / 40.0))
 
         elif torch.cuda.is_available():
-            # If standard CUDA: we don't have utilization out of the box without pynvml.
-            # Using same VRAM heuristic.
             vram = torch.cuda.memory_allocated() / (1024 * 1024)
-            if vram > 1000:
-                gpu_percent = min(100.0, max(20.0, vram / 20.0))
-            else:
-                gpu_percent = min(5.0, vram / 100.0)
+            gpu_percent = min(100.0, (vram / 40.0))
     except Exception:
         pass
     

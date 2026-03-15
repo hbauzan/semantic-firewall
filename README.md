@@ -23,5 +23,7 @@ chmod +x ./run_commander.sh
 
 ## Telemetry HUD & Control Panel
 Access the UI via `http://localhost:5173`. 
-Adjust `Excitation Threshold` (0-1024) and `Noise Tolerance` dynamically.
-Initiate chat queries prefaced with `[FW=ON]` to enforce firewall policies dynamically against the LanceDB local context array.
+- **Global Settings:** Adjust `Excitation Threshold` (0-1024) and `Noise Tolerance` dynamically via the left Control Panel.
+- **Document Management:** Directly upload your Corpus PDF files or selectively `delete` specific uploaded texts directly from the LanceDB clusters.
+- **Firewall Prompting:** Initiate chat queries prefaced with `[FW=ON]` to enforce firewall policies dynamically against the LanceDB local context array.
+- **Audit & Telemetry:** View live GPU/CPU utilization narrated by a Pirate Monkey, and utilize the dedicated `AuditPanel` at the bottom to perform stress tests and view exact activation intersections against your geometric data limits.
