@@ -110,7 +110,7 @@ async def chat_endpoint(req: ChatRequest):
                 f"Semantic contamination detected."
             )
             async def breach_stream():
-                yield json.dumps({"type": "content", "text": block_msg}).encode("utf-8")
+                yield json.dumps({"type": "content", "text": block_msg}).encode("utf-8") + b"\n"
             return StreamingResponse(breach_stream(), media_type="application/x-ndjson")
 
         # Firewall passed — prepend telemetry badge before the LLM stream

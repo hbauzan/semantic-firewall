@@ -101,18 +101,16 @@ export const ChatInterface: React.FC = () => {
             if (parsed.type === 'error') {
               assistantContent += `\n[ERROR]: ${parsed.text}`;
             } else if (parsed.type === 'content') {
-              // SECURITY BREACH case
-              if (parsed.text === 'SECURITY BREACH') {
-                useStore.setState((state) => ({
-                  messages: state.messages.map(m =>
-                    m.id === assistantMessageId
-                      ? { ...m, role: 'system', content: 'SECURITY BREACH DETECTED. CONNECTION TERMINATED.' }
-                      : m
-                  )
-                }));
-                streamDone = true;
-                break;
-              }
+              // Firewall block or other server-sent content messages
+              useStore.setState((state) => ({
+                messages: state.messages.map(m =>
+                  m.id === assistantMessageId
+                    ? { ...m, role: 'system', content: parsed.text }
+                    : m
+                )
+              }));
+              streamDone = true;
+              break;
             } else if (parsed.response !== undefined) {
               assistantContent += parsed.response;
               // update existing message

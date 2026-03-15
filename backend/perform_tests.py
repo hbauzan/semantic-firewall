@@ -48,7 +48,7 @@ async def test_firewall_interceptor_blocking():
             
             # Since the database is empty or not matching well, activations will be ~0
             # which is < 10000, so it will block.
-            assert "SECURITY BREACH" in content
+            assert "FIREWALL BLOCKED" in content
 
 @pytest.mark.asyncio
 async def test_rag_context_injection():
@@ -61,7 +61,7 @@ async def test_rag_context_injection():
                 content += chunk
             # Depending on if ollama is running or not, we might get an error or a stream, 
             # but we definitely shouldn't get a SECURITY BREACH block from the interceptor.
-            assert "SECURITY BREACH" not in content
+            assert "FIREWALL BLOCKED" not in content
 
 def test_system_stats_gpu_telemetry():
     response = client.get("/system/stats")
