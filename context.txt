@@ -12,13 +12,13 @@ The firewall operates by evaluating the raw 1024D embedding layers produced by `
 ## 2. Backend Architecture
 Utilizes **FastAPI** for route management yielding high execution throughput.
 - **Embedder Singleton (`embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU.
-- **Storage Layer (`storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata).
+- **Storage Layer (`storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation.
 - **Ingestor Protocol (`ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines (size: 2048 chars, 200 overlap).
 
 ## 3. Frontend Control Logic
-- **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads, asynchronous ingestion states, chat histories, and per-second telemetry data points.
-- **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings mapping system metrics underneath a custom ASCII-art 500ms multi-frame cycle.
-- **Interface Guardrails (`ChatInterface.tsx`):** Implements **BigInt Safety** explicitly casting all interaction `Date.now()` iterations recursively via JavaScript's `Number()` encapsulation mapping across NDJSON stream responses dynamically appending to internal store mappings seamlessly.
+- **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads, an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
+- **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings mapping system metrics underneath a custom ASCII-art **Pirate Monkey** multi-frame cycle. Utilizes a Mac Unified Memory dynamically-scaled heuristic (`vram / 40.0`) to avoid 100% hard-locking early.
+- **Interface Guardrails (`ChatInterface.tsx`):** Implements **BigInt Safety** explicitly casting all interaction `Date.now()` iterations recursively. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically.
 \n\n=== ./run_pack.sh ===\n#!/bin/bash
 python3 semantic_guardtrails_packager.py
 \n\n=== ./run_commander.sh ===\n#!/bin/bash
@@ -79,8 +79,10 @@ chmod +x ./run_commander.sh
 
 ## Telemetry HUD & Control Panel
 Access the UI via `http://localhost:5173`. 
-Adjust `Excitation Threshold` (0-1024) and `Noise Tolerance` dynamically.
-Initiate chat queries prefaced with `[FW=ON]` to enforce firewall policies dynamically against the LanceDB local context array.
+- **Global Settings:** Adjust `Excitation Threshold` (0-1024) and `Noise Tolerance` dynamically via the left Control Panel.
+- **Document Management:** Directly upload your Corpus PDF files or selectively `delete` specific uploaded texts directly from the LanceDB clusters.
+- **Firewall Prompting:** Initiate chat queries prefaced with `[FW=ON]` to enforce firewall policies dynamically against the LanceDB local context array.
+- **Audit & Telemetry:** View live GPU/CPU utilization narrated by a Pirate Monkey, and utilize the dedicated `AuditPanel` at the bottom to perform stress tests and view exact activation intersections against your geometric data limits.
 \n\n=== ./semantic_guardtrails_packager.py ===\nimport os
 
 def bundle():
@@ -122,7 +124,10 @@ pytest -v perform_tests.py
         "ollama_integration": true,
         "async_pdf_vectorization": true,
         "hardware_telemetry_hud": true,
-        "commander_tui_enabled": true
+        "commander_tui_enabled": true,
+        "document_manager_pack_deletion": true,
+        "global_system_action_status": true,
+        "utf8_ndjson_line_streaming": true
     },
     "constraints": {
         "vector_dim": 1024
@@ -3549,6 +3554,7 @@ export const ChatInterface: React.FC = () => {
 
       let streamDone = false;
       let firstChunkReceived = false;
+      let buffer = '';
       while (!streamDone) {
         const { value, done } = await reader.read();
         if (done) {
@@ -3571,11 +3577,14 @@ export const ChatInterface: React.FC = () => {
         }
 
         const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
 
-        // chunk can have multiple NDJSON lines
-        const lines = chunk.split('\\n').filter(line => line.trim() !== '');
+        // Extract complete NDJSON lines, keeping the rest in the memory buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
+          if (!line.trim()) continue;
           try {
             const parsed = JSON.parse(line);
 
