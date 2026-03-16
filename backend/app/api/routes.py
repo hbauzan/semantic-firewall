@@ -17,12 +17,14 @@ router = APIRouter()
 class ConfigState:
     excitation_threshold: int = 150
     noise_tolerance: float = 0.005
+    cosine_threshold: float = 0.78
 
 config_state = ConfigState()
 
 class ConfigUpdate(BaseModel):
     excitation_threshold: int
     noise_tolerance: float
+    cosine_threshold: float
 
 class AuditRequest(BaseModel):
     query: str
@@ -53,6 +55,7 @@ async def delete_pack(filename: str):
 async def update_config(config: ConfigUpdate):
     config_state.excitation_threshold = config.excitation_threshold
     config_state.noise_tolerance = config.noise_tolerance
+    config_state.cosine_threshold = config.cosine_threshold
     return {"status": "updated", "config": config}
 
 @router.post("/audit")
@@ -111,7 +114,9 @@ async def chat_endpoint(req: ChatRequest):
 
     context = ""
     failed_clause = None
+    block_reason = ""
     activations = 0
+    cosine_sim = 0.0
     current_threshold = float(config_state.excitation_threshold)
 
     for clause in clauses:
@@ -119,12 +124,18 @@ async def chat_endpoint(req: ChatRequest):
         results = storage.search_nearest(cl_vec, k=1)
         if not results:
             seg_activations = 0
+            cosine_sim = 0.0
         else:
             db_vec = results[0]["vector"]
             if not context:
                 context = results[0]["text"]
-            delta = np.abs(np.array(cl_vec, dtype=np.float32) - np.array(db_vec, dtype=np.float32))
+            cl_arr = np.array(cl_vec, dtype=np.float32)
+            db_arr = np.array(db_vec, dtype=np.float32)
+            delta = np.abs(cl_arr - db_arr)
             seg_activations = int(np.sum(delta <= config_state.noise_tolerance))
+            cl_norm = np.linalg.norm(cl_arr)
+            db_norm = np.linalg.norm(db_arr)
+            cosine_sim = float(np.dot(cl_arr, db_arr) / (cl_norm * db_norm)) if cl_norm > 0 and db_norm > 0 else 0.0
 
         word_count = len(clause.split())
         base_threshold = config_state.excitation_threshold
@@ -133,15 +144,28 @@ async def chat_endpoint(req: ChatRequest):
         if seg_activations < current_threshold:
             failed_clause = clause
             activations = seg_activations
+            block_reason = "activations"
+            break
+        if cosine_sim < config_state.cosine_threshold:
+            failed_clause = clause
+            activations = seg_activations
+            block_reason = "cosine"
             break
         activations = seg_activations
         
     if fw_on:
         if failed_clause is not None:
-            block_msg = (
-                f'🛑 [FIREWALL BLOCKED] Violation in segment: "{failed_clause}". '
-                f'Resonance: {activations} (Required: {current_threshold:.0f}).'
-            )
+            if block_reason == "cosine":
+                block_msg = (
+                    f'🛑 [FIREWALL BLOCKED] Semantic anchoring detected in segment: "{failed_clause}". '
+                    f'Cosine Similarity: {cosine_sim:.3f} (Required: ≥{config_state.cosine_threshold:.2f}). '
+                    f'Vector direction diverges from sovereign corpus.'
+                )
+            else:
+                block_msg = (
+                    f'🛑 [FIREWALL BLOCKED] Violation in segment: "{failed_clause}". '
+                    f'Resonance: {activations} (Required: {current_threshold:.0f}).'
+                )
             async def breach_stream():
                 yield json.dumps({"type": "content", "text": block_msg}).encode("utf-8") + b"\n"
             return StreamingResponse(breach_stream(), media_type="application/x-ndjson")

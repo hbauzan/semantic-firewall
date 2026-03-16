@@ -5,8 +5,10 @@ export const ControlPanel: React.FC = () => {
   const {
     excitationThreshold,
     noiseTolerance,
+    cosineThreshold,
     setExcitationThreshold,
     setNoiseTolerance,
+    setCosineThreshold,
     ingestionStatus,
     setIngestionStatus,
     setSystemAction
@@ -37,12 +39,13 @@ export const ControlPanel: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           excitation_threshold: excitationThreshold,
-          noise_tolerance: noiseTolerance
+          noise_tolerance: noiseTolerance,
+          cosine_threshold: cosineThreshold
         })
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
-  }, [excitationThreshold, noiseTolerance]);
+  }, [excitationThreshold, noiseTolerance, cosineThreshold]);
 
   // Poll for ingestion status if task is active
   useEffect(() => {
@@ -136,6 +139,18 @@ export const ControlPanel: React.FC = () => {
             min="0.001" max="0.100" step="0.001"
             value={noiseTolerance}
             onChange={(e) => setNoiseTolerance(Number(e.target.value))}
+          />
+        </label>
+      </div>
+
+      <div className="slider-group">
+        <label>
+          Cosine Gate: {cosineThreshold.toFixed(2)}
+          <input
+            type="range"
+            min="0.50" max="0.99" step="0.01"
+            value={cosineThreshold}
+            onChange={(e) => setCosineThreshold(Number(e.target.value))}
           />
         </label>
       </div>

@@ -15,7 +15,8 @@
         "explicit_firewall_chat_feedback": true,
         "query_segmentation_defense": true,
         "strict_context_prompting": true,
-        "hybrid_adaptive_threshold_firewall": true
+        "hybrid_adaptive_threshold_firewall": true,
+        "cosine_similarity_gate": true
     },
     "constraints": {
         "vector_dim": 1024

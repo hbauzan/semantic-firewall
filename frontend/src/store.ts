@@ -15,8 +15,10 @@ interface TelemetryData {
 interface StoreState {
   excitationThreshold: number;
   noiseTolerance: number;
+  cosineThreshold: number;
   setExcitationThreshold: (val: number) => void;
   setNoiseTolerance: (val: number) => void;
+  setCosineThreshold: (val: number) => void;
 
   messages: Message[];
   addMessage: (msg: Message) => void;
@@ -40,8 +42,10 @@ interface StoreState {
 export const useStore = create<StoreState>((set) => ({
   excitationThreshold: 150,
   noiseTolerance: 0.005,
+  cosineThreshold: 0.78,
   setExcitationThreshold: (val) => set({ excitationThreshold: val }),
   setNoiseTolerance: (val) => set({ noiseTolerance: val }),
+  setCosineThreshold: (val) => set({ cosineThreshold: val }),
 
   messages: [],
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
