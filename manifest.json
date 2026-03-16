@@ -12,7 +12,10 @@
         "document_manager_pack_deletion": true,
         "global_system_action_status": true,
         "utf8_ndjson_line_streaming": true,
-        "explicit_firewall_chat_feedback": true
+        "explicit_firewall_chat_feedback": true,
+        "query_segmentation_defense": true,
+        "strict_context_prompting": true,
+        "hybrid_adaptive_threshold_firewall": true
     },
     "constraints": {
         "vector_dim": 1024

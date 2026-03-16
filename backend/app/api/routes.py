@@ -1,6 +1,8 @@
 import psutil
 import torch
 import json
+import re
+import numpy as np
 import httpx
 from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
@@ -70,8 +72,19 @@ async def audit_query(req: AuditRequest):
     return {"activations": activations, "text": results[0]["text"], "vector": c_vec.tolist() if hasattr(c_vec, "tolist") else c_vec}
 
 
-async def stream_ollama(prompt: str, context: str):
-    full_prompt = f"Context: {context}\n\nQuery: {prompt}"
+async def stream_ollama(prompt: str, context: str, strict: bool = False):
+    if strict:
+        system_instruction = (
+            "Eres un asistente técnico. "
+            "Basa tu respuesta PRIORITARIAMENTE en el contexto proporcionado. "
+            "Si el usuario hace una pregunta que NO tiene relación con el contexto "
+            "(ej. recetas de cocina, chistes, temas completamente ajenos), "
+            "responde brevemente que no puedes ayudar con esa parte específica, "
+            "pero SÍ responde las partes que se relacionan con el contexto."
+        )
+        full_prompt = f"{system_instruction}\n\nContexto:\n{context}\n\nConsulta del usuario:\n{prompt}"
+    else:
+        full_prompt = f"Contexto:\n{context}\n\nConsulta del usuario:\n{prompt}"
     async with httpx.AsyncClient(timeout=None) as client:
         try:
             async with client.stream(
@@ -91,23 +104,43 @@ async def chat_endpoint(req: ChatRequest):
     fw_on = "[FW=ON]" in prompt
     clean_prompt = prompt.replace("[FW=ON]", "").replace("[FW=OFF]", "").strip()
     
-    q_vec = embedder.embed(clean_prompt)
-    results = storage.search_nearest(q_vec, k=1)
-    
+    # --- Hybrid Clause Segmentation Firewall ---
+    clauses = [c.strip() for c in re.split(r'[.?\n]+|,\s*(?:y|pero|también|además|and|also|plus)\s+', clean_prompt) if len(c.strip()) > 4]
+    if not clauses:
+        clauses = [clean_prompt]
+
     context = ""
+    failed_clause = None
     activations = 0
-    if results:
-        c_vec = results[0]["vector"]
-        context = results[0]["text"]
-        activations = sum(1 for q_i, c_i in zip(q_vec, c_vec) if abs(q_i - c_i) <= config_state.noise_tolerance)
+    current_threshold = float(config_state.excitation_threshold)
+
+    for clause in clauses:
+        cl_vec = embedder.embed(clause)
+        results = storage.search_nearest(cl_vec, k=1)
+        if not results:
+            seg_activations = 0
+        else:
+            db_vec = results[0]["vector"]
+            if not context:
+                context = results[0]["text"]
+            delta = np.abs(np.array(cl_vec, dtype=np.float32) - np.array(db_vec, dtype=np.float32))
+            seg_activations = int(np.sum(delta <= config_state.noise_tolerance))
+
+        word_count = len(clause.split())
+        base_threshold = config_state.excitation_threshold
+        current_threshold = base_threshold * 0.85 if word_count < 6 else float(base_threshold)
+
+        if seg_activations < current_threshold:
+            failed_clause = clause
+            activations = seg_activations
+            break
+        activations = seg_activations
         
     if fw_on:
-        if activations < config_state.excitation_threshold:
+        if failed_clause is not None:
             block_msg = (
-                f"🛑 [FIREWALL BLOCKED] Query rejected. "
-                f"Dimensional Resonance ({activations}/1024) failed to meet the "
-                f"critical threshold ({config_state.excitation_threshold}). "
-                f"Semantic contamination detected."
+                f'🛑 [FIREWALL BLOCKED] Violation in segment: "{failed_clause}". '
+                f'Resonance: {activations} (Required: {current_threshold:.0f}).'
             )
             async def breach_stream():
                 yield json.dumps({"type": "content", "text": block_msg}).encode("utf-8") + b"\n"
@@ -121,7 +154,7 @@ async def chat_endpoint(req: ChatRequest):
         )
         async def prefixed_stream():
             yield json.dumps({"response": pass_prefix}).encode("utf-8") + b"\n"
-            async for chunk in stream_ollama(clean_prompt, context):
+            async for chunk in stream_ollama(clean_prompt, context, strict=True):
                 yield chunk
         return StreamingResponse(prefixed_stream(), media_type="application/x-ndjson")
 
