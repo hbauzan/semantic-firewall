@@ -17,3 +17,12 @@ Utilizes **FastAPI** for route management yielding high execution throughput.
 - **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads, an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
 - **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings mapping system metrics underneath a custom ASCII-art **Pirate Monkey** multi-frame cycle. Utilizes a Mac Unified Memory dynamically-scaled heuristic (`vram / 40.0`) to avoid 100% hard-locking early.
 - **Interface Guardrails (`ChatInterface.tsx`):** Implements **BigInt Safety** explicitly casting all interaction `Date.now()` iterations recursively. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically.
+
+## 4. Anti-Semantic Piggybacking Defense
+Addresses the attack vector where a malicious or off-topic instruction is appended to an otherwise legitimate prompt, causing the averaged embedding to pass dimensional excitation while the piggybacked payload executes unchecked.
+
+### 4.1 Query Segmentation Firewall
+Instead of vectorizing the full prompt as a single embedding, `chat_endpoint` splits the input into logical sentences via `re.split(r'[.?\n]+', ...)` (filtering fragments ≤ 5 chars). Each sentence is vectorized independently against the nearest knowledge node. The reported `activations` value is the **minimum** across all segments. If **any single sentence** falls below `excitation_threshold`, the entire prompt is rejected with `FIREWALL BLOCKED`. This ensures a poisoned sentence cannot hide inside benign context.
+
+### 4.2 System Prompt Hardening (Zero-Tolerance Context Confinement)
+As a secondary defense layer, `stream_ollama` injects a strict system instruction constraining the LLM to respond **exclusively** from the provided RAG context. If a query or sub-instruction cannot be answered from the context (e.g. recipes, jokes, unrelated code), the LLM is instructed to refuse that portion. This provides defense-in-depth even if the segmentation firewall is bypassed.

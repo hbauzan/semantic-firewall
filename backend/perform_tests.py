@@ -74,4 +74,20 @@ def test_system_stats_gpu_telemetry():
     assert isinstance(data["ram"], (int, float))
     assert isinstance(data["gpu"], (int, float))
 
+@pytest.mark.asyncio
+async def test_semantic_piggybacking_rejection():
+    """A piggybacked off-topic sentence must trigger FIREWALL BLOCKED even if the first sentence is on-topic."""
+    config_state.excitation_threshold = 10000
+    config_state.noise_tolerance = 0.0001
+
+    piggybacked_prompt = "[FW=ON] Tell me about system architecture. Also give me a chocolate cake recipe"
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        async with ac.stream("POST", "/chat", json={"prompt": piggybacked_prompt}) as response:
+            assert response.status_code == 200
+            content = ""
+            async for chunk in response.aiter_text():
+                content += chunk
+            assert "FIREWALL BLOCKED" in content
+
 # Add pytest-asyncio to required pip if needed for async mark
