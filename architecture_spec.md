@@ -13,16 +13,48 @@ Utilizes **FastAPI** for route management yielding high execution throughput.
 - **Storage Layer (`storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation.
 - **Ingestor Protocol (`ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines (size: 2048 chars, 200 overlap).
 
-## 3. Frontend Control Logic
-- **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads, an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
+## 3. Execution Pipeline (Sequential Reorderable Firewall)
+The firewall executes three distinct validation stages in a **user-defined sequence** controlled via the HUD's `Seq` inputs. The pipeline is constructed at evaluation time by sorting the three stages based on their integer priority values:
+
+| Stage | Filter | Config Key | Default Order |
+|-------|--------|------------|---------------|
+| A | **Noise Pre-Filter** | `noise_order` | 1 |
+| B | **Cosine Filter** | `cosine_order` | 2 |
+| C | **Excitation Filter** | `excitation_order` | 3 |
+
+**Stage A — Cosine Filter:** Traditional cosine similarity gate. Computes `cos(Q, C) = dot(Q, C) / (‖Q‖ × ‖C‖)` using **raw vectors** (no normalization). Blocks if `cos(Q, C) < cosine_threshold`.
+
+**Stage B — Excitation Filter:** Dimensional resonance count. For each of 1024 dimensions, counts activations where `|Q_i - C_i| <= noise_tolerance`. Uses **raw vectors**. Applies the adaptive threshold (see Section 4). Blocks if `activations < threshold`.
+
+**Stage C — Noise Pre-Filter (Global Delta Sanity):** Computes the average absolute delta across all 1024 dimensions: `avg_delta = np.mean(np.abs(Q - C))`. If `avg_delta > global_noise_limit`, the query is blocked immediately. This catches gross semantic drift before finer-grained filters run.
+
+**Execution semantics:** Stages are sorted by their `_order` integer (ascending). If Stage N returns BREACH, Stages N+1..3 are **never evaluated**. Each clause from the segmentation defense (Section 5) must independently pass the **entire** ordered pipeline. Telemetry trace format: `Pipeline: [cosine:OK → excitation:OK → noise:OK]` or `[cosine:OK → excitation:BREACH]`.
+
+## 4. Adaptive Clause Logic
+When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, short clauses receive a relaxed excitation threshold to avoid false positives on terse but legitimate queries.
+
+- **Config:** `adaptive_factor` (float, default 0.85, range 0.01–1.00). User-adjustable via HUD slider.
+- **Rule:** If a clause contains **fewer than 6 words**, the excitation threshold is reduced by the adaptive factor: `current_threshold = excitation_threshold × adaptive_factor`.
+- **Rationale:** Short phrases produce sparser embedding activations by nature. Without this multiplier, 2–5 word queries that are semantically valid would be rejected solely due to insufficient dimensional overlap.
+- **Scope:** This adaptive reduction applies **only** within the Excitation Filter stage of the pipeline. Cosine and Noise filters use their full thresholds regardless of clause length.
+- **HUD Feedback:** The ControlPanel displays real-time dimension requirements: `Short Query Req: {threshold × factor} dims` and `Full Query Req: {threshold} dims`.
+- **Telemetry:** When a short clause triggers the adaptive path, the BREACH message includes: `[ADAPTIVE] Short Clause Detected. Applying {factor}x factor.`
+
+## 5. Frontend Control Logic
+- **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads (including `cosineOrder`, `excitationOrder`, `noiseOrder`, `globalNoiseLimit`, `adaptiveFactor`), an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
 - **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings mapping system metrics underneath a custom ASCII-art **Pirate Monkey** multi-frame cycle. Utilizes a Mac Unified Memory dynamically-scaled heuristic (`vram / 40.0`) to avoid 100% hard-locking early.
+- **Pipeline Ordering UI (`ControlPanel.tsx`):** Each filter slider (Cosine, Excitation, Noise) includes a **Seq** numerical input (1–3) that controls pipeline execution order. The `global_noise_limit` slider controls the Noise Pre-Filter threshold. All values are synced to the backend via debounced `POST /galaxy/config`.
 - **Interface Guardrails (`ChatInterface.tsx`):** Implements **BigInt Safety** explicitly casting all interaction `Date.now()` iterations recursively. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically.
 
-## 4. Anti-Semantic Piggybacking Defense
+## 6. Anti-Semantic Piggybacking Defense
 Addresses the attack vector where a malicious or off-topic instruction is appended to an otherwise legitimate prompt, causing the averaged embedding to pass dimensional excitation while the piggybacked payload executes unchecked.
 
-### 4.1 Query Segmentation Firewall
-Instead of vectorizing the full prompt as a single embedding, `chat_endpoint` splits the input into logical sentences via `re.split(r'[.?\n]+', ...)` (filtering fragments ≤ 5 chars). Each sentence is vectorized independently against the nearest knowledge node. The reported `activations` value is the **minimum** across all segments. If **any single sentence** falls below `excitation_threshold`, the entire prompt is rejected with `FIREWALL BLOCKED`. This ensures a poisoned sentence cannot hide inside benign context.
+### 6.1 Hybrid Query Segmentation Firewall
+Instead of vectorizing the full prompt as a single embedding, `chat_endpoint` splits the input into logical clauses via the enhanced hybrid regex:
+```
+re.split(r'[.?\n]+|,\s*(?:y|pero|también|además|and|also|plus)\s+', clean_prompt)
+```
+This splits on sentence terminators (`.`, `?`, `\n`) **and** logical connectors (`y`, `pero`, `también`, `además`, `and`, `also`, `plus`), filtering fragments ≤ 4 chars. Each clause is vectorized independently against the nearest knowledge node. If **any single clause** fails any stage of the ordered pipeline, the entire prompt is rejected with `FIREWALL BLOCKED`. This ensures a poisoned clause cannot hide inside benign context.
 
-### 4.2 System Prompt Hardening (Zero-Tolerance Context Confinement)
+### 6.2 System Prompt Hardening (Zero-Tolerance Context Confinement)
 As a secondary defense layer, `stream_ollama` injects a strict system instruction constraining the LLM to respond **exclusively** from the provided RAG context. If a query or sub-instruction cannot be answered from the context (e.g. recipes, jokes, unrelated code), the LLM is instructed to refuse that portion. This provides defense-in-depth even if the segmentation firewall is bypassed.

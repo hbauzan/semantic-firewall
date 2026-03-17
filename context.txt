@@ -20,18 +20,50 @@ Utilizes **FastAPI** for route management yielding high execution throughput.
 - **Storage Layer (`storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation.
 - **Ingestor Protocol (`ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines (size: 2048 chars, 200 overlap).
 
-## 3. Frontend Control Logic
-- **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads, an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
+## 3. Execution Pipeline (Sequential Reorderable Firewall)
+The firewall executes three distinct validation stages in a **user-defined sequence** controlled via the HUD's `Seq` inputs. The pipeline is constructed at evaluation time by sorting the three stages based on their integer priority values:
+
+| Stage | Filter | Config Key | Default Order |
+|-------|--------|------------|---------------|
+| A | **Noise Pre-Filter** | `noise_order` | 1 |
+| B | **Cosine Filter** | `cosine_order` | 2 |
+| C | **Excitation Filter** | `excitation_order` | 3 |
+
+**Stage A — Cosine Filter:** Traditional cosine similarity gate. Computes `cos(Q, C) = dot(Q, C) / (‖Q‖ × ‖C‖)` using **raw vectors** (no normalization). Blocks if `cos(Q, C) < cosine_threshold`.
+
+**Stage B — Excitation Filter:** Dimensional resonance count. For each of 1024 dimensions, counts activations where `|Q_i - C_i| <= noise_tolerance`. Uses **raw vectors**. Applies the adaptive threshold (see Section 4). Blocks if `activations < threshold`.
+
+**Stage C — Noise Pre-Filter (Global Delta Sanity):** Computes the average absolute delta across all 1024 dimensions: `avg_delta = np.mean(np.abs(Q - C))`. If `avg_delta > global_noise_limit`, the query is blocked immediately. This catches gross semantic drift before finer-grained filters run.
+
+**Execution semantics:** Stages are sorted by their `_order` integer (ascending). If Stage N returns BREACH, Stages N+1..3 are **never evaluated**. Each clause from the segmentation defense (Section 5) must independently pass the **entire** ordered pipeline. Telemetry trace format: `Pipeline: [cosine:OK → excitation:OK → noise:OK]` or `[cosine:OK → excitation:BREACH]`.
+
+## 4. Adaptive Clause Logic
+When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, short clauses receive a relaxed excitation threshold to avoid false positives on terse but legitimate queries.
+
+- **Config:** `adaptive_factor` (float, default 0.85, range 0.01–1.00). User-adjustable via HUD slider.
+- **Rule:** If a clause contains **fewer than 6 words**, the excitation threshold is reduced by the adaptive factor: `current_threshold = excitation_threshold × adaptive_factor`.
+- **Rationale:** Short phrases produce sparser embedding activations by nature. Without this multiplier, 2–5 word queries that are semantically valid would be rejected solely due to insufficient dimensional overlap.
+- **Scope:** This adaptive reduction applies **only** within the Excitation Filter stage of the pipeline. Cosine and Noise filters use their full thresholds regardless of clause length.
+- **HUD Feedback:** The ControlPanel displays real-time dimension requirements: `Short Query Req: {threshold × factor} dims` and `Full Query Req: {threshold} dims`.
+- **Telemetry:** When a short clause triggers the adaptive path, the BREACH message includes: `[ADAPTIVE] Short Clause Detected. Applying {factor}x factor.`
+
+## 5. Frontend Control Logic
+- **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads (including `cosineOrder`, `excitationOrder`, `noiseOrder`, `globalNoiseLimit`, `adaptiveFactor`), an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
 - **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings mapping system metrics underneath a custom ASCII-art **Pirate Monkey** multi-frame cycle. Utilizes a Mac Unified Memory dynamically-scaled heuristic (`vram / 40.0`) to avoid 100% hard-locking early.
+- **Pipeline Ordering UI (`ControlPanel.tsx`):** Each filter slider (Cosine, Excitation, Noise) includes a **Seq** numerical input (1–3) that controls pipeline execution order. The `global_noise_limit` slider controls the Noise Pre-Filter threshold. All values are synced to the backend via debounced `POST /galaxy/config`.
 - **Interface Guardrails (`ChatInterface.tsx`):** Implements **BigInt Safety** explicitly casting all interaction `Date.now()` iterations recursively. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically.
 
-## 4. Anti-Semantic Piggybacking Defense
+## 6. Anti-Semantic Piggybacking Defense
 Addresses the attack vector where a malicious or off-topic instruction is appended to an otherwise legitimate prompt, causing the averaged embedding to pass dimensional excitation while the piggybacked payload executes unchecked.
 
-### 4.1 Query Segmentation Firewall
-Instead of vectorizing the full prompt as a single embedding, `chat_endpoint` splits the input into logical sentences via `re.split(r'[.?\n]+', ...)` (filtering fragments ≤ 5 chars). Each sentence is vectorized independently against the nearest knowledge node. The reported `activations` value is the **minimum** across all segments. If **any single sentence** falls below `excitation_threshold`, the entire prompt is rejected with `FIREWALL BLOCKED`. This ensures a poisoned sentence cannot hide inside benign context.
+### 6.1 Hybrid Query Segmentation Firewall
+Instead of vectorizing the full prompt as a single embedding, `chat_endpoint` splits the input into logical clauses via the enhanced hybrid regex:
+```
+re.split(r'[.?\n]+|,\s*(?:y|pero|también|además|and|also|plus)\s+', clean_prompt)
+```
+This splits on sentence terminators (`.`, `?`, `\n`) **and** logical connectors (`y`, `pero`, `también`, `además`, `and`, `also`, `plus`), filtering fragments ≤ 4 chars. Each clause is vectorized independently against the nearest knowledge node. If **any single clause** fails any stage of the ordered pipeline, the entire prompt is rejected with `FIREWALL BLOCKED`. This ensures a poisoned clause cannot hide inside benign context.
 
-### 4.2 System Prompt Hardening (Zero-Tolerance Context Confinement)
+### 6.2 System Prompt Hardening (Zero-Tolerance Context Confinement)
 As a secondary defense layer, `stream_ollama` injects a strict system instruction constraining the LLM to respond **exclusively** from the provided RAG context. If a query or sub-instruction cannot be answered from the context (e.g. recipes, jokes, unrelated code), the LLM is instructed to refuse that portion. This provides defense-in-depth even if the segmentation firewall is bypassed.
 
 
@@ -197,7 +229,7 @@ pytest -v perform_tests.py
 === ./manifest.json ===
 {
     "project": "Phase-Lock Semantic Firewall",
-    "version": "1.0.0",
+    "version": "v2.2.0",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -212,7 +244,21 @@ pytest -v perform_tests.py
         "explicit_firewall_chat_feedback": true,
         "query_segmentation_defense": true,
         "strict_context_prompting": true,
-        "hybrid_adaptive_threshold_firewall": true
+        "hybrid_adaptive_threshold_firewall": true,
+        "cosine_similarity_gate": true,
+        "reorderable_sequential_pipeline": true,
+        "noise_prefilter_global_delta": true,
+        "configurable_adaptive_factor": true
+    },
+    "state_schema": {
+        "excitation_threshold": {"type": "int", "default": 150, "range": [0, 1024]},
+        "noise_tolerance": {"type": "float", "default": 0.005, "range": [0.001, 0.100]},
+        "cosine_threshold": {"type": "float", "default": 0.78, "range": [0.50, 0.99]},
+        "global_noise_limit": {"type": "float", "default": 0.50, "range": [0.10, 2.00]},
+        "cosine_order": {"type": "int", "default": 2, "range": [1, 3]},
+        "excitation_order": {"type": "int", "default": 3, "range": [1, 3]},
+        "noise_order": {"type": "int", "default": 1, "range": [1, 3]},
+        "adaptive_factor": {"type": "float", "default": 0.85, "range": [0.01, 1.00]}
     },
     "constraints": {
         "vector_dim": 1024
@@ -3484,8 +3530,20 @@ interface TelemetryData {
 interface StoreState {
   excitationThreshold: number;
   noiseTolerance: number;
+  cosineThreshold: number;
+  globalNoiseLimit: number;
+  cosineOrder: number;
+  excitationOrder: number;
+  noiseOrder: number;
+  adaptiveFactor: number;
   setExcitationThreshold: (val: number) => void;
   setNoiseTolerance: (val: number) => void;
+  setCosineThreshold: (val: number) => void;
+  setGlobalNoiseLimit: (val: number) => void;
+  setCosineOrder: (val: number) => void;
+  setExcitationOrder: (val: number) => void;
+  setNoiseOrder: (val: number) => void;
+  setAdaptiveFactor: (val: number) => void;
 
   messages: Message[];
   addMessage: (msg: Message) => void;
@@ -3509,8 +3567,20 @@ interface StoreState {
 export const useStore = create<StoreState>((set) => ({
   excitationThreshold: 150,
   noiseTolerance: 0.005,
+  cosineThreshold: 0.78,
+  globalNoiseLimit: 0.50,
+  cosineOrder: 2,
+  excitationOrder: 3,
+  noiseOrder: 1,
+  adaptiveFactor: 0.85,
   setExcitationThreshold: (val) => set({ excitationThreshold: val }),
   setNoiseTolerance: (val) => set({ noiseTolerance: val }),
+  setCosineThreshold: (val) => set({ cosineThreshold: val }),
+  setGlobalNoiseLimit: (val) => set({ globalNoiseLimit: val }),
+  setCosineOrder: (val) => set({ cosineOrder: val }),
+  setExcitationOrder: (val) => set({ excitationOrder: val }),
+  setNoiseOrder: (val) => set({ noiseOrder: val }),
+  setAdaptiveFactor: (val) => set({ adaptiveFactor: val }),
 
   messages: [],
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
@@ -3850,8 +3920,20 @@ export const ControlPanel: React.FC = () => {
   const {
     excitationThreshold,
     noiseTolerance,
+    cosineThreshold,
+    globalNoiseLimit,
+    cosineOrder,
+    excitationOrder,
+    noiseOrder,
+    adaptiveFactor,
     setExcitationThreshold,
     setNoiseTolerance,
+    setCosineThreshold,
+    setGlobalNoiseLimit,
+    setCosineOrder,
+    setExcitationOrder,
+    setNoiseOrder,
+    setAdaptiveFactor,
     ingestionStatus,
     setIngestionStatus,
     setSystemAction
@@ -3882,12 +3964,18 @@ export const ControlPanel: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           excitation_threshold: excitationThreshold,
-          noise_tolerance: noiseTolerance
+          noise_tolerance: noiseTolerance,
+          cosine_threshold: cosineThreshold,
+          global_noise_limit: globalNoiseLimit,
+          cosine_order: cosineOrder,
+          excitation_order: excitationOrder,
+          noise_order: noiseOrder,
+          adaptive_factor: adaptiveFactor
         })
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
-  }, [excitationThreshold, noiseTolerance]);
+  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor]);
 
   // Poll for ingestion status if task is active
   useEffect(() => {
@@ -3961,8 +4049,29 @@ export const ControlPanel: React.FC = () => {
     <div className="panel side-panel" style={{ marginTop: '1rem', width: 'auto' }}>
       <h2>Control Panel</h2>
 
-      <div className="slider-group">
-        <label>
+      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <label style={{ flex: 1 }}>
+          Cosine Gate: {cosineThreshold.toFixed(2)}
+          <input
+            type="range"
+            min="0.50" max="0.99" step="0.01"
+            value={cosineThreshold}
+            onChange={(e) => setCosineThreshold(Number(e.target.value))}
+          />
+        </label>
+        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
+          Seq
+          <input
+            type="number" min="1" max="3" step="1"
+            value={cosineOrder}
+            onChange={(e) => setCosineOrder(Number(e.target.value))}
+            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
+          />
+        </label>
+      </div>
+
+      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <label style={{ flex: 1 }}>
           Excitation Threshold: {excitationThreshold}
           <input
             type="range"
@@ -3970,17 +4079,58 @@ export const ControlPanel: React.FC = () => {
             value={excitationThreshold}
             onChange={(e) => setExcitationThreshold(Number(e.target.value))}
           />
-        </label>
-      </div>
-
-      <div className="slider-group">
-        <label>
-          Noise Tolerance: {noiseTolerance.toFixed(3)}
+          <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>Noise Tolerance: {noiseTolerance.toFixed(3)}</span>
           <input
             type="range"
             min="0.001" max="0.100" step="0.001"
             value={noiseTolerance}
             onChange={(e) => setNoiseTolerance(Number(e.target.value))}
+          />
+        </label>
+        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
+          Seq
+          <input
+            type="number" min="1" max="3" step="1"
+            value={excitationOrder}
+            onChange={(e) => setExcitationOrder(Number(e.target.value))}
+            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
+          />
+        </label>
+      </div>
+
+      <div className="slider-group">
+        <label>
+          Adaptive Factor: {adaptiveFactor.toFixed(2)}
+          <input
+            type="range"
+            min="0.01" max="1.00" step="0.01"
+            value={adaptiveFactor}
+            onChange={(e) => setAdaptiveFactor(Number(e.target.value))}
+          />
+        </label>
+        <div style={{ fontSize: '0.7rem', opacity: 0.7, display: 'flex', justifyContent: 'space-between', padding: '0 0.25rem' }}>
+          <span>Short Query Req: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
+          <span>Full Query Req: {excitationThreshold} dims</span>
+        </div>
+      </div>
+
+      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <label style={{ flex: 1 }}>
+          Noise Pre-Filter (Avg Delta Limit): {globalNoiseLimit.toFixed(2)}
+          <input
+            type="range"
+            min="0.10" max="2.00" step="0.01"
+            value={globalNoiseLimit}
+            onChange={(e) => setGlobalNoiseLimit(Number(e.target.value))}
+          />
+        </label>
+        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
+          Seq
+          <input
+            type="number" min="1" max="3" step="1"
+            value={noiseOrder}
+            onChange={(e) => setNoiseOrder(Number(e.target.value))}
+            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
           />
         </label>
       </div>
@@ -4032,9 +4182,34 @@ export const ControlPanel: React.FC = () => {
       "Bash(bash run_tests.sh 2>&1)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(find /Users/hbauzan/treepwood/semantic-firewall/backend/app -name *.py)",
+      "Bash(grep -E \"\\\\.\\(sh|py|json|md\\)$\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(.venv/bin/python -c \"from app.api.routes import router; print\\(''Backend imports OK''\\)\")",
+      "Bash(npx tsc:*)"
     ]
   }
+}
+
+
+=== ./.claude/launch.json ===
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Backend (FastAPI)",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd backend && .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"],
+      "port": 8000
+    },
+    {
+      "name": "Frontend (Vite)",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd frontend && npm run dev"],
+      "port": 5173
+    }
+  ]
 }
 
 
@@ -4131,6 +4306,96 @@ async def test_semantic_piggybacking_rejection():
                 content += chunk
             assert "FIREWALL BLOCKED" in content
 
+@pytest.mark.asyncio
+async def test_noise_prefilter_blocking():
+    """Ultra-strict global noise limit must trigger Noise Pre-Filter BREACH."""
+    config_state.excitation_threshold = 1
+    config_state.noise_tolerance = 1.0
+    config_state.cosine_threshold = 0.0
+    config_state.global_noise_limit = 0.001  # impossibly strict
+    config_state.noise_order = 1
+    config_state.cosine_order = 2
+    config_state.excitation_order = 3
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Random off-topic query about bananas"}) as response:
+            assert response.status_code == 200
+            content = ""
+            async for chunk in response.aiter_text():
+                content += chunk
+            assert "FIREWALL BLOCKED" in content
+            assert "Noise pre-filter tripped" in content or "noise:BREACH" in content
+
+@pytest.mark.asyncio
+async def test_pipeline_order_respected():
+    """When noise runs first (order=1) and is ultra-strict, cosine and excitation should never appear as OK."""
+    config_state.excitation_threshold = 1
+    config_state.noise_tolerance = 1.0
+    config_state.cosine_threshold = 0.0
+    config_state.global_noise_limit = 0.001
+    config_state.noise_order = 1
+    config_state.cosine_order = 2
+    config_state.excitation_order = 3
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Test pipeline ordering"}) as response:
+            content = ""
+            async for chunk in response.aiter_text():
+                content += chunk
+            # Noise should breach first, so cosine and excitation never run
+            assert "noise:BREACH" in content
+            assert "cosine:OK" not in content
+            assert "excitation:OK" not in content
+
+def test_pipeline_config_sync():
+    """POST to /galaxy/config with custom order values must persist in config_state."""
+    res = client.post("/galaxy/config", json={
+        "excitation_threshold": 200,
+        "noise_tolerance": 0.010,
+        "cosine_threshold": 0.85,
+        "global_noise_limit": 0.75,
+        "cosine_order": 3,
+        "excitation_order": 1,
+        "noise_order": 2,
+        "adaptive_factor": 0.70
+    })
+    assert res.status_code == 200
+    assert config_state.excitation_threshold == 200
+    assert config_state.noise_tolerance == 0.010
+    assert config_state.cosine_threshold == 0.85
+    assert config_state.global_noise_limit == 0.75
+    assert config_state.cosine_order == 3
+    assert config_state.excitation_order == 1
+    assert config_state.noise_order == 2
+    assert config_state.adaptive_factor == 0.70
+
+def test_adaptive_factor_default():
+    """Default adaptive_factor should be 0.85 on fresh ConfigState."""
+    from app.api.routes import ConfigState
+    fresh = ConfigState()
+    assert fresh.adaptive_factor == 0.85
+
+@pytest.mark.asyncio
+async def test_adaptive_factor_telemetry_on_short_clause():
+    """A short clause blocked by excitation must include [ADAPTIVE] in telemetry."""
+    config_state.excitation_threshold = 10000
+    config_state.noise_tolerance = 0.0001
+    config_state.cosine_threshold = 0.0
+    config_state.global_noise_limit = 5.0
+    config_state.adaptive_factor = 0.50
+    config_state.noise_order = 1
+    config_state.cosine_order = 2
+    config_state.excitation_order = 3
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        # "Hello" is 1 word — short clause triggers adaptive path
+        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Hello"}) as response:
+            content = ""
+            async for chunk in response.aiter_text():
+                content += chunk
+            assert "FIREWALL BLOCKED" in content
+            assert "ADAPTIVE" in content or "0.5x factor" in content
+
 # Add pytest-asyncio to required pip if needed for async mark
 
 
@@ -4176,12 +4441,24 @@ router = APIRouter()
 class ConfigState:
     excitation_threshold: int = 150
     noise_tolerance: float = 0.005
+    cosine_threshold: float = 0.78
+    global_noise_limit: float = 0.50
+    cosine_order: int = 2
+    excitation_order: int = 3
+    noise_order: int = 1
+    adaptive_factor: float = 0.85
 
 config_state = ConfigState()
 
 class ConfigUpdate(BaseModel):
     excitation_threshold: int
     noise_tolerance: float
+    cosine_threshold: float
+    global_noise_limit: float = 0.50
+    cosine_order: int = 2
+    excitation_order: int = 3
+    noise_order: int = 1
+    adaptive_factor: float = 0.85
 
 class AuditRequest(BaseModel):
     query: str
@@ -4212,6 +4489,12 @@ async def delete_pack(filename: str):
 async def update_config(config: ConfigUpdate):
     config_state.excitation_threshold = config.excitation_threshold
     config_state.noise_tolerance = config.noise_tolerance
+    config_state.cosine_threshold = config.cosine_threshold
+    config_state.global_noise_limit = config.global_noise_limit
+    config_state.cosine_order = config.cosine_order
+    config_state.excitation_order = config.excitation_order
+    config_state.noise_order = config.noise_order
+    config_state.adaptive_factor = config.adaptive_factor
     return {"status": "updated", "config": config}
 
 @router.post("/audit")
@@ -4268,47 +4551,155 @@ async def chat_endpoint(req: ChatRequest):
     if not clauses:
         clauses = [clean_prompt]
 
+    # --- Sequential Pipeline Engine ---
+    # Define the three filter functions. Each returns (passed: bool, reason: str, details: dict)
+    def run_noise_filter(cl_arr, db_arr, clause, **_kw):
+        avg_delta = float(np.mean(np.abs(cl_arr - db_arr)))
+        if avg_delta > config_state.global_noise_limit:
+            return False, "noise", {
+                "avg_delta": avg_delta,
+                "limit": config_state.global_noise_limit,
+                "clause": clause
+            }
+        return True, "noise", {"avg_delta": avg_delta}
+
+    def run_cosine_filter(cl_arr, db_arr, clause, **_kw):
+        cl_norm = np.linalg.norm(cl_arr)
+        db_norm = np.linalg.norm(db_arr)
+        sim = float(np.dot(cl_arr, db_arr) / (cl_norm * db_norm)) if cl_norm > 0 and db_norm > 0 else 0.0
+        if sim < config_state.cosine_threshold:
+            return False, "cosine", {"cosine_sim": sim, "clause": clause}
+        return True, "cosine", {"cosine_sim": sim}
+
+    def run_excitation_filter(cl_arr, db_arr, clause, word_count=0, **_kw):
+        delta = np.abs(cl_arr - db_arr)
+        seg_activations = int(np.sum(delta <= config_state.noise_tolerance))
+        base_threshold = config_state.excitation_threshold
+        is_short = word_count < 6
+        factor = config_state.adaptive_factor if is_short else 1.0
+        threshold = float(base_threshold) * factor
+        if seg_activations < threshold:
+            return False, "excitation", {
+                "activations": seg_activations,
+                "threshold": threshold,
+                "clause": clause,
+                "adaptive_applied": is_short,
+                "adaptive_factor": factor
+            }
+        return True, "excitation", {
+            "activations": seg_activations,
+            "threshold": threshold,
+            "adaptive_applied": is_short,
+            "adaptive_factor": factor
+        }
+
+    # Build ordered pipeline from config
+    pipeline_stages = sorted([
+        (config_state.cosine_order, "cosine", run_cosine_filter),
+        (config_state.excitation_order, "excitation", run_excitation_filter),
+        (config_state.noise_order, "noise", run_noise_filter),
+    ], key=lambda x: x[0])
+
     context = ""
     failed_clause = None
-    activations = 0
-    current_threshold = float(config_state.excitation_threshold)
+    block_reason = ""
+    block_details = {}
+    pipeline_results = []  # telemetry: ordered list of stage results
+    last_activations = 0
+    last_cosine = 0.0
 
     for clause in clauses:
         cl_vec = embedder.embed(clause)
         results = storage.search_nearest(cl_vec, k=1)
         if not results:
-            seg_activations = 0
-        else:
-            db_vec = results[0]["vector"]
-            if not context:
-                context = results[0]["text"]
-            delta = np.abs(np.array(cl_vec, dtype=np.float32) - np.array(db_vec, dtype=np.float32))
-            seg_activations = int(np.sum(delta <= config_state.noise_tolerance))
-
-        word_count = len(clause.split())
-        base_threshold = config_state.excitation_threshold
-        current_threshold = base_threshold * 0.85 if word_count < 6 else float(base_threshold)
-
-        if seg_activations < current_threshold:
+            # No context — all filters fail
             failed_clause = clause
-            activations = seg_activations
+            block_reason = "no_context"
+            block_details = {"clause": clause}
+            pipeline_results.append({"stage": "no_context", "passed": False})
             break
-        activations = seg_activations
-        
+
+        db_vec = results[0]["vector"]
+        if not context:
+            context = results[0]["text"]
+        cl_arr = np.array(cl_vec, dtype=np.float32)
+        db_arr = np.array(db_vec, dtype=np.float32)
+        word_count = len(clause.split())
+
+        clause_breached = False
+        for _order, stage_name, stage_fn in pipeline_stages:
+            passed, reason, details = stage_fn(
+                cl_arr, db_arr, clause, word_count=word_count
+            )
+            pipeline_results.append({"stage": stage_name, "passed": passed, **details})
+            if passed:
+                if "activations" in details:
+                    last_activations = details["activations"]
+                if "cosine_sim" in details:
+                    last_cosine = details["cosine_sim"]
+            else:
+                failed_clause = clause
+                block_reason = reason
+                block_details = details
+                clause_breached = True
+                break  # stop pipeline on first breach
+
+        if clause_breached:
+            break
+
     if fw_on:
         if failed_clause is not None:
-            block_msg = (
-                f'🛑 [FIREWALL BLOCKED] Violation in segment: "{failed_clause}". '
-                f'Resonance: {activations} (Required: {current_threshold:.0f}).'
+            if block_reason == "cosine":
+                block_msg = (
+                    f'🛑 [FIREWALL BLOCKED] Semantic anchoring detected in segment: "{failed_clause}". '
+                    f'Cosine Similarity: {block_details.get("cosine_sim", 0):.3f} '
+                    f'(Required: ≥{config_state.cosine_threshold:.2f}). '
+                    f'Vector direction diverges from sovereign corpus.'
+                )
+            elif block_reason == "noise":
+                block_msg = (
+                    f'🛑 [FIREWALL BLOCKED] Noise pre-filter tripped on segment: "{failed_clause}". '
+                    f'Avg Delta: {block_details.get("avg_delta", 0):.4f} '
+                    f'(Limit: {config_state.global_noise_limit:.3f}).'
+                )
+            elif block_reason == "no_context":
+                block_msg = (
+                    f'🛑 [FIREWALL BLOCKED] No context found for segment: "{failed_clause}". '
+                    f'Empty database or no match.'
+                )
+            else:
+                adaptive_note = ""
+                if block_details.get("adaptive_applied"):
+                    adaptive_note = (
+                        f' [ADAPTIVE] Short Clause Detected. '
+                        f'Applying {block_details.get("adaptive_factor", 1.0)}x factor. '
+                    )
+                block_msg = (
+                    f'🛑 [FIREWALL BLOCKED] Violation in segment: "{failed_clause}". '
+                    f'Resonance: {block_details.get("activations", 0)} '
+                    f'(Required: {block_details.get("threshold", 0):.0f}).{adaptive_note}'
+                )
+
+            # Include pipeline execution order in telemetry
+            stage_summary = " → ".join(
+                f'{r["stage"]}:{"OK" if r["passed"] else "BREACH"}'
+                for r in pipeline_results
             )
+            block_msg += f'\nPipeline: [{stage_summary}]'
+
             async def breach_stream():
                 yield json.dumps({"type": "content", "text": block_msg}).encode("utf-8") + b"\n"
             return StreamingResponse(breach_stream(), media_type="application/x-ndjson")
 
         # Firewall passed — prepend telemetry badge before the LLM stream
+        stage_summary = " → ".join(
+            f'{r["stage"]}:OK' for r in pipeline_results
+        )
         pass_prefix = (
-            f"🟢 [FIREWALL PASSED] Resonance achieved: "
-            f"{activations}/{config_state.excitation_threshold} dimensions. "
+            f"🟢 [FIREWALL PASSED] Resonance: "
+            f"{last_activations}/{config_state.excitation_threshold} dims | "
+            f"Cosine: {last_cosine:.3f} | "
+            f"Pipeline: [{stage_summary}]\n"
             f"Routing to sovereign knowledge...\n\n"
         )
         async def prefixed_stream():

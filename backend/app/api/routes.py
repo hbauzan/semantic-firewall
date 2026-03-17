@@ -18,6 +18,11 @@ class ConfigState:
     excitation_threshold: int = 150
     noise_tolerance: float = 0.005
     cosine_threshold: float = 0.78
+    global_noise_limit: float = 0.50
+    cosine_order: int = 2
+    excitation_order: int = 3
+    noise_order: int = 1
+    adaptive_factor: float = 0.85
 
 config_state = ConfigState()
 
@@ -25,6 +30,11 @@ class ConfigUpdate(BaseModel):
     excitation_threshold: int
     noise_tolerance: float
     cosine_threshold: float
+    global_noise_limit: float = 0.50
+    cosine_order: int = 2
+    excitation_order: int = 3
+    noise_order: int = 1
+    adaptive_factor: float = 0.85
 
 class AuditRequest(BaseModel):
     query: str
@@ -56,6 +66,11 @@ async def update_config(config: ConfigUpdate):
     config_state.excitation_threshold = config.excitation_threshold
     config_state.noise_tolerance = config.noise_tolerance
     config_state.cosine_threshold = config.cosine_threshold
+    config_state.global_noise_limit = config.global_noise_limit
+    config_state.cosine_order = config.cosine_order
+    config_state.excitation_order = config.excitation_order
+    config_state.noise_order = config.noise_order
+    config_state.adaptive_factor = config.adaptive_factor
     return {"status": "updated", "config": config}
 
 @router.post("/audit")
@@ -112,68 +127,155 @@ async def chat_endpoint(req: ChatRequest):
     if not clauses:
         clauses = [clean_prompt]
 
+    # --- Sequential Pipeline Engine ---
+    # Define the three filter functions. Each returns (passed: bool, reason: str, details: dict)
+    def run_noise_filter(cl_arr, db_arr, clause, **_kw):
+        avg_delta = float(np.mean(np.abs(cl_arr - db_arr)))
+        if avg_delta > config_state.global_noise_limit:
+            return False, "noise", {
+                "avg_delta": avg_delta,
+                "limit": config_state.global_noise_limit,
+                "clause": clause
+            }
+        return True, "noise", {"avg_delta": avg_delta}
+
+    def run_cosine_filter(cl_arr, db_arr, clause, **_kw):
+        cl_norm = np.linalg.norm(cl_arr)
+        db_norm = np.linalg.norm(db_arr)
+        sim = float(np.dot(cl_arr, db_arr) / (cl_norm * db_norm)) if cl_norm > 0 and db_norm > 0 else 0.0
+        if sim < config_state.cosine_threshold:
+            return False, "cosine", {"cosine_sim": sim, "clause": clause}
+        return True, "cosine", {"cosine_sim": sim}
+
+    def run_excitation_filter(cl_arr, db_arr, clause, word_count=0, **_kw):
+        delta = np.abs(cl_arr - db_arr)
+        seg_activations = int(np.sum(delta <= config_state.noise_tolerance))
+        base_threshold = config_state.excitation_threshold
+        is_short = word_count < 6
+        factor = config_state.adaptive_factor if is_short else 1.0
+        threshold = float(base_threshold) * factor
+        if seg_activations < threshold:
+            return False, "excitation", {
+                "activations": seg_activations,
+                "threshold": threshold,
+                "clause": clause,
+                "adaptive_applied": is_short,
+                "adaptive_factor": factor
+            }
+        return True, "excitation", {
+            "activations": seg_activations,
+            "threshold": threshold,
+            "adaptive_applied": is_short,
+            "adaptive_factor": factor
+        }
+
+    # Build ordered pipeline from config
+    pipeline_stages = sorted([
+        (config_state.cosine_order, "cosine", run_cosine_filter),
+        (config_state.excitation_order, "excitation", run_excitation_filter),
+        (config_state.noise_order, "noise", run_noise_filter),
+    ], key=lambda x: x[0])
+
     context = ""
     failed_clause = None
     block_reason = ""
-    activations = 0
-    cosine_sim = 0.0
-    current_threshold = float(config_state.excitation_threshold)
+    block_details = {}
+    pipeline_results = []  # telemetry: ordered list of stage results
+    last_activations = 0
+    last_cosine = 0.0
 
     for clause in clauses:
         cl_vec = embedder.embed(clause)
         results = storage.search_nearest(cl_vec, k=1)
         if not results:
-            seg_activations = 0
-            cosine_sim = 0.0
-        else:
-            db_vec = results[0]["vector"]
-            if not context:
-                context = results[0]["text"]
-            cl_arr = np.array(cl_vec, dtype=np.float32)
-            db_arr = np.array(db_vec, dtype=np.float32)
-            delta = np.abs(cl_arr - db_arr)
-            seg_activations = int(np.sum(delta <= config_state.noise_tolerance))
-            cl_norm = np.linalg.norm(cl_arr)
-            db_norm = np.linalg.norm(db_arr)
-            cosine_sim = float(np.dot(cl_arr, db_arr) / (cl_norm * db_norm)) if cl_norm > 0 and db_norm > 0 else 0.0
+            # No context — all filters fail
+            failed_clause = clause
+            block_reason = "no_context"
+            block_details = {"clause": clause}
+            pipeline_results.append({"stage": "no_context", "passed": False})
+            break
 
+        db_vec = results[0]["vector"]
+        if not context:
+            context = results[0]["text"]
+        cl_arr = np.array(cl_vec, dtype=np.float32)
+        db_arr = np.array(db_vec, dtype=np.float32)
         word_count = len(clause.split())
-        base_threshold = config_state.excitation_threshold
-        current_threshold = base_threshold * 0.85 if word_count < 6 else float(base_threshold)
 
-        if seg_activations < current_threshold:
-            failed_clause = clause
-            activations = seg_activations
-            block_reason = "activations"
+        clause_breached = False
+        for _order, stage_name, stage_fn in pipeline_stages:
+            passed, reason, details = stage_fn(
+                cl_arr, db_arr, clause, word_count=word_count
+            )
+            pipeline_results.append({"stage": stage_name, "passed": passed, **details})
+            if passed:
+                if "activations" in details:
+                    last_activations = details["activations"]
+                if "cosine_sim" in details:
+                    last_cosine = details["cosine_sim"]
+            else:
+                failed_clause = clause
+                block_reason = reason
+                block_details = details
+                clause_breached = True
+                break  # stop pipeline on first breach
+
+        if clause_breached:
             break
-        if cosine_sim < config_state.cosine_threshold:
-            failed_clause = clause
-            activations = seg_activations
-            block_reason = "cosine"
-            break
-        activations = seg_activations
-        
+
     if fw_on:
         if failed_clause is not None:
             if block_reason == "cosine":
                 block_msg = (
                     f'🛑 [FIREWALL BLOCKED] Semantic anchoring detected in segment: "{failed_clause}". '
-                    f'Cosine Similarity: {cosine_sim:.3f} (Required: ≥{config_state.cosine_threshold:.2f}). '
+                    f'Cosine Similarity: {block_details.get("cosine_sim", 0):.3f} '
+                    f'(Required: ≥{config_state.cosine_threshold:.2f}). '
                     f'Vector direction diverges from sovereign corpus.'
                 )
+            elif block_reason == "noise":
+                block_msg = (
+                    f'🛑 [FIREWALL BLOCKED] Noise pre-filter tripped on segment: "{failed_clause}". '
+                    f'Avg Delta: {block_details.get("avg_delta", 0):.4f} '
+                    f'(Limit: {config_state.global_noise_limit:.3f}).'
+                )
+            elif block_reason == "no_context":
+                block_msg = (
+                    f'🛑 [FIREWALL BLOCKED] No context found for segment: "{failed_clause}". '
+                    f'Empty database or no match.'
+                )
             else:
+                adaptive_note = ""
+                if block_details.get("adaptive_applied"):
+                    adaptive_note = (
+                        f' [ADAPTIVE] Short Clause Detected. '
+                        f'Applying {block_details.get("adaptive_factor", 1.0)}x factor. '
+                    )
                 block_msg = (
                     f'🛑 [FIREWALL BLOCKED] Violation in segment: "{failed_clause}". '
-                    f'Resonance: {activations} (Required: {current_threshold:.0f}).'
+                    f'Resonance: {block_details.get("activations", 0)} '
+                    f'(Required: {block_details.get("threshold", 0):.0f}).{adaptive_note}'
                 )
+
+            # Include pipeline execution order in telemetry
+            stage_summary = " → ".join(
+                f'{r["stage"]}:{"OK" if r["passed"] else "BREACH"}'
+                for r in pipeline_results
+            )
+            block_msg += f'\nPipeline: [{stage_summary}]'
+
             async def breach_stream():
                 yield json.dumps({"type": "content", "text": block_msg}).encode("utf-8") + b"\n"
             return StreamingResponse(breach_stream(), media_type="application/x-ndjson")
 
         # Firewall passed — prepend telemetry badge before the LLM stream
+        stage_summary = " → ".join(
+            f'{r["stage"]}:OK' for r in pipeline_results
+        )
         pass_prefix = (
-            f"🟢 [FIREWALL PASSED] Resonance achieved: "
-            f"{activations}/{config_state.excitation_threshold} dimensions. "
+            f"🟢 [FIREWALL PASSED] Resonance: "
+            f"{last_activations}/{config_state.excitation_threshold} dims | "
+            f"Cosine: {last_cosine:.3f} | "
+            f"Pipeline: [{stage_summary}]\n"
             f"Routing to sovereign knowledge...\n\n"
         )
         async def prefixed_stream():

@@ -90,4 +90,94 @@ async def test_semantic_piggybacking_rejection():
                 content += chunk
             assert "FIREWALL BLOCKED" in content
 
+@pytest.mark.asyncio
+async def test_noise_prefilter_blocking():
+    """Ultra-strict global noise limit must trigger Noise Pre-Filter BREACH."""
+    config_state.excitation_threshold = 1
+    config_state.noise_tolerance = 1.0
+    config_state.cosine_threshold = 0.0
+    config_state.global_noise_limit = 0.001  # impossibly strict
+    config_state.noise_order = 1
+    config_state.cosine_order = 2
+    config_state.excitation_order = 3
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Random off-topic query about bananas"}) as response:
+            assert response.status_code == 200
+            content = ""
+            async for chunk in response.aiter_text():
+                content += chunk
+            assert "FIREWALL BLOCKED" in content
+            assert "Noise pre-filter tripped" in content or "noise:BREACH" in content
+
+@pytest.mark.asyncio
+async def test_pipeline_order_respected():
+    """When noise runs first (order=1) and is ultra-strict, cosine and excitation should never appear as OK."""
+    config_state.excitation_threshold = 1
+    config_state.noise_tolerance = 1.0
+    config_state.cosine_threshold = 0.0
+    config_state.global_noise_limit = 0.001
+    config_state.noise_order = 1
+    config_state.cosine_order = 2
+    config_state.excitation_order = 3
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Test pipeline ordering"}) as response:
+            content = ""
+            async for chunk in response.aiter_text():
+                content += chunk
+            # Noise should breach first, so cosine and excitation never run
+            assert "noise:BREACH" in content
+            assert "cosine:OK" not in content
+            assert "excitation:OK" not in content
+
+def test_pipeline_config_sync():
+    """POST to /galaxy/config with custom order values must persist in config_state."""
+    res = client.post("/galaxy/config", json={
+        "excitation_threshold": 200,
+        "noise_tolerance": 0.010,
+        "cosine_threshold": 0.85,
+        "global_noise_limit": 0.75,
+        "cosine_order": 3,
+        "excitation_order": 1,
+        "noise_order": 2,
+        "adaptive_factor": 0.70
+    })
+    assert res.status_code == 200
+    assert config_state.excitation_threshold == 200
+    assert config_state.noise_tolerance == 0.010
+    assert config_state.cosine_threshold == 0.85
+    assert config_state.global_noise_limit == 0.75
+    assert config_state.cosine_order == 3
+    assert config_state.excitation_order == 1
+    assert config_state.noise_order == 2
+    assert config_state.adaptive_factor == 0.70
+
+def test_adaptive_factor_default():
+    """Default adaptive_factor should be 0.85 on fresh ConfigState."""
+    from app.api.routes import ConfigState
+    fresh = ConfigState()
+    assert fresh.adaptive_factor == 0.85
+
+@pytest.mark.asyncio
+async def test_adaptive_factor_telemetry_on_short_clause():
+    """A short clause blocked by excitation must include [ADAPTIVE] in telemetry."""
+    config_state.excitation_threshold = 10000
+    config_state.noise_tolerance = 0.0001
+    config_state.cosine_threshold = 0.0
+    config_state.global_noise_limit = 5.0
+    config_state.adaptive_factor = 0.50
+    config_state.noise_order = 1
+    config_state.cosine_order = 2
+    config_state.excitation_order = 3
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        # "Hello" is 1 word — short clause triggers adaptive path
+        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Hello"}) as response:
+            content = ""
+            async for chunk in response.aiter_text():
+                content += chunk
+            assert "FIREWALL BLOCKED" in content
+            assert "ADAPTIVE" in content or "0.5x factor" in content
+
 # Add pytest-asyncio to required pip if needed for async mark

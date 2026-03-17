@@ -6,9 +6,19 @@ export const ControlPanel: React.FC = () => {
     excitationThreshold,
     noiseTolerance,
     cosineThreshold,
+    globalNoiseLimit,
+    cosineOrder,
+    excitationOrder,
+    noiseOrder,
+    adaptiveFactor,
     setExcitationThreshold,
     setNoiseTolerance,
     setCosineThreshold,
+    setGlobalNoiseLimit,
+    setCosineOrder,
+    setExcitationOrder,
+    setNoiseOrder,
+    setAdaptiveFactor,
     ingestionStatus,
     setIngestionStatus,
     setSystemAction
@@ -40,12 +50,17 @@ export const ControlPanel: React.FC = () => {
         body: JSON.stringify({
           excitation_threshold: excitationThreshold,
           noise_tolerance: noiseTolerance,
-          cosine_threshold: cosineThreshold
+          cosine_threshold: cosineThreshold,
+          global_noise_limit: globalNoiseLimit,
+          cosine_order: cosineOrder,
+          excitation_order: excitationOrder,
+          noise_order: noiseOrder,
+          adaptive_factor: adaptiveFactor
         })
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
-  }, [excitationThreshold, noiseTolerance, cosineThreshold]);
+  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor]);
 
   // Poll for ingestion status if task is active
   useEffect(() => {
@@ -119,8 +134,29 @@ export const ControlPanel: React.FC = () => {
     <div className="panel side-panel" style={{ marginTop: '1rem', width: 'auto' }}>
       <h2>Control Panel</h2>
 
-      <div className="slider-group">
-        <label>
+      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <label style={{ flex: 1 }}>
+          Cosine Gate: {cosineThreshold.toFixed(2)}
+          <input
+            type="range"
+            min="0.50" max="0.99" step="0.01"
+            value={cosineThreshold}
+            onChange={(e) => setCosineThreshold(Number(e.target.value))}
+          />
+        </label>
+        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
+          Seq
+          <input
+            type="number" min="1" max="3" step="1"
+            value={cosineOrder}
+            onChange={(e) => setCosineOrder(Number(e.target.value))}
+            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
+          />
+        </label>
+      </div>
+
+      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <label style={{ flex: 1 }}>
           Excitation Threshold: {excitationThreshold}
           <input
             type="range"
@@ -128,12 +164,7 @@ export const ControlPanel: React.FC = () => {
             value={excitationThreshold}
             onChange={(e) => setExcitationThreshold(Number(e.target.value))}
           />
-        </label>
-      </div>
-
-      <div className="slider-group">
-        <label>
-          Noise Tolerance: {noiseTolerance.toFixed(3)}
+          <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>Noise Tolerance: {noiseTolerance.toFixed(3)}</span>
           <input
             type="range"
             min="0.001" max="0.100" step="0.001"
@@ -141,16 +172,50 @@ export const ControlPanel: React.FC = () => {
             onChange={(e) => setNoiseTolerance(Number(e.target.value))}
           />
         </label>
+        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
+          Seq
+          <input
+            type="number" min="1" max="3" step="1"
+            value={excitationOrder}
+            onChange={(e) => setExcitationOrder(Number(e.target.value))}
+            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
+          />
+        </label>
       </div>
 
       <div className="slider-group">
         <label>
-          Cosine Gate: {cosineThreshold.toFixed(2)}
+          Adaptive Factor: {adaptiveFactor.toFixed(2)}
           <input
             type="range"
-            min="0.50" max="0.99" step="0.01"
-            value={cosineThreshold}
-            onChange={(e) => setCosineThreshold(Number(e.target.value))}
+            min="0.01" max="1.00" step="0.01"
+            value={adaptiveFactor}
+            onChange={(e) => setAdaptiveFactor(Number(e.target.value))}
+          />
+        </label>
+        <div style={{ fontSize: '0.7rem', opacity: 0.7, display: 'flex', justifyContent: 'space-between', padding: '0 0.25rem' }}>
+          <span>Short Query Req: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
+          <span>Full Query Req: {excitationThreshold} dims</span>
+        </div>
+      </div>
+
+      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <label style={{ flex: 1 }}>
+          Noise Pre-Filter (Avg Delta Limit): {globalNoiseLimit.toFixed(2)}
+          <input
+            type="range"
+            min="0.10" max="2.00" step="0.01"
+            value={globalNoiseLimit}
+            onChange={(e) => setGlobalNoiseLimit(Number(e.target.value))}
+          />
+        </label>
+        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
+          Seq
+          <input
+            type="number" min="1" max="3" step="1"
+            value={noiseOrder}
+            onChange={(e) => setNoiseOrder(Number(e.target.value))}
+            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
           />
         </label>
       </div>
