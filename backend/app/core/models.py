@@ -16,12 +16,15 @@ class ConfigState(BaseModel):
 
     excitation_threshold: int = Field(default=150, ge=0, le=1024)
     noise_tolerance: float = Field(default=0.005, ge=0.0, le=1.0)
-    cosine_threshold: float = Field(default=0.78, ge=0.0, le=1.0)
+    cosine_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
     global_noise_limit: float = Field(default=0.50, ge=0.0, le=10.0)
     cosine_order: int = Field(default=2, ge=1, le=3)
     excitation_order: int = Field(default=3, ge=1, le=3)
     noise_order: int = Field(default=1, ge=1, le=3)
     adaptive_factor: float = Field(default=0.85, ge=0.01, le=1.0)
+    noise_enabled: bool = Field(default=True)
+    cosine_enabled: bool = Field(default=True)
+    excitation_enabled: bool = Field(default=True)
 
     @model_validator(mode='after')
     def validate_unique_orders(self):
@@ -44,6 +47,9 @@ class ConfigUpdate(BaseModel):
     excitation_order: int = Field(default=3, ge=1, le=3)
     noise_order: int = Field(default=1, ge=1, le=3)
     adaptive_factor: float = Field(default=0.85, ge=0.01, le=1.0)
+    noise_enabled: bool = Field(default=True)
+    cosine_enabled: bool = Field(default=True)
+    excitation_enabled: bool = Field(default=True)
 
 
 # Max prompt length to prevent memory exhaustion before vectorization

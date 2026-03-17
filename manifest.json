@@ -1,6 +1,6 @@
 {
     "project": "Phase-Lock Semantic Firewall",
-    "version": "v2.6.1",
+    "version": "v2.7.0",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -27,17 +27,21 @@
         "modular_firewall_engine": true,
         "cors_hardening": true,
         "opt_in_api_key_auth": true,
-        "input_length_sanitization": true
+        "input_length_sanitization": true,
+        "per_filter_toggle_buttons": true
     },
     "state_schema": {
         "excitation_threshold": {"type": "int", "default": 150, "range": [0, 1024]},
         "noise_tolerance": {"type": "float", "default": 0.005, "range": [0.001, 0.100]},
-        "cosine_threshold": {"type": "float", "default": 0.78, "range": [0.50, 0.99]},
+        "cosine_threshold": {"type": "float", "default": 0.50, "range": [0.00, 1.00]},
         "global_noise_limit": {"type": "float", "default": 0.50, "range": [0.10, 2.00]},
         "cosine_order": {"type": "int", "default": 2, "range": [1, 3]},
         "excitation_order": {"type": "int", "default": 3, "range": [1, 3]},
         "noise_order": {"type": "int", "default": 1, "range": [1, 3]},
-        "adaptive_factor": {"type": "float", "default": 0.85, "range": [0.01, 1.00]}
+        "adaptive_factor": {"type": "float", "default": 0.85, "range": [0.01, 1.00]},
+        "noise_enabled": {"type": "bool", "default": true},
+        "cosine_enabled": {"type": "bool", "default": true},
+        "excitation_enabled": {"type": "bool", "default": true}
     },
     "constraints": {
         "vector_dim": 1024

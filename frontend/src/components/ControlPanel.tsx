@@ -1,27 +1,29 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../store';
 
+// Shared toggle button style generator
+const toggleStyle = (on: boolean): React.CSSProperties => ({
+  width: '2.2rem', height: '1.3rem', fontSize: '0.55rem', fontWeight: 'bold',
+  border: '1px solid', borderColor: on ? 'var(--accent)' : '#555',
+  background: on ? 'var(--accent)' : '#222', color: on ? '#000' : '#555',
+  cursor: 'pointer', borderRadius: '3px', flexShrink: 0, padding: 0,
+});
+
+// Shared Seq input style
+const seqInputStyle: React.CSSProperties = {
+  width: '2.2rem', textAlign: 'center', background: '#111',
+  color: 'var(--accent)', border: '1px solid var(--accent)', padding: '1px', fontSize: '0.7rem',
+};
+
 export const ControlPanel: React.FC = () => {
   const {
-    excitationThreshold,
-    noiseTolerance,
-    cosineThreshold,
-    globalNoiseLimit,
-    cosineOrder,
-    excitationOrder,
-    noiseOrder,
-    adaptiveFactor,
-    setExcitationThreshold,
-    setNoiseTolerance,
-    setCosineThreshold,
-    setGlobalNoiseLimit,
-    setCosineOrder,
-    setExcitationOrder,
-    setNoiseOrder,
-    setAdaptiveFactor,
-    ingestionStatus,
-    setIngestionStatus,
-    setSystemAction
+    excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit,
+    cosineOrder, excitationOrder, noiseOrder, adaptiveFactor,
+    noiseEnabled, cosineEnabled, excitationEnabled,
+    setExcitationThreshold, setNoiseTolerance, setCosineThreshold, setGlobalNoiseLimit,
+    setCosineOrder, setExcitationOrder, setNoiseOrder, setAdaptiveFactor,
+    setNoiseEnabled, setCosineEnabled, setExcitationEnabled,
+    ingestionStatus, setIngestionStatus, setSystemAction
   } = useStore();
 
   const [packs, setPacks] = useState<{ filename: string, chunks: number }[]>([]);
@@ -37,9 +39,7 @@ export const ControlPanel: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchPacks();
-  }, []);
+  useEffect(() => { fetchPacks(); }, []);
 
   // Debounce API calls for config
   useEffect(() => {
@@ -55,12 +55,15 @@ export const ControlPanel: React.FC = () => {
           cosine_order: cosineOrder,
           excitation_order: excitationOrder,
           noise_order: noiseOrder,
-          adaptive_factor: adaptiveFactor
+          adaptive_factor: adaptiveFactor,
+          noise_enabled: noiseEnabled,
+          cosine_enabled: cosineEnabled,
+          excitation_enabled: excitationEnabled
         })
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
-  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor]);
+  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled]);
 
   // Poll for ingestion status if task is active
   useEffect(() => {
@@ -75,7 +78,7 @@ export const ControlPanel: React.FC = () => {
             progress: data.progress,
             message: data.message
           });
-          setSystemAction(`INGESTING_CORPUS: \${Math.round(data.progress)}%`);
+          setSystemAction(`INGESTING_CORPUS: ${Math.round(data.progress)}%`);
           if (data.status === 'completed' || data.status === 'failed') {
             setSystemAction('SYSTEM IDLE');
             fetchPacks();
@@ -85,31 +88,22 @@ export const ControlPanel: React.FC = () => {
         }
       }, 1000);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    }
+    return () => { if (interval) clearInterval(interval); }
   }, [ingestionStatus.taskId, ingestionStatus.status, setIngestionStatus, fetchPacks]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const formData = new FormData();
     formData.append('file', file);
     setSystemAction("UPLOADING_PDF...");
-
     try {
       const res = await fetch('http://localhost:8000/corpus/upload-pdf', {
         method: 'POST',
         body: formData
       });
       const data = await res.json();
-      setIngestionStatus({
-        taskId: data.task_id,
-        status: 'pending',
-        progress: 0,
-        message: 'Upload started...'
-      });
+      setIngestionStatus({ taskId: data.task_id, status: 'pending', progress: 0, message: 'Upload started...' });
     } catch (err) {
       console.error("Upload failed", err);
       setSystemAction("SYSTEM IDLE");
@@ -128,136 +122,120 @@ export const ControlPanel: React.FC = () => {
     }
   };
 
-
-
   return (
-    <div className="panel side-panel" style={{ marginTop: '1rem', width: 'auto' }}>
-      <h2>Control Panel</h2>
+    <div className="panel" style={{ width: 'auto', flex: 1, overflow: 'auto' }}>
+      <h2 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', paddingBottom: '0.3rem' }}>Control Panel</h2>
 
-      {/* --- Pipeline Stage 1: Noise Pre-Filter (Integrity Gate) --- */}
-      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <label style={{ flex: 1 }}>
-          Noise Pre-Filter (Avg Delta Limit): {globalNoiseLimit.toFixed(2)}
-          <input
-            type="range"
-            min="0.10" max="2.00" step="0.01"
-            value={globalNoiseLimit}
+      {/* --- Noise Pre-Filter --- */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', opacity: noiseEnabled ? 1 : 0.4, transition: 'opacity 0.2s' }}>
+        <button onClick={() => setNoiseEnabled(!noiseEnabled)} style={toggleStyle(noiseEnabled)}>
+          {noiseEnabled ? 'ON' : 'OFF'}
+        </button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong></div>
+          <input type="range" min="0.10" max="2.00" step="0.01" value={globalNoiseLimit}
             onChange={(e) => setGlobalNoiseLimit(Number(e.target.value))}
-          />
-        </label>
-        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
-          Seq
-          <input
-            type="number" min="1" max="3" step="1"
-            value={noiseOrder}
-            onChange={(e) => setNoiseOrder(Number(e.target.value))}
-            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
-          />
-        </label>
-      </div>
-
-      {/* --- Pipeline Stage 2: Cosine Gate (Semantic Orientation) --- */}
-      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <label style={{ flex: 1 }}>
-          Cosine Gate: {cosineThreshold.toFixed(2)}
-          <input
-            type="range"
-            min="0.50" max="0.99" step="0.01"
-            value={cosineThreshold}
-            onChange={(e) => setCosineThreshold(Number(e.target.value))}
-          />
-        </label>
-        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
-          Seq
-          <input
-            type="number" min="1" max="3" step="1"
-            value={cosineOrder}
-            onChange={(e) => setCosineOrder(Number(e.target.value))}
-            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
-          />
-        </label>
-      </div>
-
-      {/* --- Pipeline Stage 3: Excitation Filter (Atomic Resonance) --- */}
-      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <label style={{ flex: 1 }}>
-          Excitation Threshold: {excitationThreshold}
-          <input
-            type="range"
-            min="0" max="1024" step="1"
-            value={excitationThreshold}
-            onChange={(e) => setExcitationThreshold(Number(e.target.value))}
-          />
-          <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>Noise Tolerance: {noiseTolerance.toFixed(3)}</span>
-          <input
-            type="range"
-            min="0.001" max="0.100" step="0.001"
-            value={noiseTolerance}
-            onChange={(e) => setNoiseTolerance(Number(e.target.value))}
-          />
-        </label>
-        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
-          Seq
-          <input
-            type="number" min="1" max="3" step="1"
-            value={excitationOrder}
-            onChange={(e) => setExcitationOrder(Number(e.target.value))}
-            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
-          />
-        </label>
-      </div>
-
-      {/* --- Adaptive Factor (applies to Excitation on short clauses) --- */}
-      <div className="slider-group">
-        <label>
-          Adaptive Factor: {adaptiveFactor.toFixed(2)}
-          <input
-            type="range"
-            min="0.01" max="1.00" step="0.01"
-            value={adaptiveFactor}
-            onChange={(e) => setAdaptiveFactor(Number(e.target.value))}
-          />
-        </label>
-        <div style={{ fontSize: '0.7rem', opacity: 0.7, display: 'flex', justifyContent: 'space-between', padding: '0 0.25rem' }}>
-          <span>Short Query Req: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
-          <span>Full Query Req: {excitationThreshold} dims</span>
+            style={{ width: '100%', height: '12px' }} />
+        </div>
+        <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
+          <div style={{ opacity: 0.5 }}>Seq</div>
+          <input type="number" min="1" max="3" step="1" value={noiseOrder}
+            onChange={(e) => setNoiseOrder(Number(e.target.value))} style={seqInputStyle} />
         </div>
       </div>
 
-      <div className="upload-section">
-        <input
-          type="file"
-          accept="application/pdf"
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-          className="file-input"
-        />
-        <button onClick={() => fileInputRef.current?.click()} style={{ width: '100%', marginBottom: '1rem' }}>Upload PDF Corpus</button>
+      {/* --- Cosine Gate --- */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', opacity: cosineEnabled ? 1 : 0.4, transition: 'opacity 0.2s' }}>
+        <button onClick={() => setCosineEnabled(!cosineEnabled)} style={toggleStyle(cosineEnabled)}>
+          {cosineEnabled ? 'ON' : 'OFF'}
+        </button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Cosine Gate: <strong>{cosineThreshold.toFixed(2)}</strong></div>
+          <input type="range" min="0.00" max="1.00" step="0.01" value={cosineThreshold}
+            onChange={(e) => setCosineThreshold(Number(e.target.value))}
+            style={{ width: '100%', height: '12px' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.55rem', opacity: 0.4, marginTop: '-2px' }}>
+            <span>0 LAX</span><span>STRICT 1</span>
+          </div>
+        </div>
+        <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
+          <div style={{ opacity: 0.5 }}>Seq</div>
+          <input type="number" min="1" max="3" step="1" value={cosineOrder}
+            onChange={(e) => setCosineOrder(Number(e.target.value))} style={seqInputStyle} />
+        </div>
+      </div>
+
+      {/* --- Excitation Filter --- */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', opacity: excitationEnabled ? 1 : 0.4, transition: 'opacity 0.2s' }}>
+        <button onClick={() => setExcitationEnabled(!excitationEnabled)} style={toggleStyle(excitationEnabled)}>
+          {excitationEnabled ? 'ON' : 'OFF'}
+        </button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Excitation: <strong>{excitationThreshold}</strong></div>
+          <input type="range" min="0" max="1024" step="1" value={excitationThreshold}
+            onChange={(e) => setExcitationThreshold(Number(e.target.value))}
+            style={{ width: '100%', height: '12px' }} />
+          <div style={{ fontSize: '0.65rem', opacity: 0.5, marginTop: '-1px' }}>
+            Noise Tolerance: {noiseTolerance.toFixed(3)}
+          </div>
+          <input type="range" min="0.001" max="0.100" step="0.001" value={noiseTolerance}
+            onChange={(e) => setNoiseTolerance(Number(e.target.value))}
+            style={{ width: '100%', height: '12px' }} />
+        </div>
+        <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
+          <div style={{ opacity: 0.5 }}>Seq</div>
+          <input type="number" min="1" max="3" step="1" value={excitationOrder}
+            onChange={(e) => setExcitationOrder(Number(e.target.value))} style={seqInputStyle} />
+        </div>
+      </div>
+
+      {/* --- Adaptive Factor --- */}
+      <div style={{ marginBottom: '0.5rem', padding: '0.3rem 0', borderTop: '1px solid #222' }}>
+        <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Adaptive Factor: <strong>{adaptiveFactor.toFixed(2)}</strong></div>
+        <input type="range" min="0.01" max="1.00" step="0.01" value={adaptiveFactor}
+          onChange={(e) => setAdaptiveFactor(Number(e.target.value))}
+          style={{ width: '100%', height: '12px' }} />
+        <div style={{ fontSize: '0.6rem', opacity: 0.5, display: 'flex', justifyContent: 'space-between' }}>
+          <span>Short: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
+          <span>Full: {excitationThreshold} dims</span>
+        </div>
+      </div>
+
+      {/* --- Corpus Upload --- */}
+      <div style={{ borderTop: '1px solid #222', paddingTop: '0.4rem' }}>
+        <input type="file" accept="application/pdf" ref={fileInputRef}
+          onChange={handleFileUpload} className="file-input" />
+        <button onClick={() => fileInputRef.current?.click()}
+          style={{ width: '100%', padding: '0.35rem', fontSize: '0.75rem', marginBottom: '0.4rem' }}>
+          Upload PDF Corpus
+        </button>
 
         {packs.length > 0 && (
-          <div className="pack-list" style={{ textAlign: 'left', fontSize: '0.85rem' }}>
-            <strong>Loaded Packs:</strong>
-            <ul style={{ listStyle: 'none', padding: 0, margin: '0.5rem 0' }}>
-              {packs.map((p) => (
-                <li key={p.filename} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', padding: '0.25rem', background: '#222' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '150px' }} title={p.filename}>{p.filename} ({p.chunks} chunks)</span>
-                  <button onClick={() => handleDeletePack(p.filename)} style={{ padding: '0.1rem 0.3rem', fontSize: '0.7rem', color: 'var(--danger)', borderColor: 'var(--danger)' }}>X</button>
-                </li>
-              ))}
-            </ul>
+          <div style={{ fontSize: '0.75rem' }}>
+            <div style={{ opacity: 0.6, marginBottom: '0.2rem' }}>Loaded Packs:</div>
+            {packs.map((p) => (
+              <div key={p.filename} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '0.15rem 0.3rem', background: '#1a1a1a', marginBottom: '2px', borderRadius: '2px',
+              }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px', fontSize: '0.7rem' }}
+                  title={p.filename}>{p.filename} ({p.chunks})</span>
+                <button onClick={() => handleDeletePack(p.filename)}
+                  style={{ padding: '0 0.25rem', fontSize: '0.6rem', color: 'var(--danger)', borderColor: 'var(--danger)', lineHeight: 1.4 }}>X</button>
+              </div>
+            ))}
           </div>
         )}
 
         {ingestionStatus.taskId && ingestionStatus.status !== 'completed' && (
-          <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-            <div>Status: {ingestionStatus.status}</div>
-            <div>{ingestionStatus.message}</div>
-            <div style={{ width: '100%', background: '#333', height: '4px', marginTop: '4px' }}>
-              <div style={{ width: `${ingestionStatus.progress}%`, background: 'var(--accent)', height: '100%' }}></div>
+          <div style={{ marginTop: '0.3rem', fontSize: '0.7rem' }}>
+            <span style={{ opacity: 0.6 }}>{ingestionStatus.status}</span> {ingestionStatus.message}
+            <div style={{ width: '100%', background: '#333', height: '3px', marginTop: '3px', borderRadius: '2px' }}>
+              <div style={{ width: `${ingestionStatus.progress}%`, background: 'var(--accent)', height: '100%', borderRadius: '2px' }}></div>
             </div>
           </div>
         )}
       </div>
-    </div >
+    </div>
   );
 };

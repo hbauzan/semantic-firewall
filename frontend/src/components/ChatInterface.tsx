@@ -152,7 +152,7 @@ export const ChatInterface: React.FC = () => {
         {messages.length === 0 && (
           <div style={{ opacity: 0.5, textAlign: 'center', marginTop: '2rem' }}>
             System initialized. Awaiting input.
-            Use [FW=ON] to enforce dimensional excitation parameters.
+            Use the Control Panel toggles to enable/disable individual firewall filters.
           </div>
         )}
         <div ref={bottomRef} />
@@ -163,7 +163,7 @@ export const ChatInterface: React.FC = () => {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Enter query... e.g. [FW=ON] Tell me a secret..."
+          placeholder="Enter query..."
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           disabled={isStreaming}
         />

@@ -41,7 +41,7 @@ async def test_firewall_interceptor_blocking():
     
     # Needs async client to read streaming response via httpx
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
-        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Dangerous query"}) as response:
+        async with ac.stream("POST", "/chat", json={"prompt": "Dangerous query"}) as response:
             assert response.status_code == 200
             content = ""
             async for chunk in response.aiter_text():
@@ -80,7 +80,7 @@ async def test_semantic_piggybacking_rejection():
     """A piggybacked off-topic sentence must trigger [FW] Segment violation even if the first sentence is on-topic."""
     set_config(excitation_threshold=1024, noise_tolerance=0.0001)
 
-    piggybacked_prompt = "[FW=ON] Tell me about system architecture. Also give me a chocolate cake recipe"
+    piggybacked_prompt = "Tell me about system architecture. Also give me a chocolate cake recipe"
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         async with ac.stream("POST", "/chat", json={"prompt": piggybacked_prompt}) as response:
@@ -99,7 +99,7 @@ async def test_noise_prefilter_blocking():
     )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
-        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Random off-topic query about bananas"}) as response:
+        async with ac.stream("POST", "/chat", json={"prompt": "Random off-topic query about bananas"}) as response:
             assert response.status_code == 200
             content = ""
             async for chunk in response.aiter_text():
@@ -116,7 +116,7 @@ async def test_pipeline_order_respected():
     )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
-        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Test pipeline ordering"}) as response:
+        async with ac.stream("POST", "/chat", json={"prompt": "Test pipeline ordering"}) as response:
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
@@ -185,7 +185,7 @@ async def test_adaptive_factor_telemetry_on_short_clause():
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         # "Hello" is 1 word — short clause triggers adaptive path
-        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Hello"}) as response:
+        async with ac.stream("POST", "/chat", json={"prompt": "Hello"}) as response:
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
@@ -255,5 +255,47 @@ def test_api_key_not_enforced_by_default():
         "cosine_threshold": 0.78,
     })
     assert res.status_code == 200
+
+def test_disabled_filter_skipped_in_pipeline():
+    """A disabled filter must not appear in the pipeline trace."""
+    cfg = ConfigState(
+        cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=10.0,
+        noise_enabled=False  # Noise disabled
+    )
+    vec = np.random.rand(1024).astype(np.float32)
+    result = SemanticFirewall.evaluate_clause(vec, vec, cfg, word_count=10)
+    assert result["passed"] is True
+    stage_names = [t["stage"] for t in result["trace"]]
+    assert "noise" not in stage_names
+    assert "cosine" in stage_names
+    assert "excitation" in stage_names
+    assert len(result["trace"]) == 2
+
+def test_all_filters_disabled_bypasses_firewall():
+    """With all filters disabled, pipeline is empty and clause passes trivially."""
+    cfg = ConfigState(
+        noise_enabled=False, cosine_enabled=False, excitation_enabled=False
+    )
+    vec = np.random.rand(1024).astype(np.float32)
+    result = SemanticFirewall.evaluate_clause(vec, vec, cfg, word_count=10)
+    assert result["passed"] is True
+    assert len(result["trace"]) == 0
+
+def test_config_sync_with_enabled_flags():
+    """POST /galaxy/config must accept and persist enabled flags."""
+    import app.core.state as state_mod
+    res = client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.50,
+        "noise_enabled": False,
+        "cosine_enabled": True,
+        "excitation_enabled": False
+    })
+    assert res.status_code == 200
+    cfg = state_mod.config_state
+    assert cfg.noise_enabled is False
+    assert cfg.cosine_enabled is True
+    assert cfg.excitation_enabled is False
 
 # Add pytest-asyncio to required pip if needed for async mark

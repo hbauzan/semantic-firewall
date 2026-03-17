@@ -88,12 +88,16 @@ class SemanticFirewall:
 
     @staticmethod
     def build_pipeline(cfg: ConfigState) -> list[tuple[int, str, callable]]:
-        """Build ordered list of (priority, name, function) sorted by config order."""
-        return sorted([
-            (cfg.cosine_order, "cosine", SemanticFirewall.run_cosine_filter),
-            (cfg.excitation_order, "excitation", SemanticFirewall.run_excitation_filter),
-            (cfg.noise_order, "noise", SemanticFirewall.run_noise_filter),
-        ], key=lambda x: x[0])
+        """Build ordered list of (priority, name, function) sorted by config order.
+        Disabled filters are excluded from the pipeline."""
+        stages = []
+        if cfg.cosine_enabled:
+            stages.append((cfg.cosine_order, "cosine", SemanticFirewall.run_cosine_filter))
+        if cfg.excitation_enabled:
+            stages.append((cfg.excitation_order, "excitation", SemanticFirewall.run_excitation_filter))
+        if cfg.noise_enabled:
+            stages.append((cfg.noise_order, "noise", SemanticFirewall.run_noise_filter))
+        return sorted(stages, key=lambda x: x[0])
 
     @staticmethod
     def evaluate_clause(

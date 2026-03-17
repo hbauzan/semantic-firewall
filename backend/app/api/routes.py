@@ -109,7 +109,7 @@ async def stream_ollama(prompt: str, context: str, strict: bool = False):
                     if chunk:
                         yield (chunk + "\n").encode("utf-8")
         except Exception as e:
-            yield json.dumps({"type": "error", "text": str(e)}).encode("utf-8")
+            yield json.dumps({"response": f"🔴 [LLM OFFLINE] Cannot reach Ollama at localhost:11434. Error: {e}"}).encode("utf-8") + b"\n"
 
 # --- Chat Endpoint (Firewall Gateway) ---
 
@@ -118,7 +118,11 @@ async def chat_endpoint(req: ChatRequest):
     from app.core import state as state_mod
     cfg = state_mod.config_state  # immutable snapshot — consistent for entire request
     prompt = req.prompt
-    fw_on = "[FW=ON]" in prompt
+    # Firewall is active when at least one filter is enabled
+    fw_on = cfg.noise_enabled or cfg.cosine_enabled or cfg.excitation_enabled
+    # Legacy prefix support: [FW=OFF] forces bypass regardless of toggles
+    if "[FW=OFF]" in prompt:
+        fw_on = False
     clean_prompt = prompt.replace("[FW=ON]", "").replace("[FW=OFF]", "").strip()
 
     # Segment prompt via the engine (language-agnostic + overflow chunking)
@@ -236,11 +240,14 @@ async def system_stats():
     gpu_percent = 0.0
     try:
         if torch.backends.mps.is_available():
-            vram = torch.mps.current_allocated_memory() / (1024 * 1024)
-            gpu_percent = min(100.0, (vram / 40.0))
+            # Apple Silicon: GPU shares unified memory with the system
+            allocated = torch.mps.current_allocated_memory()
+            total = psutil.virtual_memory().total
+            gpu_percent = min(100.0, (allocated / total) * 100.0) if total > 0 else 0.0
         elif torch.cuda.is_available():
-            vram = torch.cuda.memory_allocated() / (1024 * 1024)
-            gpu_percent = min(100.0, (vram / 40.0))
+            allocated = torch.cuda.memory_allocated()
+            total = torch.cuda.get_device_properties(0).total_mem
+            gpu_percent = min(100.0, (allocated / total) * 100.0) if total > 0 else 0.0
     except Exception:
         pass
 

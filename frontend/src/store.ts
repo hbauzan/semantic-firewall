@@ -21,6 +21,9 @@ interface StoreState {
   excitationOrder: number;
   noiseOrder: number;
   adaptiveFactor: number;
+  noiseEnabled: boolean;
+  cosineEnabled: boolean;
+  excitationEnabled: boolean;
   setExcitationThreshold: (val: number) => void;
   setNoiseTolerance: (val: number) => void;
   setCosineThreshold: (val: number) => void;
@@ -29,6 +32,9 @@ interface StoreState {
   setExcitationOrder: (val: number) => void;
   setNoiseOrder: (val: number) => void;
   setAdaptiveFactor: (val: number) => void;
+  setNoiseEnabled: (val: boolean) => void;
+  setCosineEnabled: (val: boolean) => void;
+  setExcitationEnabled: (val: boolean) => void;
 
   messages: Message[];
   addMessage: (msg: Message) => void;
@@ -52,12 +58,15 @@ interface StoreState {
 export const useStore = create<StoreState>((set) => ({
   excitationThreshold: 150,
   noiseTolerance: 0.005,
-  cosineThreshold: 0.78,
+  cosineThreshold: 0.50,
   globalNoiseLimit: 0.50,
   cosineOrder: 2,
   excitationOrder: 3,
   noiseOrder: 1,
   adaptiveFactor: 0.85,
+  noiseEnabled: true,
+  cosineEnabled: true,
+  excitationEnabled: true,
   setExcitationThreshold: (val) => set({ excitationThreshold: val }),
   setNoiseTolerance: (val) => set({ noiseTolerance: val }),
   setCosineThreshold: (val) => set({ cosineThreshold: val }),
@@ -66,6 +75,9 @@ export const useStore = create<StoreState>((set) => ({
   setExcitationOrder: (val) => set({ excitationOrder: val }),
   setNoiseOrder: (val) => set({ noiseOrder: val }),
   setAdaptiveFactor: (val) => set({ adaptiveFactor: val }),
+  setNoiseEnabled: (val) => set({ noiseEnabled: val }),
+  setCosineEnabled: (val) => set({ cosineEnabled: val }),
+  setExcitationEnabled: (val) => set({ excitationEnabled: val }),
 
   messages: [],
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
