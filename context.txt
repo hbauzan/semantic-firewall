@@ -12,7 +12,7 @@ The firewall operates by evaluating the raw 1024D embedding layers produced by `
 - **Delta Calculation:** For each dimension `i`, we compute the absolute delta `Delta_i = abs(Q_i - C_i)`.
 - **Activation Logic:** An activation register is tripped if `Delta_i` is less than or equal to the `Noise Tolerance` configuration (default 0.005). Thus, `Activation_i = 1`.
 - **Gate:** The final dimension sum `sum(Activation_i)` must be mathematically greater than or equal to the `Excitation Threshold` (default 150) to be deemed geometrically 'SAFE'. Otherwise, the request triggers a `SECURITY BREACH` and the streaming block breaks connection.
-- **Explicit Chat Feedback:** When `[FW=ON]` is active, the chat endpoint injects human-readable telemetry into the response. A blocked query returns `🛑 [FIREWALL BLOCKED]` with the exact resonance ratio (`activations/1024`) versus the threshold. A passed query prepends `🟢 [FIREWALL PASSED]` with `activations/threshold` before routing to the LLM stream.
+- **Explicit Chat Feedback:** When `[FW=ON]` is active, the chat endpoint injects human-readable telemetry into the response. A blocked query returns `🛑 [FW] Segment violation` with the exact metric that triggered the breach. A passed query prepends `🟢 [FW PASS]` with resonance/threshold and cosine values before routing to the LLM stream. All telemetry uses language-neutral technical terms.
 
 ## 2. Backend Architecture
 Utilizes **FastAPI** for route management yielding high execution throughput.
@@ -56,12 +56,16 @@ When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, 
 ## 6. Anti-Semantic Piggybacking Defense
 Addresses the attack vector where a malicious or off-topic instruction is appended to an otherwise legitimate prompt, causing the averaged embedding to pass dimensional excitation while the piggybacked payload executes unchecked.
 
-### 6.1 Hybrid Query Segmentation Firewall
-Instead of vectorizing the full prompt as a single embedding, `chat_endpoint` splits the input into logical clauses via the enhanced hybrid regex:
+### 6.1 Language-Agnostic Structural Segmentation
+Instead of vectorizing the full prompt as a single embedding, `chat_endpoint` splits the input into logical clauses via a **purely structural (symbol-only) regex** that carries zero language-specific dependencies:
 ```
-re.split(r'[.?\n]+|,\s*(?:y|pero|también|además|and|also|plus)\s+', clean_prompt)
+re.split(r'[.!?;:\n\-\|«»\u201c\u201d]+', clean_prompt)
 ```
-This splits on sentence terminators (`.`, `?`, `\n`) **and** logical connectors (`y`, `pero`, `también`, `además`, `and`, `also`, `plus`), filtering fragments ≤ 4 chars. Each clause is vectorized independently against the nearest knowledge node. If **any single clause** fails any stage of the ordered pipeline, the entire prompt is rejected with `FIREWALL BLOCKED`. This ensures a poisoned clause cannot hide inside benign context.
+This splits on universal punctuation terminators (`.`, `!`, `?`, `;`, `:`, `\n`, `-`, `|`, `«»`, `""`) — no words from any language are referenced. Fragments ≤ 4 chars are discarded.
+
+**Safety Fallback (Overflow Chunking):** If any resulting clause exceeds 20 words, it is force-split into sub-chunks of 15 words each. This prevents a long run-on sentence from averaging its embedding across safe and malicious content. Each sub-chunk must independently pass the entire ordered pipeline.
+
+If **any single clause or sub-chunk** fails any stage of the pipeline, the entire prompt is rejected with `[FW] Segment violation`. This ensures a poisoned clause cannot hide inside benign context, regardless of input language.
 
 ### 6.2 System Prompt Hardening (Zero-Tolerance Context Confinement)
 As a secondary defense layer, `stream_ollama` injects a strict system instruction constraining the LLM to respond **exclusively** from the provided RAG context. If a query or sub-instruction cannot be answered from the context (e.g. recipes, jokes, unrelated code), the LLM is instructed to refuse that portion. This provides defense-in-depth even if the segmentation firewall is bypassed.
@@ -229,7 +233,7 @@ pytest -v perform_tests.py
 === ./manifest.json ===
 {
     "project": "Phase-Lock Semantic Firewall",
-    "version": "v2.2.0",
+    "version": "v2.3.0",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -242,6 +246,8 @@ pytest -v perform_tests.py
         "global_system_action_status": true,
         "utf8_ndjson_line_streaming": true,
         "explicit_firewall_chat_feedback": true,
+        "language_agnostic_segmentation": true,
+        "overflow_chunking_fallback": true,
         "query_segmentation_defense": true,
         "strict_context_prompting": true,
         "hybrid_adaptive_threshold_firewall": true,
@@ -4187,7 +4193,11 @@ export const ControlPanel: React.FC = () => {
       "Bash(grep -E \"\\\\.\\(sh|py|json|md\\)$\")",
       "mcp__Claude_Preview__preview_start",
       "Bash(.venv/bin/python -c \"from app.api.routes import router; print\\(''Backend imports OK''\\)\")",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(grep -E \"\\\\.\\(json|js|ts|tsx|css\\)$|eslint\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''app/api/routes.py'', doraise=True\\); py_compile.compile\\(''perform_tests.py'', doraise=True\\); print\\(''OK''\\)\")",
+      "Bash(.venv/bin/python -c \"import py_compile; py_compile.compile\\(''app/api/routes.py'', doraise=True\\); py_compile.compile\\(''perform_tests.py'', doraise=True\\); print\\(''OK''\\)\")",
+      "Bash(.venv/bin/python -c \"import json; print\\(json.dumps\\(json.load\\(open\\(''../manifest.json''\\)\\), indent=2\\)\\)\")"
     ]
   }
 }
@@ -4264,7 +4274,7 @@ async def test_firewall_interceptor_blocking():
             
             # Since the database is empty or not matching well, activations will be ~0
             # which is < 10000, so it will block.
-            assert "FIREWALL BLOCKED" in content
+            assert "[FW] Segment violation" in content
 
 @pytest.mark.asyncio
 async def test_rag_context_injection():
@@ -4277,7 +4287,7 @@ async def test_rag_context_injection():
                 content += chunk
             # Depending on if ollama is running or not, we might get an error or a stream, 
             # but we definitely shouldn't get a SECURITY BREACH block from the interceptor.
-            assert "FIREWALL BLOCKED" not in content
+            assert "[FW] Segment violation" not in content and "FIREWALL BLOCKED" not in content
 
 def test_system_stats_gpu_telemetry():
     response = client.get("/system/stats")
@@ -4292,7 +4302,7 @@ def test_system_stats_gpu_telemetry():
 
 @pytest.mark.asyncio
 async def test_semantic_piggybacking_rejection():
-    """A piggybacked off-topic sentence must trigger FIREWALL BLOCKED even if the first sentence is on-topic."""
+    """A piggybacked off-topic sentence must trigger [FW] Segment violation even if the first sentence is on-topic."""
     config_state.excitation_threshold = 10000
     config_state.noise_tolerance = 0.0001
 
@@ -4304,7 +4314,7 @@ async def test_semantic_piggybacking_rejection():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "FIREWALL BLOCKED" in content
+            assert "[FW] Segment violation" in content
 
 @pytest.mark.asyncio
 async def test_noise_prefilter_blocking():
@@ -4323,8 +4333,8 @@ async def test_noise_prefilter_blocking():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "FIREWALL BLOCKED" in content
-            assert "Noise pre-filter tripped" in content or "noise:BREACH" in content
+            assert "[FW] Segment violation" in content
+            assert "noise:BREACH" in content or "Noise pre-filter" in content
 
 @pytest.mark.asyncio
 async def test_pipeline_order_respected():
@@ -4393,7 +4403,7 @@ async def test_adaptive_factor_telemetry_on_short_clause():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "FIREWALL BLOCKED" in content
+            assert "[FW] Segment violation" in content
             assert "ADAPTIVE" in content or "0.5x factor" in content
 
 # Add pytest-asyncio to required pip if needed for async mark
@@ -4517,16 +4527,16 @@ async def audit_query(req: AuditRequest):
 async def stream_ollama(prompt: str, context: str, strict: bool = False):
     if strict:
         system_instruction = (
-            "Eres un asistente técnico. "
-            "Basa tu respuesta PRIORITARIAMENTE en el contexto proporcionado. "
-            "Si el usuario hace una pregunta que NO tiene relación con el contexto "
-            "(ej. recetas de cocina, chistes, temas completamente ajenos), "
-            "responde brevemente que no puedes ayudar con esa parte específica, "
-            "pero SÍ responde las partes que se relacionan con el contexto."
+            "You are a technical assistant. "
+            "Base your response PRIMARILY on the provided context. "
+            "If the user asks a question that has NO relation to the context "
+            "(e.g. recipes, jokes, completely unrelated topics), "
+            "briefly state you cannot help with that specific part, "
+            "but DO answer the parts that relate to the context."
         )
-        full_prompt = f"{system_instruction}\n\nContexto:\n{context}\n\nConsulta del usuario:\n{prompt}"
+        full_prompt = f"{system_instruction}\n\nContext:\n{context}\n\nUser query:\n{prompt}"
     else:
-        full_prompt = f"Contexto:\n{context}\n\nConsulta del usuario:\n{prompt}"
+        full_prompt = f"Context:\n{context}\n\nUser query:\n{prompt}"
     async with httpx.AsyncClient(timeout=None) as client:
         try:
             async with client.stream(
@@ -4546,8 +4556,22 @@ async def chat_endpoint(req: ChatRequest):
     fw_on = "[FW=ON]" in prompt
     clean_prompt = prompt.replace("[FW=ON]", "").replace("[FW=OFF]", "").strip()
     
-    # --- Hybrid Clause Segmentation Firewall ---
-    clauses = [c.strip() for c in re.split(r'[.?\n]+|,\s*(?:y|pero|también|además|and|also|plus)\s+', clean_prompt) if len(c.strip()) > 4]
+    # --- Structural Clause Segmentation (Language-Agnostic) ---
+    raw_clauses = [c.strip() for c in re.split(r'[.!?;:\n\-\|«»\u201c\u201d]+', clean_prompt) if len(c.strip()) > 4]
+    if not raw_clauses:
+        raw_clauses = [clean_prompt]
+
+    # Safety fallback: force-split long clauses into ≤15-word sub-chunks
+    clauses = []
+    for rc in raw_clauses:
+        words = rc.split()
+        if len(words) > 20:
+            for i in range(0, len(words), 15):
+                sub = " ".join(words[i:i+15])
+                if len(sub.strip()) > 4:
+                    clauses.append(sub.strip())
+        else:
+            clauses.append(rc)
     if not clauses:
         clauses = [clean_prompt]
 
@@ -4651,33 +4675,31 @@ async def chat_endpoint(req: ChatRequest):
         if failed_clause is not None:
             if block_reason == "cosine":
                 block_msg = (
-                    f'🛑 [FIREWALL BLOCKED] Semantic anchoring detected in segment: "{failed_clause}". '
-                    f'Cosine Similarity: {block_details.get("cosine_sim", 0):.3f} '
-                    f'(Required: ≥{config_state.cosine_threshold:.2f}). '
-                    f'Vector direction diverges from sovereign corpus.'
+                    f'🛑 [FW] Segment violation: "{failed_clause}". '
+                    f'Cosine: {block_details.get("cosine_sim", 0):.3f} '
+                    f'(Required: >={config_state.cosine_threshold:.2f}). '
+                    f'Vector direction diverges from corpus.'
                 )
             elif block_reason == "noise":
                 block_msg = (
-                    f'🛑 [FIREWALL BLOCKED] Noise pre-filter tripped on segment: "{failed_clause}". '
-                    f'Avg Delta: {block_details.get("avg_delta", 0):.4f} '
+                    f'🛑 [FW] Segment violation: "{failed_clause}". '
+                    f'Noise pre-filter: avg_delta={block_details.get("avg_delta", 0):.4f} '
                     f'(Limit: {config_state.global_noise_limit:.3f}).'
                 )
             elif block_reason == "no_context":
                 block_msg = (
-                    f'🛑 [FIREWALL BLOCKED] No context found for segment: "{failed_clause}". '
-                    f'Empty database or no match.'
+                    f'🛑 [FW] Segment violation: "{failed_clause}". '
+                    f'No context match in corpus.'
                 )
             else:
                 adaptive_note = ""
                 if block_details.get("adaptive_applied"):
                     adaptive_note = (
-                        f' [ADAPTIVE] Short Clause Detected. '
-                        f'Applying {block_details.get("adaptive_factor", 1.0)}x factor. '
+                        f' [ADAPTIVE] Factor: {block_details.get("adaptive_factor", 1.0)}x.'
                     )
                 block_msg = (
-                    f'🛑 [FIREWALL BLOCKED] Violation in segment: "{failed_clause}". '
-                    f'Resonance: {block_details.get("activations", 0)} '
-                    f'(Required: {block_details.get("threshold", 0):.0f}).{adaptive_note}'
+                    f'🛑 [FW] Segment violation: "{failed_clause}". '
+                    f'Resonance: {block_details.get("activations", 0)}/{block_details.get("threshold", 0):.0f}.{adaptive_note}'
                 )
 
             # Include pipeline execution order in telemetry
@@ -4696,11 +4718,11 @@ async def chat_endpoint(req: ChatRequest):
             f'{r["stage"]}:OK' for r in pipeline_results
         )
         pass_prefix = (
-            f"🟢 [FIREWALL PASSED] Resonance: "
+            f"🟢 [FW PASS] Resonance: "
             f"{last_activations}/{config_state.excitation_threshold} dims | "
             f"Cosine: {last_cosine:.3f} | "
             f"Pipeline: [{stage_summary}]\n"
-            f"Routing to sovereign knowledge...\n\n"
+            f"Routing to corpus...\n\n"
         )
         async def prefixed_stream():
             yield json.dumps({"response": pass_prefix}).encode("utf-8") + b"\n"

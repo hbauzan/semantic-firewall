@@ -48,7 +48,7 @@ async def test_firewall_interceptor_blocking():
             
             # Since the database is empty or not matching well, activations will be ~0
             # which is < 10000, so it will block.
-            assert "FIREWALL BLOCKED" in content
+            assert "[FW] Segment violation" in content
 
 @pytest.mark.asyncio
 async def test_rag_context_injection():
@@ -61,7 +61,7 @@ async def test_rag_context_injection():
                 content += chunk
             # Depending on if ollama is running or not, we might get an error or a stream, 
             # but we definitely shouldn't get a SECURITY BREACH block from the interceptor.
-            assert "FIREWALL BLOCKED" not in content
+            assert "[FW] Segment violation" not in content and "FIREWALL BLOCKED" not in content
 
 def test_system_stats_gpu_telemetry():
     response = client.get("/system/stats")
@@ -76,7 +76,7 @@ def test_system_stats_gpu_telemetry():
 
 @pytest.mark.asyncio
 async def test_semantic_piggybacking_rejection():
-    """A piggybacked off-topic sentence must trigger FIREWALL BLOCKED even if the first sentence is on-topic."""
+    """A piggybacked off-topic sentence must trigger [FW] Segment violation even if the first sentence is on-topic."""
     config_state.excitation_threshold = 10000
     config_state.noise_tolerance = 0.0001
 
@@ -88,7 +88,7 @@ async def test_semantic_piggybacking_rejection():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "FIREWALL BLOCKED" in content
+            assert "[FW] Segment violation" in content
 
 @pytest.mark.asyncio
 async def test_noise_prefilter_blocking():
@@ -107,8 +107,8 @@ async def test_noise_prefilter_blocking():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "FIREWALL BLOCKED" in content
-            assert "Noise pre-filter tripped" in content or "noise:BREACH" in content
+            assert "[FW] Segment violation" in content
+            assert "noise:BREACH" in content or "Noise pre-filter" in content
 
 @pytest.mark.asyncio
 async def test_pipeline_order_respected():
@@ -177,7 +177,7 @@ async def test_adaptive_factor_telemetry_on_short_clause():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "FIREWALL BLOCKED" in content
+            assert "[FW] Segment violation" in content
             assert "ADAPTIVE" in content or "0.5x factor" in content
 
 # Add pytest-asyncio to required pip if needed for async mark

@@ -1,6 +1,6 @@
 {
     "project": "Phase-Lock Semantic Firewall",
-    "version": "v2.2.0",
+    "version": "v2.3.0",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -13,6 +13,8 @@
         "global_system_action_status": true,
         "utf8_ndjson_line_streaming": true,
         "explicit_firewall_chat_feedback": true,
+        "language_agnostic_segmentation": true,
+        "overflow_chunking_fallback": true,
         "query_segmentation_defense": true,
         "strict_context_prompting": true,
         "hybrid_adaptive_threshold_firewall": true,

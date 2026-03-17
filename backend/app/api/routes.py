@@ -93,16 +93,16 @@ async def audit_query(req: AuditRequest):
 async def stream_ollama(prompt: str, context: str, strict: bool = False):
     if strict:
         system_instruction = (
-            "Eres un asistente técnico. "
-            "Basa tu respuesta PRIORITARIAMENTE en el contexto proporcionado. "
-            "Si el usuario hace una pregunta que NO tiene relación con el contexto "
-            "(ej. recetas de cocina, chistes, temas completamente ajenos), "
-            "responde brevemente que no puedes ayudar con esa parte específica, "
-            "pero SÍ responde las partes que se relacionan con el contexto."
+            "You are a technical assistant. "
+            "Base your response PRIMARILY on the provided context. "
+            "If the user asks a question that has NO relation to the context "
+            "(e.g. recipes, jokes, completely unrelated topics), "
+            "briefly state you cannot help with that specific part, "
+            "but DO answer the parts that relate to the context."
         )
-        full_prompt = f"{system_instruction}\n\nContexto:\n{context}\n\nConsulta del usuario:\n{prompt}"
+        full_prompt = f"{system_instruction}\n\nContext:\n{context}\n\nUser query:\n{prompt}"
     else:
-        full_prompt = f"Contexto:\n{context}\n\nConsulta del usuario:\n{prompt}"
+        full_prompt = f"Context:\n{context}\n\nUser query:\n{prompt}"
     async with httpx.AsyncClient(timeout=None) as client:
         try:
             async with client.stream(
@@ -122,8 +122,22 @@ async def chat_endpoint(req: ChatRequest):
     fw_on = "[FW=ON]" in prompt
     clean_prompt = prompt.replace("[FW=ON]", "").replace("[FW=OFF]", "").strip()
     
-    # --- Hybrid Clause Segmentation Firewall ---
-    clauses = [c.strip() for c in re.split(r'[.?\n]+|,\s*(?:y|pero|también|además|and|also|plus)\s+', clean_prompt) if len(c.strip()) > 4]
+    # --- Structural Clause Segmentation (Language-Agnostic) ---
+    raw_clauses = [c.strip() for c in re.split(r'[.!?;:\n\-\|«»\u201c\u201d]+', clean_prompt) if len(c.strip()) > 4]
+    if not raw_clauses:
+        raw_clauses = [clean_prompt]
+
+    # Safety fallback: force-split long clauses into ≤15-word sub-chunks
+    clauses = []
+    for rc in raw_clauses:
+        words = rc.split()
+        if len(words) > 20:
+            for i in range(0, len(words), 15):
+                sub = " ".join(words[i:i+15])
+                if len(sub.strip()) > 4:
+                    clauses.append(sub.strip())
+        else:
+            clauses.append(rc)
     if not clauses:
         clauses = [clean_prompt]
 
@@ -227,33 +241,31 @@ async def chat_endpoint(req: ChatRequest):
         if failed_clause is not None:
             if block_reason == "cosine":
                 block_msg = (
-                    f'🛑 [FIREWALL BLOCKED] Semantic anchoring detected in segment: "{failed_clause}". '
-                    f'Cosine Similarity: {block_details.get("cosine_sim", 0):.3f} '
-                    f'(Required: ≥{config_state.cosine_threshold:.2f}). '
-                    f'Vector direction diverges from sovereign corpus.'
+                    f'🛑 [FW] Segment violation: "{failed_clause}". '
+                    f'Cosine: {block_details.get("cosine_sim", 0):.3f} '
+                    f'(Required: >={config_state.cosine_threshold:.2f}). '
+                    f'Vector direction diverges from corpus.'
                 )
             elif block_reason == "noise":
                 block_msg = (
-                    f'🛑 [FIREWALL BLOCKED] Noise pre-filter tripped on segment: "{failed_clause}". '
-                    f'Avg Delta: {block_details.get("avg_delta", 0):.4f} '
+                    f'🛑 [FW] Segment violation: "{failed_clause}". '
+                    f'Noise pre-filter: avg_delta={block_details.get("avg_delta", 0):.4f} '
                     f'(Limit: {config_state.global_noise_limit:.3f}).'
                 )
             elif block_reason == "no_context":
                 block_msg = (
-                    f'🛑 [FIREWALL BLOCKED] No context found for segment: "{failed_clause}". '
-                    f'Empty database or no match.'
+                    f'🛑 [FW] Segment violation: "{failed_clause}". '
+                    f'No context match in corpus.'
                 )
             else:
                 adaptive_note = ""
                 if block_details.get("adaptive_applied"):
                     adaptive_note = (
-                        f' [ADAPTIVE] Short Clause Detected. '
-                        f'Applying {block_details.get("adaptive_factor", 1.0)}x factor. '
+                        f' [ADAPTIVE] Factor: {block_details.get("adaptive_factor", 1.0)}x.'
                     )
                 block_msg = (
-                    f'🛑 [FIREWALL BLOCKED] Violation in segment: "{failed_clause}". '
-                    f'Resonance: {block_details.get("activations", 0)} '
-                    f'(Required: {block_details.get("threshold", 0):.0f}).{adaptive_note}'
+                    f'🛑 [FW] Segment violation: "{failed_clause}". '
+                    f'Resonance: {block_details.get("activations", 0)}/{block_details.get("threshold", 0):.0f}.{adaptive_note}'
                 )
 
             # Include pipeline execution order in telemetry
@@ -272,11 +284,11 @@ async def chat_endpoint(req: ChatRequest):
             f'{r["stage"]}:OK' for r in pipeline_results
         )
         pass_prefix = (
-            f"🟢 [FIREWALL PASSED] Resonance: "
+            f"🟢 [FW PASS] Resonance: "
             f"{last_activations}/{config_state.excitation_threshold} dims | "
             f"Cosine: {last_cosine:.3f} | "
             f"Pipeline: [{stage_summary}]\n"
-            f"Routing to sovereign knowledge...\n\n"
+            f"Routing to corpus...\n\n"
         )
         async def prefixed_stream():
             yield json.dumps({"response": pass_prefix}).encode("utf-8") + b"\n"

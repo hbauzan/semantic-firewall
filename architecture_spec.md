@@ -5,7 +5,7 @@ The firewall operates by evaluating the raw 1024D embedding layers produced by `
 - **Delta Calculation:** For each dimension `i`, we compute the absolute delta `Delta_i = abs(Q_i - C_i)`.
 - **Activation Logic:** An activation register is tripped if `Delta_i` is less than or equal to the `Noise Tolerance` configuration (default 0.005). Thus, `Activation_i = 1`.
 - **Gate:** The final dimension sum `sum(Activation_i)` must be mathematically greater than or equal to the `Excitation Threshold` (default 150) to be deemed geometrically 'SAFE'. Otherwise, the request triggers a `SECURITY BREACH` and the streaming block breaks connection.
-- **Explicit Chat Feedback:** When `[FW=ON]` is active, the chat endpoint injects human-readable telemetry into the response. A blocked query returns `🛑 [FIREWALL BLOCKED]` with the exact resonance ratio (`activations/1024`) versus the threshold. A passed query prepends `🟢 [FIREWALL PASSED]` with `activations/threshold` before routing to the LLM stream.
+- **Explicit Chat Feedback:** When `[FW=ON]` is active, the chat endpoint injects human-readable telemetry into the response. A blocked query returns `🛑 [FW] Segment violation` with the exact metric that triggered the breach. A passed query prepends `🟢 [FW PASS]` with resonance/threshold and cosine values before routing to the LLM stream. All telemetry uses language-neutral technical terms.
 
 ## 2. Backend Architecture
 Utilizes **FastAPI** for route management yielding high execution throughput.
@@ -49,12 +49,16 @@ When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, 
 ## 6. Anti-Semantic Piggybacking Defense
 Addresses the attack vector where a malicious or off-topic instruction is appended to an otherwise legitimate prompt, causing the averaged embedding to pass dimensional excitation while the piggybacked payload executes unchecked.
 
-### 6.1 Hybrid Query Segmentation Firewall
-Instead of vectorizing the full prompt as a single embedding, `chat_endpoint` splits the input into logical clauses via the enhanced hybrid regex:
+### 6.1 Language-Agnostic Structural Segmentation
+Instead of vectorizing the full prompt as a single embedding, `chat_endpoint` splits the input into logical clauses via a **purely structural (symbol-only) regex** that carries zero language-specific dependencies:
 ```
-re.split(r'[.?\n]+|,\s*(?:y|pero|también|además|and|also|plus)\s+', clean_prompt)
+re.split(r'[.!?;:\n\-\|«»\u201c\u201d]+', clean_prompt)
 ```
-This splits on sentence terminators (`.`, `?`, `\n`) **and** logical connectors (`y`, `pero`, `también`, `además`, `and`, `also`, `plus`), filtering fragments ≤ 4 chars. Each clause is vectorized independently against the nearest knowledge node. If **any single clause** fails any stage of the ordered pipeline, the entire prompt is rejected with `FIREWALL BLOCKED`. This ensures a poisoned clause cannot hide inside benign context.
+This splits on universal punctuation terminators (`.`, `!`, `?`, `;`, `:`, `\n`, `-`, `|`, `«»`, `""`) — no words from any language are referenced. Fragments ≤ 4 chars are discarded.
+
+**Safety Fallback (Overflow Chunking):** If any resulting clause exceeds 20 words, it is force-split into sub-chunks of 15 words each. This prevents a long run-on sentence from averaging its embedding across safe and malicious content. Each sub-chunk must independently pass the entire ordered pipeline.
+
+If **any single clause or sub-chunk** fails any stage of the pipeline, the entire prompt is rejected with `[FW] Segment violation`. This ensures a poisoned clause cannot hide inside benign context, regardless of input language.
 
 ### 6.2 System Prompt Hardening (Zero-Tolerance Context Confinement)
 As a secondary defense layer, `stream_ollama` injects a strict system instruction constraining the LLM to respond **exclusively** from the provided RAG context. If a query or sub-instruction cannot be answered from the context (e.g. recipes, jokes, unrelated code), the LLM is instructed to refuse that portion. This provides defense-in-depth even if the segmentation firewall is bypassed.
