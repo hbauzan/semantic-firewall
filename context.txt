@@ -12,7 +12,7 @@ The firewall operates by evaluating the raw 1024D embedding layers produced by `
 - **Delta Calculation:** For each dimension `i`, we compute the absolute delta `Delta_i = abs(Q_i - C_i)`.
 - **Activation Logic:** An activation register is tripped if `Delta_i` is less than or equal to the `Noise Tolerance` configuration (default 0.005). Thus, `Activation_i = 1`.
 - **Gate:** The final dimension sum `sum(Activation_i)` must be mathematically greater than or equal to the `Excitation Threshold` (default 150) to be deemed geometrically 'SAFE'. Otherwise, the request triggers a `SECURITY BREACH` and the streaming block breaks connection.
-- **Explicit Chat Feedback:** When `[FW=ON]` is active, the chat endpoint injects human-readable telemetry into the response. A blocked query returns `🛑 [FW] Segment violation` with the exact metric that triggered the breach. A passed query prepends `🟢 [FW PASS]` with resonance/threshold and cosine values before routing to the LLM stream. All telemetry uses language-neutral technical terms.
+- **Explicit Chat Feedback:** When any firewall filter is enabled, the chat endpoint injects human-readable telemetry into the response. A blocked query returns `🛑 [FW] Segment violation` with the exact metric that triggered the breach. A passed query prepends `🟢 [FW PASS]` with resonance/threshold and cosine values before routing to the LLM stream. All telemetry uses language-neutral technical terms.
 
 ## 2. Backend Architecture
 Utilizes **FastAPI** for route management yielding high execution throughput. The backend follows a **layered separation of concerns**:
@@ -68,8 +68,8 @@ When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, 
 
 ## 5. Frontend Control Logic
 - **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads (including `cosineOrder`, `excitationOrder`, `noiseOrder`, `globalNoiseLimit`, `adaptiveFactor`), an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
-- **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings mapping system metrics underneath a custom ASCII-art **Pirate Monkey** multi-frame cycle. Utilizes a Mac Unified Memory dynamically-scaled heuristic (`vram / 40.0`) to avoid 100% hard-locking early.
-- **Pipeline Ordering UI (`ControlPanel.tsx`):** Slider groups are visually ordered to match the default pipeline execution sequence: **Noise Pre-Filter (Seq 1)** → **Cosine Gate (Seq 2)** → **Excitation Threshold + Noise Tolerance (Seq 3)** → **Adaptive Factor**. Each filter includes a **Seq** numerical input (1–3) that controls pipeline execution order. All values are synced to the backend via debounced `POST /galaxy/config`.
+- **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings mapping system metrics underneath a custom ASCII-art **Pirate Monkey** multi-frame cycle. On Apple Silicon (MPS), GPU% is calculated as `torch.mps.current_allocated_memory() / psutil.virtual_memory().total * 100` — reflecting actual allocation against total unified memory. On CUDA, it uses `torch.cuda.memory_allocated() / torch.cuda.get_device_properties(0).total_mem * 100`.
+- **Pipeline Ordering UI (`ControlPanel.tsx`):** Slider groups are visually ordered to match the default pipeline execution sequence: **Noise Pre-Filter (Seq 1)** → **Cosine Gate (Seq 2)** → **Excitation Threshold + Noise Tolerance (Seq 3)** → **Adaptive Factor**. Each filter includes a **Seq** numerical input (1–3) that controls pipeline execution order and an **ON/OFF toggle button** that enables or disables that individual filter. When a filter is toggled OFF, its slider group dims to 40% opacity and the filter is excluded from the pipeline entirely (via `build_pipeline()` in the engine). The firewall is considered active when at least one filter is enabled (`fw_on = noise_enabled || cosine_enabled || excitation_enabled`). The legacy `[FW=OFF]` prompt prefix is still supported as a bypass override. All values including enabled states are synced to the backend via debounced `POST /galaxy/config`.
 - **Interface Guardrails (`ChatInterface.tsx`):** Implements **BigInt Safety** explicitly casting all interaction `Date.now()` iterations recursively. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically.
 
 ## 6. Anti-Semantic Piggybacking Defense
@@ -595,7 +595,7 @@ pytest -v perform_tests.py
 === ./manifest.json ===
 {
     "project": "Phase-Lock Semantic Firewall",
-    "version": "v2.6.1",
+    "version": "v2.7.0",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -622,17 +622,21 @@ pytest -v perform_tests.py
         "modular_firewall_engine": true,
         "cors_hardening": true,
         "opt_in_api_key_auth": true,
-        "input_length_sanitization": true
+        "input_length_sanitization": true,
+        "per_filter_toggle_buttons": true
     },
     "state_schema": {
         "excitation_threshold": {"type": "int", "default": 150, "range": [0, 1024]},
         "noise_tolerance": {"type": "float", "default": 0.005, "range": [0.001, 0.100]},
-        "cosine_threshold": {"type": "float", "default": 0.78, "range": [0.50, 0.99]},
+        "cosine_threshold": {"type": "float", "default": 0.50, "range": [0.00, 1.00]},
         "global_noise_limit": {"type": "float", "default": 0.50, "range": [0.10, 2.00]},
         "cosine_order": {"type": "int", "default": 2, "range": [1, 3]},
         "excitation_order": {"type": "int", "default": 3, "range": [1, 3]},
         "noise_order": {"type": "int", "default": 1, "range": [1, 3]},
-        "adaptive_factor": {"type": "float", "default": 0.85, "range": [0.01, 1.00]}
+        "adaptive_factor": {"type": "float", "default": 0.85, "range": [0.01, 1.00]},
+        "noise_enabled": {"type": "bool", "default": true},
+        "cosine_enabled": {"type": "bool", "default": true},
+        "excitation_enabled": {"type": "bool", "default": true}
     },
     "constraints": {
         "vector_dim": 1024
@@ -3910,6 +3914,9 @@ interface StoreState {
   excitationOrder: number;
   noiseOrder: number;
   adaptiveFactor: number;
+  noiseEnabled: boolean;
+  cosineEnabled: boolean;
+  excitationEnabled: boolean;
   setExcitationThreshold: (val: number) => void;
   setNoiseTolerance: (val: number) => void;
   setCosineThreshold: (val: number) => void;
@@ -3918,6 +3925,9 @@ interface StoreState {
   setExcitationOrder: (val: number) => void;
   setNoiseOrder: (val: number) => void;
   setAdaptiveFactor: (val: number) => void;
+  setNoiseEnabled: (val: boolean) => void;
+  setCosineEnabled: (val: boolean) => void;
+  setExcitationEnabled: (val: boolean) => void;
 
   messages: Message[];
   addMessage: (msg: Message) => void;
@@ -3941,12 +3951,15 @@ interface StoreState {
 export const useStore = create<StoreState>((set) => ({
   excitationThreshold: 150,
   noiseTolerance: 0.005,
-  cosineThreshold: 0.78,
+  cosineThreshold: 0.50,
   globalNoiseLimit: 0.50,
   cosineOrder: 2,
   excitationOrder: 3,
   noiseOrder: 1,
   adaptiveFactor: 0.85,
+  noiseEnabled: true,
+  cosineEnabled: true,
+  excitationEnabled: true,
   setExcitationThreshold: (val) => set({ excitationThreshold: val }),
   setNoiseTolerance: (val) => set({ noiseTolerance: val }),
   setCosineThreshold: (val) => set({ cosineThreshold: val }),
@@ -3955,6 +3968,9 @@ export const useStore = create<StoreState>((set) => ({
   setExcitationOrder: (val) => set({ excitationOrder: val }),
   setNoiseOrder: (val) => set({ noiseOrder: val }),
   setAdaptiveFactor: (val) => set({ adaptiveFactor: val }),
+  setNoiseEnabled: (val) => set({ noiseEnabled: val }),
+  setCosineEnabled: (val) => set({ cosineEnabled: val }),
+  setExcitationEnabled: (val) => set({ excitationEnabled: val }),
 
   messages: [],
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
@@ -3977,78 +3993,131 @@ export const useStore = create<StoreState>((set) => ({
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
 
-const FRAMES = [
-    `
-  .---.
- /_____\\
- ( x.o )
-  > m <
-  `,
-    `
-  .---.
- /_____\\
- ( x.- )
-  > m <
-  `,
-    `
-  .---.
- /_____\\
- ( x.o )
-  > O <
-  `
+// Alive monkey frames (animated mouth)
+const ALIVE_FRAMES = [
+  [
+    `  .-.  `,
+    ` (o.o) `,
+    `  >m<  `,
+  ],
+  [
+    `  .-.  `,
+    ` (o.-) `,
+    `  >m<  `,
+  ],
+  [
+    `  .-.  `,
+    ` (-.o) `,
+    `  >O<  `,
+  ],
 ];
 
+// Dead monkey (static)
+const DEAD_FRAME = [
+  `  .-.  `,
+  ` (x.x) `,
+  `  >-<  `,
+];
+
+interface MonkeyHeadProps {
+  alive: boolean;
+  label: string;
+  frameIdx: number;
+}
+
+const MonkeyHead: React.FC<MonkeyHeadProps> = ({ alive, label, frameIdx }) => {
+  const lines = alive ? ALIVE_FRAMES[frameIdx % ALIVE_FRAMES.length] : DEAD_FRAME;
+  return (
+    <div style={{
+      textAlign: 'center',
+      opacity: alive ? 1 : 0.25,
+      transition: 'opacity 0.3s',
+      minWidth: '4.5rem',
+    }}>
+      <pre style={{
+        margin: 0,
+        fontFamily: 'monospace',
+        fontSize: '9px',
+        lineHeight: '10px',
+        color: alive ? 'var(--accent)' : '#555',
+      }}>
+        {lines.join('\n')}
+      </pre>
+      <div style={{
+        fontSize: '0.55rem',
+        marginTop: '2px',
+        color: alive ? 'var(--accent)' : '#444',
+        letterSpacing: '0.5px',
+        fontWeight: 'bold',
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+};
+
 export const TelemetryHUD: React.FC = () => {
-    const { telemetry, setTelemetry, systemAction } = useStore();
-    const [frameIdx, setFrameIdx] = useState(0);
+  const { telemetry, setTelemetry, systemAction, noiseEnabled, cosineEnabled, excitationEnabled } = useStore();
+  const [frameIdx, setFrameIdx] = useState(0);
 
-    useEffect(() => {
-        const animationInterval = setInterval(() => {
-            setFrameIdx((prev) => (prev + 1) % FRAMES.length);
-        }, 500);
-        return () => clearInterval(animationInterval);
-    }, []);
+  useEffect(() => {
+    const animationInterval = setInterval(() => {
+      setFrameIdx((prev) => (prev + 1) % ALIVE_FRAMES.length);
+    }, 500);
+    return () => clearInterval(animationInterval);
+  }, []);
 
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const res = await fetch('http://localhost:8000/system/stats');
-                const data = await res.json();
-                setTelemetry(data);
-            } catch (err) {
-                console.error("Failed to fetch stats", err);
-            }
-        };
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/system/stats');
+        const data = await res.json();
+        setTelemetry(data);
+      } catch (err) {
+        console.error("Failed to fetch stats", err);
+      }
+    };
 
-        const statsInterval = setInterval(fetchStats, 1000);
-        fetchStats(); // initial fetch
-        return () => clearInterval(statsInterval);
-    }, [setTelemetry]);
+    const statsInterval = setInterval(fetchStats, 1000);
+    fetchStats();
+    return () => clearInterval(statsInterval);
+  }, [setTelemetry]);
 
-    return (
-        <div className="panel">
-            <h2>Telemetry HUD</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                <div className="ascii-art" style={{ marginBottom: 0 }}>{FRAMES[frameIdx]}</div>
-                <div style={{ flexGrow: 1, fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-main)' }}>
-                    <div style={{ opacity: 0.5, marginBottom: '0.2rem' }}>[SYS_STATE]:</div>
-                    <div style={{ color: 'var(--accent)' }}>{systemAction}</div>
-                </div>
-            </div>
-            <div className="stat-item">
-                <span>CPU:</span>
-                <span>{telemetry.cpu.toFixed(1)}%</span>
-            </div>
-            <div className="stat-item">
-                <span>RAM:</span>
-                <span>{telemetry.ram.toFixed(0)} MB</span>
-            </div>
-            <div className="stat-item">
-                <span>GPU %:</span>
-                <span>{telemetry.gpu.toFixed(1)}%</span>
-            </div>
-        </div>
-    );
+  return (
+    <div className="panel" style={{ paddingBottom: '0.6rem' }}>
+      <h2 style={{ fontSize: '1rem', marginBottom: '0.4rem', paddingBottom: '0.3rem' }}>Three-headed Semantic Firewall</h2>
+
+      {/* --- Three Monkey Heads --- */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: '0.3rem', margin: '0.3rem 0' }}>
+        <MonkeyHead alive={noiseEnabled} label="NOISE" frameIdx={frameIdx} />
+        <MonkeyHead alive={cosineEnabled} label="COSINE" frameIdx={frameIdx + 1} />
+        <MonkeyHead alive={excitationEnabled} label="EXCITE" frameIdx={frameIdx + 2} />
+      </div>
+
+      {/* --- System State --- */}
+      <div style={{ fontFamily: 'monospace', fontSize: '0.7rem', textAlign: 'center', margin: '0.3rem 0' }}>
+        <span style={{ opacity: 0.4 }}>[SYS] </span>
+        <span style={{ color: 'var(--accent)' }}>{systemAction}</span>
+      </div>
+
+      {/* --- Compact Telemetry Line --- */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '1rem',
+        fontFamily: 'monospace',
+        fontSize: '0.6rem',
+        opacity: 0.5,
+        borderTop: '1px solid #222',
+        paddingTop: '0.3rem',
+        marginTop: '0.2rem',
+      }}>
+        <span>CPU {telemetry.cpu.toFixed(0)}%</span>
+        <span>RAM {telemetry.ram.toFixed(0)}MB</span>
+        <span>GPU {telemetry.gpu.toFixed(0)}%</span>
+      </div>
+    </div>
+  );
 };
 
 
@@ -4207,7 +4276,7 @@ export const ChatInterface: React.FC = () => {
         {messages.length === 0 && (
           <div style={{ opacity: 0.5, textAlign: 'center', marginTop: '2rem' }}>
             System initialized. Awaiting input.
-            Use [FW=ON] to enforce dimensional excitation parameters.
+            Use the Control Panel toggles to enable/disable individual firewall filters.
           </div>
         )}
         <div ref={bottomRef} />
@@ -4218,7 +4287,7 @@ export const ChatInterface: React.FC = () => {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Enter query... e.g. [FW=ON] Tell me a secret..."
+          placeholder="Enter query..."
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           disabled={isStreaming}
         />
@@ -4290,27 +4359,29 @@ export const AuditPanel: React.FC = () => {
 import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../store';
 
+// Shared toggle button style generator
+const toggleStyle = (on: boolean): React.CSSProperties => ({
+  width: '2.2rem', height: '1.3rem', fontSize: '0.55rem', fontWeight: 'bold',
+  border: '1px solid', borderColor: on ? 'var(--accent)' : '#555',
+  background: on ? 'var(--accent)' : '#222', color: on ? '#000' : '#555',
+  cursor: 'pointer', borderRadius: '3px', flexShrink: 0, padding: 0,
+});
+
+// Shared Seq input style
+const seqInputStyle: React.CSSProperties = {
+  width: '2.2rem', textAlign: 'center', background: '#111',
+  color: 'var(--accent)', border: '1px solid var(--accent)', padding: '1px', fontSize: '0.7rem',
+};
+
 export const ControlPanel: React.FC = () => {
   const {
-    excitationThreshold,
-    noiseTolerance,
-    cosineThreshold,
-    globalNoiseLimit,
-    cosineOrder,
-    excitationOrder,
-    noiseOrder,
-    adaptiveFactor,
-    setExcitationThreshold,
-    setNoiseTolerance,
-    setCosineThreshold,
-    setGlobalNoiseLimit,
-    setCosineOrder,
-    setExcitationOrder,
-    setNoiseOrder,
-    setAdaptiveFactor,
-    ingestionStatus,
-    setIngestionStatus,
-    setSystemAction
+    excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit,
+    cosineOrder, excitationOrder, noiseOrder, adaptiveFactor,
+    noiseEnabled, cosineEnabled, excitationEnabled,
+    setExcitationThreshold, setNoiseTolerance, setCosineThreshold, setGlobalNoiseLimit,
+    setCosineOrder, setExcitationOrder, setNoiseOrder, setAdaptiveFactor,
+    setNoiseEnabled, setCosineEnabled, setExcitationEnabled,
+    ingestionStatus, setIngestionStatus, setSystemAction
   } = useStore();
 
   const [packs, setPacks] = useState<{ filename: string, chunks: number }[]>([]);
@@ -4326,9 +4397,7 @@ export const ControlPanel: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchPacks();
-  }, []);
+  useEffect(() => { fetchPacks(); }, []);
 
   // Debounce API calls for config
   useEffect(() => {
@@ -4344,12 +4413,15 @@ export const ControlPanel: React.FC = () => {
           cosine_order: cosineOrder,
           excitation_order: excitationOrder,
           noise_order: noiseOrder,
-          adaptive_factor: adaptiveFactor
+          adaptive_factor: adaptiveFactor,
+          noise_enabled: noiseEnabled,
+          cosine_enabled: cosineEnabled,
+          excitation_enabled: excitationEnabled
         })
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
-  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor]);
+  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled]);
 
   // Poll for ingestion status if task is active
   useEffect(() => {
@@ -4364,7 +4436,7 @@ export const ControlPanel: React.FC = () => {
             progress: data.progress,
             message: data.message
           });
-          setSystemAction(`INGESTING_CORPUS: \${Math.round(data.progress)}%`);
+          setSystemAction(`INGESTING_CORPUS: ${Math.round(data.progress)}%`);
           if (data.status === 'completed' || data.status === 'failed') {
             setSystemAction('SYSTEM IDLE');
             fetchPacks();
@@ -4374,31 +4446,22 @@ export const ControlPanel: React.FC = () => {
         }
       }, 1000);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    }
+    return () => { if (interval) clearInterval(interval); }
   }, [ingestionStatus.taskId, ingestionStatus.status, setIngestionStatus, fetchPacks]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const formData = new FormData();
     formData.append('file', file);
     setSystemAction("UPLOADING_PDF...");
-
     try {
       const res = await fetch('http://localhost:8000/corpus/upload-pdf', {
         method: 'POST',
         body: formData
       });
       const data = await res.json();
-      setIngestionStatus({
-        taskId: data.task_id,
-        status: 'pending',
-        progress: 0,
-        message: 'Upload started...'
-      });
+      setIngestionStatus({ taskId: data.task_id, status: 'pending', progress: 0, message: 'Upload started...' });
     } catch (err) {
       console.error("Upload failed", err);
       setSystemAction("SYSTEM IDLE");
@@ -4417,137 +4480,121 @@ export const ControlPanel: React.FC = () => {
     }
   };
 
-
-
   return (
-    <div className="panel side-panel" style={{ marginTop: '1rem', width: 'auto' }}>
-      <h2>Control Panel</h2>
+    <div className="panel" style={{ width: 'auto', flex: 1, overflow: 'auto' }}>
+      <h2 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', paddingBottom: '0.3rem' }}>Control Panel</h2>
 
-      {/* --- Pipeline Stage 1: Noise Pre-Filter (Integrity Gate) --- */}
-      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <label style={{ flex: 1 }}>
-          Noise Pre-Filter (Avg Delta Limit): {globalNoiseLimit.toFixed(2)}
-          <input
-            type="range"
-            min="0.10" max="2.00" step="0.01"
-            value={globalNoiseLimit}
+      {/* --- Noise Pre-Filter --- */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', opacity: noiseEnabled ? 1 : 0.4, transition: 'opacity 0.2s' }}>
+        <button onClick={() => setNoiseEnabled(!noiseEnabled)} style={toggleStyle(noiseEnabled)}>
+          {noiseEnabled ? 'ON' : 'OFF'}
+        </button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong></div>
+          <input type="range" min="0.10" max="2.00" step="0.01" value={globalNoiseLimit}
             onChange={(e) => setGlobalNoiseLimit(Number(e.target.value))}
-          />
-        </label>
-        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
-          Seq
-          <input
-            type="number" min="1" max="3" step="1"
-            value={noiseOrder}
-            onChange={(e) => setNoiseOrder(Number(e.target.value))}
-            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
-          />
-        </label>
-      </div>
-
-      {/* --- Pipeline Stage 2: Cosine Gate (Semantic Orientation) --- */}
-      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <label style={{ flex: 1 }}>
-          Cosine Gate: {cosineThreshold.toFixed(2)}
-          <input
-            type="range"
-            min="0.50" max="0.99" step="0.01"
-            value={cosineThreshold}
-            onChange={(e) => setCosineThreshold(Number(e.target.value))}
-          />
-        </label>
-        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
-          Seq
-          <input
-            type="number" min="1" max="3" step="1"
-            value={cosineOrder}
-            onChange={(e) => setCosineOrder(Number(e.target.value))}
-            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
-          />
-        </label>
-      </div>
-
-      {/* --- Pipeline Stage 3: Excitation Filter (Atomic Resonance) --- */}
-      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <label style={{ flex: 1 }}>
-          Excitation Threshold: {excitationThreshold}
-          <input
-            type="range"
-            min="0" max="1024" step="1"
-            value={excitationThreshold}
-            onChange={(e) => setExcitationThreshold(Number(e.target.value))}
-          />
-          <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>Noise Tolerance: {noiseTolerance.toFixed(3)}</span>
-          <input
-            type="range"
-            min="0.001" max="0.100" step="0.001"
-            value={noiseTolerance}
-            onChange={(e) => setNoiseTolerance(Number(e.target.value))}
-          />
-        </label>
-        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
-          Seq
-          <input
-            type="number" min="1" max="3" step="1"
-            value={excitationOrder}
-            onChange={(e) => setExcitationOrder(Number(e.target.value))}
-            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
-          />
-        </label>
-      </div>
-
-      {/* --- Adaptive Factor (applies to Excitation on short clauses) --- */}
-      <div className="slider-group">
-        <label>
-          Adaptive Factor: {adaptiveFactor.toFixed(2)}
-          <input
-            type="range"
-            min="0.01" max="1.00" step="0.01"
-            value={adaptiveFactor}
-            onChange={(e) => setAdaptiveFactor(Number(e.target.value))}
-          />
-        </label>
-        <div style={{ fontSize: '0.7rem', opacity: 0.7, display: 'flex', justifyContent: 'space-between', padding: '0 0.25rem' }}>
-          <span>Short Query Req: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
-          <span>Full Query Req: {excitationThreshold} dims</span>
+            style={{ width: '100%', height: '12px' }} />
+        </div>
+        <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
+          <div style={{ opacity: 0.5 }}>Seq</div>
+          <input type="number" min="1" max="3" step="1" value={noiseOrder}
+            onChange={(e) => setNoiseOrder(Number(e.target.value))} style={seqInputStyle} />
         </div>
       </div>
 
-      <div className="upload-section">
-        <input
-          type="file"
-          accept="application/pdf"
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-          className="file-input"
-        />
-        <button onClick={() => fileInputRef.current?.click()} style={{ width: '100%', marginBottom: '1rem' }}>Upload PDF Corpus</button>
+      {/* --- Cosine Gate --- */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', opacity: cosineEnabled ? 1 : 0.4, transition: 'opacity 0.2s' }}>
+        <button onClick={() => setCosineEnabled(!cosineEnabled)} style={toggleStyle(cosineEnabled)}>
+          {cosineEnabled ? 'ON' : 'OFF'}
+        </button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Cosine Gate: <strong>{cosineThreshold.toFixed(2)}</strong></div>
+          <input type="range" min="0.00" max="1.00" step="0.01" value={cosineThreshold}
+            onChange={(e) => setCosineThreshold(Number(e.target.value))}
+            style={{ width: '100%', height: '12px' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.55rem', opacity: 0.4, marginTop: '-2px' }}>
+            <span>0 LAX</span><span>STRICT 1</span>
+          </div>
+        </div>
+        <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
+          <div style={{ opacity: 0.5 }}>Seq</div>
+          <input type="number" min="1" max="3" step="1" value={cosineOrder}
+            onChange={(e) => setCosineOrder(Number(e.target.value))} style={seqInputStyle} />
+        </div>
+      </div>
+
+      {/* --- Excitation Filter --- */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', opacity: excitationEnabled ? 1 : 0.4, transition: 'opacity 0.2s' }}>
+        <button onClick={() => setExcitationEnabled(!excitationEnabled)} style={toggleStyle(excitationEnabled)}>
+          {excitationEnabled ? 'ON' : 'OFF'}
+        </button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Excitation: <strong>{excitationThreshold}</strong></div>
+          <input type="range" min="0" max="1024" step="1" value={excitationThreshold}
+            onChange={(e) => setExcitationThreshold(Number(e.target.value))}
+            style={{ width: '100%', height: '12px' }} />
+          <div style={{ fontSize: '0.65rem', opacity: 0.5, marginTop: '-1px' }}>
+            Noise Tolerance: {noiseTolerance.toFixed(3)}
+          </div>
+          <input type="range" min="0.001" max="0.100" step="0.001" value={noiseTolerance}
+            onChange={(e) => setNoiseTolerance(Number(e.target.value))}
+            style={{ width: '100%', height: '12px' }} />
+        </div>
+        <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
+          <div style={{ opacity: 0.5 }}>Seq</div>
+          <input type="number" min="1" max="3" step="1" value={excitationOrder}
+            onChange={(e) => setExcitationOrder(Number(e.target.value))} style={seqInputStyle} />
+        </div>
+      </div>
+
+      {/* --- Adaptive Factor --- */}
+      <div style={{ marginBottom: '0.5rem', padding: '0.3rem 0', borderTop: '1px solid #222' }}>
+        <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Adaptive Factor: <strong>{adaptiveFactor.toFixed(2)}</strong></div>
+        <input type="range" min="0.01" max="1.00" step="0.01" value={adaptiveFactor}
+          onChange={(e) => setAdaptiveFactor(Number(e.target.value))}
+          style={{ width: '100%', height: '12px' }} />
+        <div style={{ fontSize: '0.6rem', opacity: 0.5, display: 'flex', justifyContent: 'space-between' }}>
+          <span>Short: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
+          <span>Full: {excitationThreshold} dims</span>
+        </div>
+      </div>
+
+      {/* --- Corpus Upload --- */}
+      <div style={{ borderTop: '1px solid #222', paddingTop: '0.4rem' }}>
+        <input type="file" accept="application/pdf" ref={fileInputRef}
+          onChange={handleFileUpload} className="file-input" />
+        <button onClick={() => fileInputRef.current?.click()}
+          style={{ width: '100%', padding: '0.35rem', fontSize: '0.75rem', marginBottom: '0.4rem' }}>
+          Upload PDF Corpus
+        </button>
 
         {packs.length > 0 && (
-          <div className="pack-list" style={{ textAlign: 'left', fontSize: '0.85rem' }}>
-            <strong>Loaded Packs:</strong>
-            <ul style={{ listStyle: 'none', padding: 0, margin: '0.5rem 0' }}>
-              {packs.map((p) => (
-                <li key={p.filename} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', padding: '0.25rem', background: '#222' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '150px' }} title={p.filename}>{p.filename} ({p.chunks} chunks)</span>
-                  <button onClick={() => handleDeletePack(p.filename)} style={{ padding: '0.1rem 0.3rem', fontSize: '0.7rem', color: 'var(--danger)', borderColor: 'var(--danger)' }}>X</button>
-                </li>
-              ))}
-            </ul>
+          <div style={{ fontSize: '0.75rem' }}>
+            <div style={{ opacity: 0.6, marginBottom: '0.2rem' }}>Loaded Packs:</div>
+            {packs.map((p) => (
+              <div key={p.filename} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '0.15rem 0.3rem', background: '#1a1a1a', marginBottom: '2px', borderRadius: '2px',
+              }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px', fontSize: '0.7rem' }}
+                  title={p.filename}>{p.filename} ({p.chunks})</span>
+                <button onClick={() => handleDeletePack(p.filename)}
+                  style={{ padding: '0 0.25rem', fontSize: '0.6rem', color: 'var(--danger)', borderColor: 'var(--danger)', lineHeight: 1.4 }}>X</button>
+              </div>
+            ))}
           </div>
         )}
 
         {ingestionStatus.taskId && ingestionStatus.status !== 'completed' && (
-          <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-            <div>Status: {ingestionStatus.status}</div>
-            <div>{ingestionStatus.message}</div>
-            <div style={{ width: '100%', background: '#333', height: '4px', marginTop: '4px' }}>
-              <div style={{ width: `${ingestionStatus.progress}%`, background: 'var(--accent)', height: '100%' }}></div>
+          <div style={{ marginTop: '0.3rem', fontSize: '0.7rem' }}>
+            <span style={{ opacity: 0.6 }}>{ingestionStatus.status}</span> {ingestionStatus.message}
+            <div style={{ width: '100%', background: '#333', height: '3px', marginTop: '3px', borderRadius: '2px' }}>
+              <div style={{ width: `${ingestionStatus.progress}%`, background: 'var(--accent)', height: '100%', borderRadius: '2px' }}></div>
             </div>
           </div>
         )}
       </div>
-    </div >
+    </div>
   );
 };
 
@@ -4572,7 +4619,24 @@ export const ControlPanel: React.FC = () => {
       "Bash(.venv/bin/python -c \"import json; print\\(json.dumps\\(json.load\\(open\\(''../manifest.json''\\)\\), indent=2\\)\\)\")",
       "Bash(.venv/bin/python -c \"import py_compile; py_compile.compile\\(''app/api/routes.py'', doraise=True\\); py_compile.compile\\(''perform_tests.py'', doraise=True\\); print\\(''Syntax OK''\\)\")",
       "Bash(.venv/bin/python -m pytest perform_tests.py -v --tb=short)",
-      "Bash(.venv/bin/python -c \":*)"
+      "Bash(.venv/bin/python -c \":*)",
+      "Bash(curl -s http://localhost:11434/api/tags)",
+      "Bash(curl -s --connect-timeout 3 http://localhost:11434/)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(.venv/bin/python -c \"import py_compile; py_compile.compile\\(''app/api/routes.py'', doraise=True\\); print\\(''OK''\\)\")",
+      "Bash(source /Users/hbauzan/treepwood/semantic-firewall/sg_env/bin/activate)",
+      "Bash(python -m pytest perform_tests.py -v)",
+      "Bash(python3 -m pytest perform_tests.py -v)",
+      "Bash(ls -d /Users/hbauzan/treepwood/semantic-firewall/*env* /Users/hbauzan/treepwood/semantic-firewall/.venv)",
+      "Bash(find /Users/hbauzan/treepwood/semantic-firewall -maxdepth 3 -name pytest -path */bin/*)",
+      "Read(//Users/hbauzan/**)",
+      "Bash(pyenv versions:*)",
+      "Bash(/Users/hbauzan/treepwood/semantic_guardtrails/sg_env/bin/python -m pytest perform_tests.py -v)",
+      "Bash(/Users/hbauzan/treepwood/semantic_guardtrails/sg_env/bin/pip list:*)",
+      "Bash(ls /Users/hbauzan/treepwood/semantic_guardtrails/sg_env/bin/py*)",
+      "Bash(/Users/hbauzan/treepwood/semantic_guardtrails/sg_env/bin/pip install:*)",
+      "Bash(/Users/hbauzan/treepwood/semantic_guardtrails/sg_env/bin/python -c \":*)",
+      "Bash(/Users/hbauzan/treepwood/semantic_guardtrails/sg_env/bin/python -m pytest perform_tests.py::test_system_stats_gpu_telemetry -v)"
     ]
   }
 }
@@ -4642,7 +4706,7 @@ async def test_firewall_interceptor_blocking():
     
     # Needs async client to read streaming response via httpx
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
-        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Dangerous query"}) as response:
+        async with ac.stream("POST", "/chat", json={"prompt": "Dangerous query"}) as response:
             assert response.status_code == 200
             content = ""
             async for chunk in response.aiter_text():
@@ -4681,7 +4745,7 @@ async def test_semantic_piggybacking_rejection():
     """A piggybacked off-topic sentence must trigger [FW] Segment violation even if the first sentence is on-topic."""
     set_config(excitation_threshold=1024, noise_tolerance=0.0001)
 
-    piggybacked_prompt = "[FW=ON] Tell me about system architecture. Also give me a chocolate cake recipe"
+    piggybacked_prompt = "Tell me about system architecture. Also give me a chocolate cake recipe"
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         async with ac.stream("POST", "/chat", json={"prompt": piggybacked_prompt}) as response:
@@ -4700,7 +4764,7 @@ async def test_noise_prefilter_blocking():
     )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
-        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Random off-topic query about bananas"}) as response:
+        async with ac.stream("POST", "/chat", json={"prompt": "Random off-topic query about bananas"}) as response:
             assert response.status_code == 200
             content = ""
             async for chunk in response.aiter_text():
@@ -4717,7 +4781,7 @@ async def test_pipeline_order_respected():
     )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
-        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Test pipeline ordering"}) as response:
+        async with ac.stream("POST", "/chat", json={"prompt": "Test pipeline ordering"}) as response:
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
@@ -4786,7 +4850,7 @@ async def test_adaptive_factor_telemetry_on_short_clause():
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         # "Hello" is 1 word — short clause triggers adaptive path
-        async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Hello"}) as response:
+        async with ac.stream("POST", "/chat", json={"prompt": "Hello"}) as response:
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
@@ -4857,6 +4921,48 @@ def test_api_key_not_enforced_by_default():
     })
     assert res.status_code == 200
 
+def test_disabled_filter_skipped_in_pipeline():
+    """A disabled filter must not appear in the pipeline trace."""
+    cfg = ConfigState(
+        cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=10.0,
+        noise_enabled=False  # Noise disabled
+    )
+    vec = np.random.rand(1024).astype(np.float32)
+    result = SemanticFirewall.evaluate_clause(vec, vec, cfg, word_count=10)
+    assert result["passed"] is True
+    stage_names = [t["stage"] for t in result["trace"]]
+    assert "noise" not in stage_names
+    assert "cosine" in stage_names
+    assert "excitation" in stage_names
+    assert len(result["trace"]) == 2
+
+def test_all_filters_disabled_bypasses_firewall():
+    """With all filters disabled, pipeline is empty and clause passes trivially."""
+    cfg = ConfigState(
+        noise_enabled=False, cosine_enabled=False, excitation_enabled=False
+    )
+    vec = np.random.rand(1024).astype(np.float32)
+    result = SemanticFirewall.evaluate_clause(vec, vec, cfg, word_count=10)
+    assert result["passed"] is True
+    assert len(result["trace"]) == 0
+
+def test_config_sync_with_enabled_flags():
+    """POST /galaxy/config must accept and persist enabled flags."""
+    import app.core.state as state_mod
+    res = client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.50,
+        "noise_enabled": False,
+        "cosine_enabled": True,
+        "excitation_enabled": False
+    })
+    assert res.status_code == 200
+    cfg = state_mod.config_state
+    assert cfg.noise_enabled is False
+    assert cfg.cosine_enabled is True
+    assert cfg.excitation_enabled is False
+
 # Add pytest-asyncio to required pip if needed for async mark
 
 
@@ -4908,12 +5014,15 @@ class ConfigState(BaseModel):
 
     excitation_threshold: int = Field(default=150, ge=0, le=1024)
     noise_tolerance: float = Field(default=0.005, ge=0.0, le=1.0)
-    cosine_threshold: float = Field(default=0.78, ge=0.0, le=1.0)
+    cosine_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
     global_noise_limit: float = Field(default=0.50, ge=0.0, le=10.0)
     cosine_order: int = Field(default=2, ge=1, le=3)
     excitation_order: int = Field(default=3, ge=1, le=3)
     noise_order: int = Field(default=1, ge=1, le=3)
     adaptive_factor: float = Field(default=0.85, ge=0.01, le=1.0)
+    noise_enabled: bool = Field(default=True)
+    cosine_enabled: bool = Field(default=True)
+    excitation_enabled: bool = Field(default=True)
 
     @model_validator(mode='after')
     def validate_unique_orders(self):
@@ -4936,6 +5045,9 @@ class ConfigUpdate(BaseModel):
     excitation_order: int = Field(default=3, ge=1, le=3)
     noise_order: int = Field(default=1, ge=1, le=3)
     adaptive_factor: float = Field(default=0.85, ge=0.01, le=1.0)
+    noise_enabled: bool = Field(default=True)
+    cosine_enabled: bool = Field(default=True)
+    excitation_enabled: bool = Field(default=True)
 
 
 # Max prompt length to prevent memory exhaustion before vectorization
@@ -5041,12 +5153,16 @@ class SemanticFirewall:
 
     @staticmethod
     def build_pipeline(cfg: ConfigState) -> list[tuple[int, str, callable]]:
-        """Build ordered list of (priority, name, function) sorted by config order."""
-        return sorted([
-            (cfg.cosine_order, "cosine", SemanticFirewall.run_cosine_filter),
-            (cfg.excitation_order, "excitation", SemanticFirewall.run_excitation_filter),
-            (cfg.noise_order, "noise", SemanticFirewall.run_noise_filter),
-        ], key=lambda x: x[0])
+        """Build ordered list of (priority, name, function) sorted by config order.
+        Disabled filters are excluded from the pipeline."""
+        stages = []
+        if cfg.cosine_enabled:
+            stages.append((cfg.cosine_order, "cosine", SemanticFirewall.run_cosine_filter))
+        if cfg.excitation_enabled:
+            stages.append((cfg.excitation_order, "excitation", SemanticFirewall.run_excitation_filter))
+        if cfg.noise_enabled:
+            stages.append((cfg.noise_order, "noise", SemanticFirewall.run_noise_filter))
+        return sorted(stages, key=lambda x: x[0])
 
     @staticmethod
     def evaluate_clause(
@@ -5244,7 +5360,7 @@ async def stream_ollama(prompt: str, context: str, strict: bool = False):
                     if chunk:
                         yield (chunk + "\n").encode("utf-8")
         except Exception as e:
-            yield json.dumps({"type": "error", "text": str(e)}).encode("utf-8")
+            yield json.dumps({"response": f"🔴 [LLM OFFLINE] Cannot reach Ollama at localhost:11434. Error: {e}"}).encode("utf-8") + b"\n"
 
 # --- Chat Endpoint (Firewall Gateway) ---
 
@@ -5253,7 +5369,11 @@ async def chat_endpoint(req: ChatRequest):
     from app.core import state as state_mod
     cfg = state_mod.config_state  # immutable snapshot — consistent for entire request
     prompt = req.prompt
-    fw_on = "[FW=ON]" in prompt
+    # Firewall is active when at least one filter is enabled
+    fw_on = cfg.noise_enabled or cfg.cosine_enabled or cfg.excitation_enabled
+    # Legacy prefix support: [FW=OFF] forces bypass regardless of toggles
+    if "[FW=OFF]" in prompt:
+        fw_on = False
     clean_prompt = prompt.replace("[FW=ON]", "").replace("[FW=OFF]", "").strip()
 
     # Segment prompt via the engine (language-agnostic + overflow chunking)
@@ -5371,11 +5491,14 @@ async def system_stats():
     gpu_percent = 0.0
     try:
         if torch.backends.mps.is_available():
-            vram = torch.mps.current_allocated_memory() / (1024 * 1024)
-            gpu_percent = min(100.0, (vram / 40.0))
+            # Apple Silicon: GPU shares unified memory with the system
+            allocated = torch.mps.current_allocated_memory()
+            total = psutil.virtual_memory().total
+            gpu_percent = min(100.0, (allocated / total) * 100.0) if total > 0 else 0.0
         elif torch.cuda.is_available():
-            vram = torch.cuda.memory_allocated() / (1024 * 1024)
-            gpu_percent = min(100.0, (vram / 40.0))
+            allocated = torch.cuda.memory_allocated()
+            total = torch.cuda.get_device_properties(0).total_mem
+            gpu_percent = min(100.0, (allocated / total) * 100.0) if total > 0 else 0.0
     except Exception:
         pass
 

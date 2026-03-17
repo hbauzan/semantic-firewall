@@ -15,6 +15,32 @@ const seqInputStyle: React.CSSProperties = {
   color: 'var(--accent)', border: '1px solid var(--accent)', padding: '1px', fontSize: '0.7rem',
 };
 
+// Step button style
+const stepBtnStyle: React.CSSProperties = {
+  width: '1.4rem', height: '1.2rem', fontSize: '0.7rem', fontWeight: 'bold',
+  padding: 0, border: '1px solid #444', background: '#1a1a1a', color: 'var(--accent)',
+  cursor: 'pointer', borderRadius: '2px', flexShrink: 0, lineHeight: 1,
+};
+
+// Reusable slider with - / + step buttons
+const StepSlider: React.FC<{
+  value: number; min: number; max: number; step: number;
+  onChange: (v: number) => void; style?: React.CSSProperties;
+}> = ({ value, min, max, step, onChange, style }) => {
+  const clamp = (v: number) => Math.min(max, Math.max(min, parseFloat(v.toFixed(10))));
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+      <button type="button" style={stepBtnStyle}
+        onClick={() => onChange(clamp(value - step))}>-</button>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ flex: 1, height: '12px', ...style }} />
+      <button type="button" style={stepBtnStyle}
+        onClick={() => onChange(clamp(value + step))}>+</button>
+    </div>
+  );
+};
+
 export const ControlPanel: React.FC = () => {
   const {
     excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit,
@@ -133,9 +159,7 @@ export const ControlPanel: React.FC = () => {
         </button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong></div>
-          <input type="range" min="0.10" max="2.00" step="0.01" value={globalNoiseLimit}
-            onChange={(e) => setGlobalNoiseLimit(Number(e.target.value))}
-            style={{ width: '100%', height: '12px' }} />
+          <StepSlider value={globalNoiseLimit} min={0.10} max={2.00} step={0.01} onChange={setGlobalNoiseLimit} />
         </div>
         <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
           <div style={{ opacity: 0.5 }}>Seq</div>
@@ -151,9 +175,7 @@ export const ControlPanel: React.FC = () => {
         </button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Cosine Gate: <strong>{cosineThreshold.toFixed(2)}</strong></div>
-          <input type="range" min="0.00" max="1.00" step="0.01" value={cosineThreshold}
-            onChange={(e) => setCosineThreshold(Number(e.target.value))}
-            style={{ width: '100%', height: '12px' }} />
+          <StepSlider value={cosineThreshold} min={0.00} max={1.00} step={0.01} onChange={setCosineThreshold} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.55rem', opacity: 0.4, marginTop: '-2px' }}>
             <span>0 LAX</span><span>STRICT 1</span>
           </div>
@@ -172,15 +194,11 @@ export const ControlPanel: React.FC = () => {
         </button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Excitation: <strong>{excitationThreshold}</strong></div>
-          <input type="range" min="0" max="1024" step="1" value={excitationThreshold}
-            onChange={(e) => setExcitationThreshold(Number(e.target.value))}
-            style={{ width: '100%', height: '12px' }} />
+          <StepSlider value={excitationThreshold} min={0} max={1024} step={1} onChange={setExcitationThreshold} />
           <div style={{ fontSize: '0.65rem', opacity: 0.5, marginTop: '-1px' }}>
             Noise Tolerance: {noiseTolerance.toFixed(3)}
           </div>
-          <input type="range" min="0.001" max="0.100" step="0.001" value={noiseTolerance}
-            onChange={(e) => setNoiseTolerance(Number(e.target.value))}
-            style={{ width: '100%', height: '12px' }} />
+          <StepSlider value={noiseTolerance} min={0.001} max={0.100} step={0.001} onChange={setNoiseTolerance} />
         </div>
         <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
           <div style={{ opacity: 0.5 }}>Seq</div>
@@ -192,9 +210,7 @@ export const ControlPanel: React.FC = () => {
       {/* --- Adaptive Factor --- */}
       <div style={{ marginBottom: '0.5rem', padding: '0.3rem 0', borderTop: '1px solid #222' }}>
         <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Adaptive Factor: <strong>{adaptiveFactor.toFixed(2)}</strong></div>
-        <input type="range" min="0.01" max="1.00" step="0.01" value={adaptiveFactor}
-          onChange={(e) => setAdaptiveFactor(Number(e.target.value))}
-          style={{ width: '100%', height: '12px' }} />
+        <StepSlider value={adaptiveFactor} min={0.01} max={1.00} step={0.01} onChange={setAdaptiveFactor} />
         <div style={{ fontSize: '0.6rem', opacity: 0.5, display: 'flex', justifyContent: 'space-between' }}>
           <span>Short: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
           <span>Full: {excitationThreshold} dims</span>
