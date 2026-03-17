@@ -134,6 +134,29 @@ export const ControlPanel: React.FC = () => {
     <div className="panel side-panel" style={{ marginTop: '1rem', width: 'auto' }}>
       <h2>Control Panel</h2>
 
+      {/* --- Pipeline Stage 1: Noise Pre-Filter (Integrity Gate) --- */}
+      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <label style={{ flex: 1 }}>
+          Noise Pre-Filter (Avg Delta Limit): {globalNoiseLimit.toFixed(2)}
+          <input
+            type="range"
+            min="0.10" max="2.00" step="0.01"
+            value={globalNoiseLimit}
+            onChange={(e) => setGlobalNoiseLimit(Number(e.target.value))}
+          />
+        </label>
+        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
+          Seq
+          <input
+            type="number" min="1" max="3" step="1"
+            value={noiseOrder}
+            onChange={(e) => setNoiseOrder(Number(e.target.value))}
+            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
+          />
+        </label>
+      </div>
+
+      {/* --- Pipeline Stage 2: Cosine Gate (Semantic Orientation) --- */}
       <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <label style={{ flex: 1 }}>
           Cosine Gate: {cosineThreshold.toFixed(2)}
@@ -155,6 +178,7 @@ export const ControlPanel: React.FC = () => {
         </label>
       </div>
 
+      {/* --- Pipeline Stage 3: Excitation Filter (Atomic Resonance) --- */}
       <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <label style={{ flex: 1 }}>
           Excitation Threshold: {excitationThreshold}
@@ -183,6 +207,7 @@ export const ControlPanel: React.FC = () => {
         </label>
       </div>
 
+      {/* --- Adaptive Factor (applies to Excitation on short clauses) --- */}
       <div className="slider-group">
         <label>
           Adaptive Factor: {adaptiveFactor.toFixed(2)}
@@ -197,27 +222,6 @@ export const ControlPanel: React.FC = () => {
           <span>Short Query Req: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
           <span>Full Query Req: {excitationThreshold} dims</span>
         </div>
-      </div>
-
-      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <label style={{ flex: 1 }}>
-          Noise Pre-Filter (Avg Delta Limit): {globalNoiseLimit.toFixed(2)}
-          <input
-            type="range"
-            min="0.10" max="2.00" step="0.01"
-            value={globalNoiseLimit}
-            onChange={(e) => setGlobalNoiseLimit(Number(e.target.value))}
-          />
-        </label>
-        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
-          Seq
-          <input
-            type="number" min="1" max="3" step="1"
-            value={noiseOrder}
-            onChange={(e) => setNoiseOrder(Number(e.target.value))}
-            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
-          />
-        </label>
       </div>
 
       <div className="upload-section">

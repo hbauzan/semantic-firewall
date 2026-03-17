@@ -1,6 +1,6 @@
 {
     "project": "Phase-Lock Semantic Firewall",
-    "version": "v2.6.0",
+    "version": "v2.6.1",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,

@@ -15,10 +15,29 @@ The firewall operates by evaluating the raw 1024D embedding layers produced by `
 - **Explicit Chat Feedback:** When `[FW=ON]` is active, the chat endpoint injects human-readable telemetry into the response. A blocked query returns `🛑 [FW] Segment violation` with the exact metric that triggered the breach. A passed query prepends `🟢 [FW PASS]` with resonance/threshold and cosine values before routing to the LLM stream. All telemetry uses language-neutral technical terms.
 
 ## 2. Backend Architecture
-Utilizes **FastAPI** for route management yielding high execution throughput.
-- **Embedder Singleton (`embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU.
-- **Storage Layer (`storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation.
-- **Ingestor Protocol (`ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines (size: 2048 chars, 200 overlap).
+Utilizes **FastAPI** for route management yielding high execution throughput. The backend follows a **layered separation of concerns**:
+
+```
+app/
+├── core/                    # Framework-agnostic logic
+│   ├── models.py            # Pydantic models (ConfigState, ConfigUpdate, etc.)
+│   ├── state.py             # Global config singleton + asyncio.Lock + set_config()
+│   └── firewall.py          # SemanticFirewall engine (pure vector math)
+├── api/
+│   └── routes.py            # Thin FastAPI layer (HTTP, streaming, telemetry)
+└── modules/
+    ├── embedder.py          # BGE-M3 embedding singleton
+    ├── storage.py           # LanceDB vector store
+    └── ingestor.py          # PDF chunking pipeline
+```
+
+- **Firewall Engine (`core/firewall.py`):** `SemanticFirewall` class with static methods — completely agnostic of web framework, embedders, and storage. Receives numpy arrays and a frozen `ConfigState`, returns structured results. Portable for CLI tools, batch audits, or alternative API wrappers. Contains: `segment()`, `run_noise_filter()`, `run_cosine_filter()`, `run_excitation_filter()`, `build_pipeline()`, `evaluate_clause()`.
+- **Models (`core/models.py`):** All Pydantic schemas. `ConfigState` is a **frozen BaseModel** — immutable after construction. `Field` constraints enforce value ranges. `@model_validator` ensures pipeline order uniqueness.
+- **State (`core/state.py`):** Configuration singleton + `asyncio.Lock` for serialized writes + `set_config()` for atomic merge-validate-swap. Each request handler snapshots the reference at entry (`cfg = config_state`) for mid-request consistency.
+- **Routes (`api/routes.py`):** Thin HTTP layer — request parsing, embedding calls, storage queries, telemetry formatting, streaming responses. Delegates all firewall math to `SemanticFirewall`.
+- **Embedder Singleton (`modules/embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU.
+- **Storage Layer (`modules/storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation.
+- **Ingestor Protocol (`modules/ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines (size: 2048 chars, 200 overlap).
 
 ## 3. Execution Pipeline (Sequential Reorderable Firewall)
 The firewall executes three distinct validation stages in a **user-defined sequence** controlled via the HUD's `Seq` inputs. The pipeline is constructed at evaluation time by sorting the three stages based on their integer priority values:
@@ -50,7 +69,7 @@ When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, 
 ## 5. Frontend Control Logic
 - **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads (including `cosineOrder`, `excitationOrder`, `noiseOrder`, `globalNoiseLimit`, `adaptiveFactor`), an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
 - **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings mapping system metrics underneath a custom ASCII-art **Pirate Monkey** multi-frame cycle. Utilizes a Mac Unified Memory dynamically-scaled heuristic (`vram / 40.0`) to avoid 100% hard-locking early.
-- **Pipeline Ordering UI (`ControlPanel.tsx`):** Each filter slider (Cosine, Excitation, Noise) includes a **Seq** numerical input (1–3) that controls pipeline execution order. The `global_noise_limit` slider controls the Noise Pre-Filter threshold. All values are synced to the backend via debounced `POST /galaxy/config`.
+- **Pipeline Ordering UI (`ControlPanel.tsx`):** Slider groups are visually ordered to match the default pipeline execution sequence: **Noise Pre-Filter (Seq 1)** → **Cosine Gate (Seq 2)** → **Excitation Threshold + Noise Tolerance (Seq 3)** → **Adaptive Factor**. Each filter includes a **Seq** numerical input (1–3) that controls pipeline execution order. All values are synced to the backend via debounced `POST /galaxy/config`.
 - **Interface Guardrails (`ChatInterface.tsx`):** Implements **BigInt Safety** explicitly casting all interaction `Date.now()` iterations recursively. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically.
 
 ## 6. Anti-Semantic Piggybacking Defense
@@ -69,6 +88,20 @@ If **any single clause or sub-chunk** fails any stage of the pipeline, the entir
 
 ### 6.2 System Prompt Hardening (Zero-Tolerance Context Confinement)
 As a secondary defense layer, `stream_ollama` injects a strict system instruction constraining the LLM to respond **exclusively** from the provided RAG context. If a query or sub-instruction cannot be answered from the context (e.g. recipes, jokes, unrelated code), the LLM is instructed to refuse that portion. This provides defense-in-depth even if the segmentation firewall is bypassed.
+
+## 7. API Security Hardening
+
+### 7.1 CORS Policy
+CORS is configured via the `ALLOWED_ORIGINS` environment variable (default: `http://localhost:5173`). The middleware enforces:
+- **Explicit origins only** — no wildcard `*` in production. If `*` is used (dev only), `allow_credentials` is automatically set to `false` to prevent the browser credential leak anti-pattern.
+- **Restricted methods** — only `GET`, `POST`, `DELETE` are allowed (no `PUT`, `PATCH`, `OPTIONS` beyond preflight).
+- **Restricted headers** — only `Content-Type` and `X-API-Key` are accepted.
+
+### 7.2 API Key Authentication (Opt-in)
+When the `FIREWALL_API_KEY` environment variable is set, all mutation endpoints (`/chat`, `/audit`, `/galaxy/config`) require the `X-API-Key` header to match. Returns HTTP 403 on mismatch. If the variable is unset, all endpoints remain open for local development. Configuration is documented in `.env.example`.
+
+### 7.3 Input Sanitization
+All inbound prompts (`ChatRequest`, `AuditRequest`) are constrained to `PROMPT_MAX_LENGTH` (4000 characters) at the Pydantic schema level. Payloads exceeding this limit are rejected with HTTP 422 before any embedding computation occurs, preventing memory exhaustion attacks on the vectorization stage.
 
 
 === ./run_pack.sh ===
@@ -131,35 +164,364 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 
 === ./README.md ===
-# Phase-Lock Semantic Firewall (Distilled Core)
+# Phase-Lock Semantic Firewall
 
-A highly optimized RAG-enabled local LLM client utilizing the Dimensional Excitation Math theorem to validate geometric semantic boundaries around sensitive vectors. 
+A local-first RAG security layer that validates query-to-corpus geometric alignment across 1024 dimensions before routing to an LLM. Three independent filters — Noise, Cosine, and Excitation — execute in a user-defined sequence. Any single failure blocks the entire prompt.
 
-## Requirements
-- Python 3.10+
-- Node.js 20+
-- `ollama` with `llama3.1` model pulled and running (`ollama run llama3.1`)
+Built for sovereign AI deployments where data never leaves the machine.
 
-## Execution Instructions
-We provide a DOS-style TUI to orchestrate the infrastructure smoothly. From the root directory:
+> **Version:** v2.6.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
+
+---
+
+## Table of Contents
+
+- [Architecture Overview](#architecture-overview)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Running the System](#running-the-system)
+- [Operating the Firewall](#operating-the-firewall)
+- [Testing](#testing)
+- [Project Structure](#project-structure)
+- [API Reference](#api-reference)
+- [Security](#security)
+- [License](#license)
+
+---
+
+## Architecture Overview
+
+```
+User Prompt
+     │
+     ▼
+┌─────────────────────────────────────────────────┐
+│  Structural Segmentation (Language-Agnostic)    │
+│  Split on punctuation → overflow chunk > 20w    │
+└──────────────────────┬──────────────────────────┘
+                       │  per clause
+                       ▼
+┌─────────────────────────────────────────────────┐
+│  Sequential Pipeline (user-defined order)       │
+│                                                 │
+│  ┌─────────┐   ┌─────────┐   ┌──────────────┐  │
+│  │ Noise   │──▶│ Cosine  │──▶│  Excitation   │  │
+│  │ Filter  │   │ Filter  │   │  Filter       │  │
+│  └─────────┘   └─────────┘   └──────────────┘  │
+│                                                 │
+│  BREACH at any stage → halt, block, report      │
+└──────────────────────┬──────────────────────────┘
+                       │  ALL PASS
+                       ▼
+┌─────────────────────────────────────────────────┐
+│  Ollama LLM (llama3.1) + Strict RAG Context     │
+└─────────────────────────────────────────────────┘
+```
+
+**Three Filters:**
+
+| # | Filter | What it checks | Blocks when |
+|---|--------|---------------|-------------|
+| 1 | **Noise Pre-Filter** | Average absolute delta across all 1024 dims | `avg_delta > global_noise_limit` |
+| 2 | **Cosine Filter** | Cosine similarity between query and corpus vectors | `cos(Q, C) < cosine_threshold` |
+| 3 | **Excitation Filter** | Count of dimensions where `|Q_i - C_i| <= noise_tolerance` | `activations < excitation_threshold` |
+
+Execution order is configurable at runtime via the HUD. If Filter 1 blocks, Filters 2 and 3 never execute.
+
+---
+
+## Prerequisites
+
+| Dependency | Version | Purpose |
+|-----------|---------|---------|
+| **Python** | 3.10+ | Backend (FastAPI, embeddings, vector math) |
+| **Node.js** | 20+ | Frontend (React 19, Vite) |
+| **Ollama** | Latest | Local LLM inference |
+| **Git** | Any | Clone the repository |
+
+Ollama must have the `llama3.1` model pulled:
+```bash
+ollama pull llama3.1
+```
+
+---
+
+## Installation
+
+### 1. Clone the repository
 
 ```bash
-chmod +x ./run_commander.sh
+git clone https://github.com/hbauzan/semantic-firewall.git
+cd semantic-firewall
+```
+
+### 2. Backend setup
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate        # Linux/macOS
+# .venv\Scripts\activate         # Windows
+
+pip install -r requirements.txt
+```
+
+> **First run note:** The `BAAI/bge-m3` model (~2.3 GB) will be automatically downloaded by HuggingFace on first boot. This is a one-time operation.
+
+### 3. Frontend setup
+
+```bash
+cd ../frontend
+npm install
+```
+
+### 4. Make scripts executable (macOS/Linux)
+
+```bash
+cd ..
+chmod +x run_commander.sh run_server.sh run_ui.sh run_tests.sh
+```
+
+---
+
+## Configuration
+
+Copy the environment template and adjust for your deployment:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ALLOWED_ORIGINS` | `http://localhost:5173` | Comma-separated CORS origins. Use `*` only for development. |
+| `FIREWALL_API_KEY` | *(unset)* | If set, all `/chat`, `/audit`, and `/galaxy/config` endpoints require `X-API-Key` header. Leave unset for open local development. |
+
+**For local development, no `.env` file is required.** Defaults work out of the box.
+
+---
+
+## Running the System
+
+### Option A: Commander TUI (recommended)
+
+```bash
 ./run_commander.sh
 ```
 
-### Menu Options
-1. **[S] Start Server**: Activates the virtual python environment and boots FastAPI via `uvicorn`.
-2. **[U] Start UI**: Starts the React 19 Frontend Vite server.
-3. **[T] Run Tests**: Triggers the Pytest verification pipeline assessing logic.
-4. **[O] Ollama Menu**: Instantiates local terminal chat with the raw model directly.
+Interactive menu:
 
-## Telemetry HUD & Control Panel
-Access the UI via `http://localhost:5173`. 
-- **Global Settings:** Adjust `Excitation Threshold` (0-1024) and `Noise Tolerance` dynamically via the left Control Panel.
-- **Document Management:** Directly upload your Corpus PDF files or selectively `delete` specific uploaded texts directly from the LanceDB clusters.
-- **Firewall Prompting:** Initiate chat queries prefaced with `[FW=ON]` to enforce firewall policies dynamically against the LanceDB local context array.
-- **Audit & Telemetry:** View live GPU/CPU utilization narrated by a Pirate Monkey, and utilize the dedicated `AuditPanel` at the bottom to perform stress tests and view exact activation intersections against your geometric data limits.
+| Key | Action |
+|-----|--------|
+| `S` | Start the FastAPI backend on `http://localhost:8000` |
+| `U` | Start the Vite frontend on `http://localhost:5173` |
+| `T` | Run the pytest test suite |
+| `O` | Start Ollama and open a direct llama3.1 chat |
+| `Q` | Quit |
+
+### Option B: Manual startup
+
+**Terminal 1 — Backend:**
+```bash
+cd backend
+source .venv/bin/activate
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Terminal 2 — Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+
+**Terminal 3 — Ollama (if not already running):**
+```bash
+ollama serve
+```
+
+Open `http://localhost:5173` in your browser.
+
+---
+
+## Operating the Firewall
+
+### The HUD Interface
+
+The browser UI at `http://localhost:5173` contains four main panels:
+
+#### 1. Control Panel (left sidebar)
+
+All firewall parameters are adjustable in real-time. Changes are synced to the backend via debounced API calls.
+
+| Slider | Default | Range | Purpose |
+|--------|---------|-------|---------|
+| **Noise Threshold** | 0.50 | 0.0 – 10.0 | Global delta sanity limit |
+| **Cosine Threshold** | 0.78 | 0.0 – 1.0 | Minimum cosine similarity |
+| **Excitation Threshold** | 150 | 0 – 1024 | Minimum activated dimensions |
+| **Noise Tolerance** | 0.005 | 0.0 – 1.0 | Per-dimension activation sensitivity |
+| **Adaptive Factor** | 0.85 | 0.01 – 1.0 | Threshold reduction for short queries (< 6 words) |
+| **Seq (×3)** | 1, 2, 3 | 1 – 3 | Pipeline execution order for each filter |
+
+The **Adaptive Factor** section shows real-time calculated thresholds:
+- `Short Query Req: {threshold × factor} dims` — what short prompts need
+- `Full Query Req: {threshold} dims` — what normal prompts need
+
+#### 2. Chat Interface (center)
+
+Type prompts with the firewall prefix to control behavior:
+
+| Prefix | Behavior |
+|--------|----------|
+| `[FW=ON] your query here` | Firewall active — evaluates all clauses through the pipeline. Telemetry injected into response. |
+| `[FW=OFF] your query here` | Firewall bypassed — query goes directly to Ollama with RAG context. |
+| `your query here` *(no prefix)* | Same as `[FW=OFF]`. |
+
+**Firewall feedback examples:**
+
+```
+🟢 [FW PASS] Resonance: 287/150 dims | Cosine: 0.891 | Pipeline: [noise:OK → cosine:OK → excitation:OK]
+Routing to corpus...
+```
+
+```
+🛑 [FW] Segment violation: "give me a cake recipe". Cosine: 0.312 (Required: >=0.78).
+Vector direction diverges from corpus.
+Pipeline: [noise:OK → cosine:BREACH]
+```
+
+#### 3. Document Manager (right sidebar)
+
+- **Upload PDF:** Click to upload corpus documents. Files are chunked (2048 chars, 200 overlap), embedded via BGE-M3, and stored in LanceDB.
+- **Delete Pack:** Remove specific documents from the vector store by filename.
+- Ingestion is asynchronous — a progress indicator tracks the task status.
+
+#### 4. Telemetry HUD (bottom)
+
+- Real-time CPU, RAM, and GPU utilization polled every second.
+- GPU metric uses Apple MPS / NVIDIA CUDA memory allocation.
+- The **Audit Panel** allows you to test a query against the corpus and see the raw activation count without triggering the full pipeline.
+
+### Typical Workflow
+
+1. **Load your corpus:** Upload one or more PDF files via the Document Manager.
+2. **Set your thresholds:** Use the Control Panel sliders. Start with defaults, then tune based on your corpus density.
+3. **Test with `[FW=ON]`:** Send queries. The pipeline trace tells you exactly which filter passed or blocked, with numeric details.
+4. **Tune the pipeline order:** If you want cosine checked first (cheaper), drag its Seq to 1.
+5. **Production:** Set `FIREWALL_API_KEY` in `.env`, restrict `ALLOWED_ORIGINS` to your frontend domain.
+
+### Anti-Piggybacking Defense
+
+The firewall automatically segments prompts on punctuation boundaries (`. ! ? ; : - |`). Each clause is evaluated independently. A prompt like:
+
+```
+[FW=ON] Tell me about network architecture. Also give me a cake recipe.
+```
+
+Will split into two clauses. The first may pass. The second will fail cosine/excitation against a networking corpus. **The entire prompt is blocked** — no partial execution.
+
+Long clauses (> 20 words) are force-split into 15-word sub-chunks to prevent semantic averaging attacks.
+
+---
+
+## Testing
+
+```bash
+cd backend
+source .venv/bin/activate
+pytest -v perform_tests.py
+```
+
+The test suite validates:
+
+| Category | Tests |
+|----------|-------|
+| **Infrastructure** | PDF upload/status, system stats, config sync |
+| **Firewall Logic** | Blocking, piggybacking rejection, noise pre-filter, pipeline ordering |
+| **Configuration** | Immutability, duplicate order rejection, range validation, adaptive factor |
+| **Engine (unit)** | Segmentation, overflow chunking, clause evaluation pass/breach |
+| **Security** | Prompt length limits, API key enforcement |
+
+---
+
+## Project Structure
+
+```
+semantic-firewall/
+├── run_commander.sh              # Interactive TUI launcher
+├── run_server.sh                 # Backend startup script
+├── run_ui.sh                     # Frontend startup script
+├── run_tests.sh                  # Test runner script
+├── manifest.json                 # Feature flags and state schema
+├── architecture_spec.md          # Detailed technical specification
+│
+├── backend/
+│   ├── .env.example              # Environment variable template
+│   ├── requirements.txt          # Python dependencies
+│   ├── perform_tests.py          # Pytest test suite
+│   └── app/
+│       ├── main.py               # FastAPI app + CORS middleware
+│       ├── core/
+│       │   ├── models.py         # Pydantic schemas (ConfigState, etc.)
+│       │   ├── state.py          # Global config singleton + lock
+│       │   └── firewall.py       # SemanticFirewall engine (pure math)
+│       ├── api/
+│       │   └── routes.py         # HTTP routes (thin FastAPI layer)
+│       └── modules/
+│           ├── embedder.py       # BGE-M3 embedding singleton
+│           ├── storage.py        # LanceDB vector store
+│           └── ingestor.py       # PDF chunking pipeline
+│
+└── frontend/
+    ├── package.json
+    └── src/
+        ├── App.tsx               # Main layout
+        └── components/
+            ├── ControlPanel.tsx   # Firewall sliders + pipeline ordering
+            ├── ChatInterface.tsx  # Chat with FW=ON/OFF support
+            ├── AuditPanel.tsx     # Query audit + activation inspector
+            └── TelemetryHUD.tsx   # System metrics display
+```
+
+---
+
+## API Reference
+
+All endpoints are served at `http://localhost:8000`.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/chat` | API Key* | Send a prompt through the firewall pipeline. Streaming NDJSON response. |
+| `POST` | `/audit` | API Key* | Test a query against the corpus. Returns activation count and nearest vector. |
+| `POST` | `/galaxy/config` | API Key* | Update firewall configuration (thresholds, orders, factor). |
+| `POST` | `/corpus/upload-pdf` | — | Upload a PDF for async vectorization into LanceDB. |
+| `GET` | `/corpus/task-status/{id}` | — | Poll PDF ingestion task progress. |
+| `GET` | `/corpus/packs` | — | List all uploaded document packs with chunk counts. |
+| `DELETE` | `/corpus/packs/{filename}` | — | Remove a document pack from the vector store. |
+| `GET` | `/system/stats` | — | CPU, RAM, GPU utilization metrics. |
+
+*\* API Key required only if `FIREWALL_API_KEY` environment variable is set.*
+
+---
+
+## Security
+
+This system implements multiple defense layers:
+
+1. **Semantic Firewall** — Three-stage vector validation pipeline with short-circuit evaluation.
+2. **Anti-Piggybacking** — Language-agnostic clause segmentation prevents malicious prompt injection via appended instructions.
+3. **Strict RAG Confinement** — LLM system prompt constrains responses exclusively to corpus context.
+4. **CORS Hardening** — Explicit origin allowlist, no wildcard credentials.
+5. **API Key Authentication** — Opt-in header-based auth for mutation endpoints.
+6. **Input Sanitization** — 4000-character prompt limit enforced at schema level before vectorization.
+7. **Atomic Configuration** — Frozen Pydantic models prevent race conditions on concurrent config updates.
+8. **Pipeline Order Validation** — Duplicate filter priorities are rejected at the schema level.
+
+---
+
+## License
+
+Proprietary. All rights reserved.
 
 
 === ./semantic_guardtrails_packager.py ===
@@ -233,7 +595,7 @@ pytest -v perform_tests.py
 === ./manifest.json ===
 {
     "project": "Phase-Lock Semantic Firewall",
-    "version": "v2.3.0",
+    "version": "v2.6.1",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -254,7 +616,13 @@ pytest -v perform_tests.py
         "cosine_similarity_gate": true,
         "reorderable_sequential_pipeline": true,
         "noise_prefilter_global_delta": true,
-        "configurable_adaptive_factor": true
+        "configurable_adaptive_factor": true,
+        "atomic_config_state": true,
+        "pydantic_schema_validation": true,
+        "modular_firewall_engine": true,
+        "cors_hardening": true,
+        "opt_in_api_key_auth": true,
+        "input_length_sanitization": true
     },
     "state_schema": {
         "excitation_threshold": {"type": "int", "default": 150, "range": [0, 1024]},
@@ -4055,6 +4423,29 @@ export const ControlPanel: React.FC = () => {
     <div className="panel side-panel" style={{ marginTop: '1rem', width: 'auto' }}>
       <h2>Control Panel</h2>
 
+      {/* --- Pipeline Stage 1: Noise Pre-Filter (Integrity Gate) --- */}
+      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <label style={{ flex: 1 }}>
+          Noise Pre-Filter (Avg Delta Limit): {globalNoiseLimit.toFixed(2)}
+          <input
+            type="range"
+            min="0.10" max="2.00" step="0.01"
+            value={globalNoiseLimit}
+            onChange={(e) => setGlobalNoiseLimit(Number(e.target.value))}
+          />
+        </label>
+        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
+          Seq
+          <input
+            type="number" min="1" max="3" step="1"
+            value={noiseOrder}
+            onChange={(e) => setNoiseOrder(Number(e.target.value))}
+            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
+          />
+        </label>
+      </div>
+
+      {/* --- Pipeline Stage 2: Cosine Gate (Semantic Orientation) --- */}
       <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <label style={{ flex: 1 }}>
           Cosine Gate: {cosineThreshold.toFixed(2)}
@@ -4076,6 +4467,7 @@ export const ControlPanel: React.FC = () => {
         </label>
       </div>
 
+      {/* --- Pipeline Stage 3: Excitation Filter (Atomic Resonance) --- */}
       <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         <label style={{ flex: 1 }}>
           Excitation Threshold: {excitationThreshold}
@@ -4104,6 +4496,7 @@ export const ControlPanel: React.FC = () => {
         </label>
       </div>
 
+      {/* --- Adaptive Factor (applies to Excitation on short clauses) --- */}
       <div className="slider-group">
         <label>
           Adaptive Factor: {adaptiveFactor.toFixed(2)}
@@ -4118,27 +4511,6 @@ export const ControlPanel: React.FC = () => {
           <span>Short Query Req: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
           <span>Full Query Req: {excitationThreshold} dims</span>
         </div>
-      </div>
-
-      <div className="slider-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <label style={{ flex: 1 }}>
-          Noise Pre-Filter (Avg Delta Limit): {globalNoiseLimit.toFixed(2)}
-          <input
-            type="range"
-            min="0.10" max="2.00" step="0.01"
-            value={globalNoiseLimit}
-            onChange={(e) => setGlobalNoiseLimit(Number(e.target.value))}
-          />
-        </label>
-        <label style={{ fontSize: '0.7rem', width: '3rem', textAlign: 'center' }}>
-          Seq
-          <input
-            type="number" min="1" max="3" step="1"
-            value={noiseOrder}
-            onChange={(e) => setNoiseOrder(Number(e.target.value))}
-            style={{ width: '2.5rem', textAlign: 'center', background: '#111', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '2px' }}
-          />
-        </label>
       </div>
 
       <div className="upload-section">
@@ -4197,7 +4569,10 @@ export const ControlPanel: React.FC = () => {
       "Bash(grep -E \"\\\\.\\(json|js|ts|tsx|css\\)$|eslint\")",
       "Bash(python -c \"import py_compile; py_compile.compile\\(''app/api/routes.py'', doraise=True\\); py_compile.compile\\(''perform_tests.py'', doraise=True\\); print\\(''OK''\\)\")",
       "Bash(.venv/bin/python -c \"import py_compile; py_compile.compile\\(''app/api/routes.py'', doraise=True\\); py_compile.compile\\(''perform_tests.py'', doraise=True\\); print\\(''OK''\\)\")",
-      "Bash(.venv/bin/python -c \"import json; print\\(json.dumps\\(json.load\\(open\\(''../manifest.json''\\)\\), indent=2\\)\\)\")"
+      "Bash(.venv/bin/python -c \"import json; print\\(json.dumps\\(json.load\\(open\\(''../manifest.json''\\)\\), indent=2\\)\\)\")",
+      "Bash(.venv/bin/python -c \"import py_compile; py_compile.compile\\(''app/api/routes.py'', doraise=True\\); py_compile.compile\\(''perform_tests.py'', doraise=True\\); print\\(''Syntax OK''\\)\")",
+      "Bash(.venv/bin/python -m pytest perform_tests.py -v --tb=short)",
+      "Bash(.venv/bin/python -c \":*)"
     ]
   }
 }
@@ -4228,9 +4603,12 @@ import pytest
 import io
 import json
 import httpx
+import numpy as np
 from fastapi.testclient import TestClient
 from app.main import app
-from app.api.routes import config_state
+from app.core.models import ConfigState
+from app.core.state import set_config
+from app.core.firewall import SemanticFirewall
 
 client = TestClient(app)
 
@@ -4249,8 +4627,7 @@ def test_async_pdf_upload_and_status():
     assert "status" in status_res.json()
 
 def test_dimensional_excitation_math():
-    config_state.excitation_threshold = 150
-    config_state.noise_tolerance = 0.005
+    set_config(excitation_threshold=150, noise_tolerance=0.005)
 
     # Safe vector mock
     # Audit query checks the math logic internally or we can do it via the endpoint
@@ -4261,8 +4638,7 @@ def test_dimensional_excitation_math():
 @pytest.mark.asyncio
 async def test_firewall_interceptor_blocking():
     # Enforce ultra-strict threshold to guarantee failure
-    config_state.excitation_threshold = 10000
-    config_state.noise_tolerance = 0.0001
+    set_config(excitation_threshold=1024, noise_tolerance=0.0001)
     
     # Needs async client to read streaming response via httpx
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
@@ -4303,8 +4679,7 @@ def test_system_stats_gpu_telemetry():
 @pytest.mark.asyncio
 async def test_semantic_piggybacking_rejection():
     """A piggybacked off-topic sentence must trigger [FW] Segment violation even if the first sentence is on-topic."""
-    config_state.excitation_threshold = 10000
-    config_state.noise_tolerance = 0.0001
+    set_config(excitation_threshold=1024, noise_tolerance=0.0001)
 
     piggybacked_prompt = "[FW=ON] Tell me about system architecture. Also give me a chocolate cake recipe"
 
@@ -4319,13 +4694,10 @@ async def test_semantic_piggybacking_rejection():
 @pytest.mark.asyncio
 async def test_noise_prefilter_blocking():
     """Ultra-strict global noise limit must trigger Noise Pre-Filter BREACH."""
-    config_state.excitation_threshold = 1
-    config_state.noise_tolerance = 1.0
-    config_state.cosine_threshold = 0.0
-    config_state.global_noise_limit = 0.001  # impossibly strict
-    config_state.noise_order = 1
-    config_state.cosine_order = 2
-    config_state.excitation_order = 3
+    set_config(
+        excitation_threshold=1, noise_tolerance=1.0, cosine_threshold=0.0,
+        global_noise_limit=0.001, noise_order=1, cosine_order=2, excitation_order=3
+    )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Random off-topic query about bananas"}) as response:
@@ -4339,13 +4711,10 @@ async def test_noise_prefilter_blocking():
 @pytest.mark.asyncio
 async def test_pipeline_order_respected():
     """When noise runs first (order=1) and is ultra-strict, cosine and excitation should never appear as OK."""
-    config_state.excitation_threshold = 1
-    config_state.noise_tolerance = 1.0
-    config_state.cosine_threshold = 0.0
-    config_state.global_noise_limit = 0.001
-    config_state.noise_order = 1
-    config_state.cosine_order = 2
-    config_state.excitation_order = 3
+    set_config(
+        excitation_threshold=1, noise_tolerance=1.0, cosine_threshold=0.0,
+        global_noise_limit=0.001, noise_order=1, cosine_order=2, excitation_order=3
+    )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Test pipeline ordering"}) as response:
@@ -4359,6 +4728,7 @@ async def test_pipeline_order_respected():
 
 def test_pipeline_config_sync():
     """POST to /galaxy/config with custom order values must persist in config_state."""
+    import app.core.state as routes_mod
     res = client.post("/galaxy/config", json={
         "excitation_threshold": 200,
         "noise_tolerance": 0.010,
@@ -4370,32 +4740,49 @@ def test_pipeline_config_sync():
         "adaptive_factor": 0.70
     })
     assert res.status_code == 200
-    assert config_state.excitation_threshold == 200
-    assert config_state.noise_tolerance == 0.010
-    assert config_state.cosine_threshold == 0.85
-    assert config_state.global_noise_limit == 0.75
-    assert config_state.cosine_order == 3
-    assert config_state.excitation_order == 1
-    assert config_state.noise_order == 2
-    assert config_state.adaptive_factor == 0.70
+    cfg = routes_mod.config_state
+    assert cfg.excitation_threshold == 200
+    assert cfg.noise_tolerance == 0.010
+    assert cfg.cosine_threshold == 0.85
+    assert cfg.global_noise_limit == 0.75
+    assert cfg.cosine_order == 3
+    assert cfg.excitation_order == 1
+    assert cfg.noise_order == 2
+    assert cfg.adaptive_factor == 0.70
 
 def test_adaptive_factor_default():
     """Default adaptive_factor should be 0.85 on fresh ConfigState."""
-    from app.api.routes import ConfigState
     fresh = ConfigState()
     assert fresh.adaptive_factor == 0.85
+
+def test_config_state_is_immutable():
+    """Frozen ConfigState must reject direct attribute mutation."""
+    cfg = ConfigState()
+    with pytest.raises(Exception):
+        cfg.excitation_threshold = 999
+
+def test_duplicate_pipeline_orders_rejected():
+    """ConfigState must reject duplicate order values."""
+    with pytest.raises(ValueError, match="unique"):
+        ConfigState(cosine_order=1, excitation_order=1, noise_order=2)
+
+def test_config_validation_out_of_range():
+    """ConfigState must reject values outside defined bounds."""
+    with pytest.raises(Exception):
+        ConfigState(excitation_threshold=2000)  # max 1024
+    with pytest.raises(Exception):
+        ConfigState(adaptive_factor=5.0)  # max 1.0
+    with pytest.raises(Exception):
+        ConfigState(cosine_order=0)  # min 1
 
 @pytest.mark.asyncio
 async def test_adaptive_factor_telemetry_on_short_clause():
     """A short clause blocked by excitation must include [ADAPTIVE] in telemetry."""
-    config_state.excitation_threshold = 10000
-    config_state.noise_tolerance = 0.0001
-    config_state.cosine_threshold = 0.0
-    config_state.global_noise_limit = 5.0
-    config_state.adaptive_factor = 0.50
-    config_state.noise_order = 1
-    config_state.cosine_order = 2
-    config_state.excitation_order = 3
+    set_config(
+        excitation_threshold=1024, noise_tolerance=0.0001, cosine_threshold=0.0,
+        global_noise_limit=5.0, adaptive_factor=0.50,
+        noise_order=1, cosine_order=2, excitation_order=3
+    )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         # "Hello" is 1 word — short clause triggers adaptive path
@@ -4406,22 +4793,93 @@ async def test_adaptive_factor_telemetry_on_short_clause():
             assert "[FW] Segment violation" in content
             assert "ADAPTIVE" in content or "0.5x factor" in content
 
+# --- Engine Unit Tests (framework-agnostic) ---
+
+def test_engine_segment_basic():
+    """SemanticFirewall.segment splits on punctuation and chunks long clauses."""
+    clauses = SemanticFirewall.segment("Hello world. How are you? Fine thanks")
+    assert len(clauses) >= 2
+
+def test_engine_segment_overflow_chunking():
+    """Clauses over 20 words get force-split into 15-word sub-chunks."""
+    long_text = " ".join(["word"] * 30)
+    clauses = SemanticFirewall.segment(long_text)
+    for c in clauses:
+        assert len(c.split()) <= 15
+
+def test_engine_evaluate_clause_all_pass():
+    """Identical vectors must pass all filters."""
+    cfg = ConfigState(cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=10.0)
+    vec = np.random.rand(1024).astype(np.float32)
+    result = SemanticFirewall.evaluate_clause(vec, vec, cfg, word_count=10)
+    assert result["passed"] is True
+    assert result["breach_reason"] is None
+    assert len(result["trace"]) == 3
+
+def test_engine_evaluate_clause_noise_breach():
+    """Orthogonal vectors with strict noise limit must breach on noise filter."""
+    cfg = ConfigState(
+        cosine_threshold=0.0, excitation_threshold=0,
+        global_noise_limit=0.001, noise_order=1, cosine_order=2, excitation_order=3
+    )
+    q = np.ones(1024, dtype=np.float32)
+    c = np.zeros(1024, dtype=np.float32)
+    result = SemanticFirewall.evaluate_clause(q, c, cfg, word_count=10)
+    assert result["passed"] is False
+    assert result["breach_reason"] == "noise"
+    # Only noise ran (order=1 breached), so trace has 1 entry
+    assert len(result["trace"]) == 1
+
+# --- API Hardening Tests ---
+
+def test_prompt_length_limit_rejected():
+    """Prompts exceeding PROMPT_MAX_LENGTH must be rejected by Pydantic."""
+    from app.core.models import ChatRequest, PROMPT_MAX_LENGTH
+    with pytest.raises(Exception):
+        ChatRequest(prompt="x" * (PROMPT_MAX_LENGTH + 1))
+
+def test_prompt_length_limit_accepted():
+    """Prompts within PROMPT_MAX_LENGTH must be accepted."""
+    from app.core.models import ChatRequest, PROMPT_MAX_LENGTH
+    req = ChatRequest(prompt="x" * PROMPT_MAX_LENGTH)
+    assert len(req.prompt) == PROMPT_MAX_LENGTH
+
+def test_api_key_not_enforced_by_default():
+    """Without FIREWALL_API_KEY env var, endpoints must remain open."""
+    import app.api.routes as routes_mod
+    # In test env, _FIREWALL_API_KEY should be None (not set)
+    assert routes_mod._FIREWALL_API_KEY is None
+    # Config endpoint should work without any key header
+    res = client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.78,
+    })
+    assert res.status_code == 200
+
 # Add pytest-asyncio to required pip if needed for async mark
 
 
 === ./backend/app/main.py ===
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 
-app = FastAPI(title="Phase-Lock Semantic Firewall", version="1.0.0")
+app = FastAPI(title="Phase-Lock Semantic Firewall", version="2.6.0")
+
+# --- CORS: env-driven, secure defaults ---
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173")
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+# allow_credentials=True is only safe with explicit origins, never with "*"
+_use_credentials = "*" not in _allowed_origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allowed_origins,
+    allow_credentials=_use_credentials,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type", "X-API-Key"],
 )
 
 app.include_router(router)
@@ -4431,50 +4889,284 @@ if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
 
 
+=== ./backend/app/core/models.py ===
+"""Pydantic models for the Semantic Firewall configuration and API contracts.
+
+All schema validation, field constraints, and business rules live here.
+Zero framework dependencies — portable across FastAPI, CLI, or any runtime.
+"""
+from pydantic import BaseModel, Field, model_validator, ConfigDict
+
+
+class ConfigState(BaseModel):
+    """Immutable firewall configuration snapshot.
+
+    Frozen after construction — any update creates a new instance.
+    The model_validator enforces that pipeline order values are always unique.
+    """
+    model_config = ConfigDict(frozen=True)
+
+    excitation_threshold: int = Field(default=150, ge=0, le=1024)
+    noise_tolerance: float = Field(default=0.005, ge=0.0, le=1.0)
+    cosine_threshold: float = Field(default=0.78, ge=0.0, le=1.0)
+    global_noise_limit: float = Field(default=0.50, ge=0.0, le=10.0)
+    cosine_order: int = Field(default=2, ge=1, le=3)
+    excitation_order: int = Field(default=3, ge=1, le=3)
+    noise_order: int = Field(default=1, ge=1, le=3)
+    adaptive_factor: float = Field(default=0.85, ge=0.01, le=1.0)
+
+    @model_validator(mode='after')
+    def validate_unique_orders(self):
+        orders = {self.cosine_order, self.excitation_order, self.noise_order}
+        if len(orders) != 3:
+            raise ValueError(
+                'Pipeline order values must be unique (each of 1, 2, 3). '
+                f'Got cosine={self.cosine_order}, excitation={self.excitation_order}, noise={self.noise_order}'
+            )
+        return self
+
+
+class ConfigUpdate(BaseModel):
+    """Inbound payload for POST /galaxy/config. Validated on arrival."""
+    excitation_threshold: int = Field(ge=0, le=1024)
+    noise_tolerance: float = Field(ge=0.0, le=1.0)
+    cosine_threshold: float = Field(ge=0.0, le=1.0)
+    global_noise_limit: float = Field(default=0.50, ge=0.0, le=10.0)
+    cosine_order: int = Field(default=2, ge=1, le=3)
+    excitation_order: int = Field(default=3, ge=1, le=3)
+    noise_order: int = Field(default=1, ge=1, le=3)
+    adaptive_factor: float = Field(default=0.85, ge=0.01, le=1.0)
+
+
+# Max prompt length to prevent memory exhaustion before vectorization
+PROMPT_MAX_LENGTH = 4000
+
+
+class AuditRequest(BaseModel):
+    query: str = Field(max_length=PROMPT_MAX_LENGTH)
+
+
+class ChatRequest(BaseModel):
+    prompt: str = Field(max_length=PROMPT_MAX_LENGTH)
+
+
+=== ./backend/app/core/firewall.py ===
+"""Semantic Firewall Engine — pure vector math, zero framework dependencies.
+
+This module is completely agnostic of FastAPI, embedders, and storage layers.
+It receives numpy arrays and a frozen ConfigState, returns structured results.
+Portable across CLI tools, test harnesses, or alternative API wrappers.
+"""
+import re
+from typing import Any
+import numpy as np
+
+from app.core.models import ConfigState
+
+
+class SemanticFirewall:
+    """Stateless firewall engine. All methods are static — no instance state."""
+
+    # --- Segmentation ---
+
+    @staticmethod
+    def segment(text: str) -> list[str]:
+        """Language-agnostic structural segmentation with overflow chunking.
+
+        1. Split on universal punctuation (no language-specific words).
+        2. Discard fragments <= 4 chars.
+        3. Force-split any clause > 20 words into 15-word sub-chunks.
+        """
+        raw = [c.strip() for c in re.split(r'[.!?;:\n\-\|«»\u201c\u201d]+', text) if len(c.strip()) > 4]
+        if not raw:
+            raw = [text]
+
+        clauses: list[str] = []
+        for rc in raw:
+            words = rc.split()
+            if len(words) > 20:
+                for i in range(0, len(words), 15):
+                    sub = " ".join(words[i:i + 15])
+                    if len(sub.strip()) > 4:
+                        clauses.append(sub.strip())
+            else:
+                clauses.append(rc)
+
+        return clauses if clauses else [text]
+
+    # --- Individual Filters ---
+    # Each returns: (passed: bool, stage_name: str, details: dict)
+
+    @staticmethod
+    def run_noise_filter(
+        q_arr: np.ndarray, c_arr: np.ndarray, cfg: ConfigState, **_kw: Any
+    ) -> tuple[bool, str, dict]:
+        """Global delta sanity check across all dimensions."""
+        avg_delta = float(np.mean(np.abs(q_arr - c_arr)))
+        if avg_delta > cfg.global_noise_limit:
+            return False, "noise", {"avg_delta": avg_delta, "limit": cfg.global_noise_limit}
+        return True, "noise", {"avg_delta": avg_delta}
+
+    @staticmethod
+    def run_cosine_filter(
+        q_arr: np.ndarray, c_arr: np.ndarray, cfg: ConfigState, **_kw: Any
+    ) -> tuple[bool, str, dict]:
+        """Cosine similarity gate using raw vectors."""
+        q_norm = np.linalg.norm(q_arr)
+        c_norm = np.linalg.norm(c_arr)
+        sim = float(np.dot(q_arr, c_arr) / (q_norm * c_norm)) if q_norm > 0 and c_norm > 0 else 0.0
+        if sim < cfg.cosine_threshold:
+            return False, "cosine", {"cosine_sim": sim}
+        return True, "cosine", {"cosine_sim": sim}
+
+    @staticmethod
+    def run_excitation_filter(
+        q_arr: np.ndarray, c_arr: np.ndarray, cfg: ConfigState, word_count: int = 0, **_kw: Any
+    ) -> tuple[bool, str, dict]:
+        """Dimensional resonance count with adaptive threshold for short clauses."""
+        delta = np.abs(q_arr - c_arr)
+        activations = int(np.sum(delta <= cfg.noise_tolerance))
+        is_short = word_count < 6
+        factor = cfg.adaptive_factor if is_short else 1.0
+        threshold = float(cfg.excitation_threshold) * factor
+        passed = activations >= threshold
+        return passed, "excitation", {
+            "activations": activations,
+            "threshold": threshold,
+            "adaptive_applied": is_short,
+            "adaptive_factor": factor,
+        }
+
+    # --- Pipeline Engine ---
+
+    @staticmethod
+    def build_pipeline(cfg: ConfigState) -> list[tuple[int, str, callable]]:
+        """Build ordered list of (priority, name, function) sorted by config order."""
+        return sorted([
+            (cfg.cosine_order, "cosine", SemanticFirewall.run_cosine_filter),
+            (cfg.excitation_order, "excitation", SemanticFirewall.run_excitation_filter),
+            (cfg.noise_order, "noise", SemanticFirewall.run_noise_filter),
+        ], key=lambda x: x[0])
+
+    @staticmethod
+    def evaluate_clause(
+        q_arr: np.ndarray,
+        c_arr: np.ndarray,
+        cfg: ConfigState,
+        word_count: int = 0,
+    ) -> dict:
+        """Run the full ordered pipeline on a single clause's vectors.
+
+        Returns:
+            {
+                "passed": bool,
+                "breach_reason": str | None,
+                "breach_details": dict | None,
+                "trace": [{"stage": str, "passed": bool, ...}, ...],
+                "last_activations": int,
+                "last_cosine": float,
+            }
+        """
+        pipeline = SemanticFirewall.build_pipeline(cfg)
+        trace: list[dict] = []
+        last_activations = 0
+        last_cosine = 0.0
+
+        for _order, stage_name, stage_fn in pipeline:
+            passed, _name, details = stage_fn(
+                q_arr, c_arr, cfg, word_count=word_count
+            )
+            trace.append({"stage": stage_name, "passed": passed, **details})
+
+            if passed:
+                if "activations" in details:
+                    last_activations = details["activations"]
+                if "cosine_sim" in details:
+                    last_cosine = details["cosine_sim"]
+            else:
+                return {
+                    "passed": False,
+                    "breach_reason": stage_name,
+                    "breach_details": details,
+                    "trace": trace,
+                    "last_activations": last_activations,
+                    "last_cosine": last_cosine,
+                }
+
+        return {
+            "passed": True,
+            "breach_reason": None,
+            "breach_details": None,
+            "trace": trace,
+            "last_activations": last_activations,
+            "last_cosine": last_cosine,
+        }
+
+
+=== ./backend/app/core/__init__.py ===
+# app.core — Semantic Firewall core logic (framework-agnostic)
+
+
+=== ./backend/app/core/state.py ===
+"""Global configuration state management with thread-safety guarantees.
+
+- config_state is always a frozen ConfigState (immutable after construction).
+- Writes are serialized via asyncio.Lock.
+- set_config() atomically replaces the global reference (merge + validate + swap).
+- Readers take a snapshot reference: cfg = config_state (safe under GIL).
+"""
+import asyncio
+from app.core.models import ConfigState
+
+config_state: ConfigState = ConfigState()
+_config_lock = asyncio.Lock()
+
+
+def set_config(**kwargs) -> ConfigState:
+    """Atomically replace global config. Merges kwargs over current state.
+    Used by update_config route and test harness."""
+    global config_state
+    current = config_state.model_dump()
+    current.update(kwargs)
+    config_state = ConfigState(**current)
+    return config_state
+
+
 === ./backend/app/api/routes.py ===
+"""API Routes — thin FastAPI layer.
+
+All firewall math lives in app.core.firewall (SemanticFirewall).
+All models live in app.core.models.
+All state management lives in app.core.state.
+This file handles: HTTP parsing, embedding calls, storage calls, streaming, telemetry formatting.
+"""
+import os
 import psutil
 import torch
 import json
-import re
 import numpy as np
 import httpx
-from fastapi import APIRouter, UploadFile, File
-from pydantic import BaseModel
+from fastapi import APIRouter, UploadFile, File, HTTPException, Header, Depends
 from fastapi.responses import StreamingResponse
 
 from app.modules.ingestor import process_pdf_async, get_task_status
 from app.modules.embedder import embedder
 from app.modules.storage import storage
+from app.core.models import ConfigState, ConfigUpdate, AuditRequest, ChatRequest
+from app.core.state import config_state, _config_lock, set_config
+from app.core.firewall import SemanticFirewall
+
+# --- Optional API Key Guard ---
+_FIREWALL_API_KEY = os.environ.get("FIREWALL_API_KEY")
+
+async def verify_api_key(x_api_key: str | None = Header(default=None)):
+    """Opt-in API key check. Only enforced if FIREWALL_API_KEY env var is set."""
+    if _FIREWALL_API_KEY and x_api_key != _FIREWALL_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
 router = APIRouter()
 
-class ConfigState:
-    excitation_threshold: int = 150
-    noise_tolerance: float = 0.005
-    cosine_threshold: float = 0.78
-    global_noise_limit: float = 0.50
-    cosine_order: int = 2
-    excitation_order: int = 3
-    noise_order: int = 1
-    adaptive_factor: float = 0.85
-
-config_state = ConfigState()
-
-class ConfigUpdate(BaseModel):
-    excitation_threshold: int
-    noise_tolerance: float
-    cosine_threshold: float
-    global_noise_limit: float = 0.50
-    cosine_order: int = 2
-    excitation_order: int = 3
-    noise_order: int = 1
-    adaptive_factor: float = 0.85
-
-class AuditRequest(BaseModel):
-    query: str
-
-class ChatRequest(BaseModel):
-    prompt: str
+# --- Corpus Endpoints ---
 
 @router.post("/corpus/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
@@ -4495,34 +5187,38 @@ async def delete_pack(filename: str):
     storage.delete_pack(filename)
     return {"status": "deleted", "filename": filename}
 
-@router.post("/galaxy/config")
-async def update_config(config: ConfigUpdate):
-    config_state.excitation_threshold = config.excitation_threshold
-    config_state.noise_tolerance = config.noise_tolerance
-    config_state.cosine_threshold = config.cosine_threshold
-    config_state.global_noise_limit = config.global_noise_limit
-    config_state.cosine_order = config.cosine_order
-    config_state.excitation_order = config.excitation_order
-    config_state.noise_order = config.noise_order
-    config_state.adaptive_factor = config.adaptive_factor
-    return {"status": "updated", "config": config}
+# --- Configuration Endpoint ---
 
-@router.post("/audit")
+@router.post("/galaxy/config", dependencies=[Depends(verify_api_key)])
+async def update_config(config: ConfigUpdate):
+    from app.core import state as state_mod
+    try:
+        async with _config_lock:
+            state_mod.config_state = ConfigState(**config.model_dump())
+        return {"status": "updated", "config": config.model_dump()}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+# --- Audit Endpoint ---
+
+@router.post("/audit", dependencies=[Depends(verify_api_key)])
 async def audit_query(req: AuditRequest):
+    from app.core import state as state_mod
+    cfg = state_mod.config_state  # immutable snapshot
     q_vec = embedder.embed(req.query)
     results = storage.search_nearest(q_vec, k=1)
     if not results:
         return {"activations": 0, "text": "Empty Database.", "vector": []}
-    
-    # Calculate activations
+
     c_vec = results[0]["vector"]
     activations = 0
     for q_i, c_i in zip(q_vec, c_vec):
-        if abs(q_i - c_i) <= config_state.noise_tolerance:
+        if abs(q_i - c_i) <= cfg.noise_tolerance:
             activations += 1
 
     return {"activations": activations, "text": results[0]["text"], "vector": c_vec.tolist() if hasattr(c_vec, "tolist") else c_vec}
 
+# --- Ollama Streaming ---
 
 async def stream_ollama(prompt: str, context: str, strict: bool = False):
     if strict:
@@ -4540,7 +5236,7 @@ async def stream_ollama(prompt: str, context: str, strict: bool = False):
     async with httpx.AsyncClient(timeout=None) as client:
         try:
             async with client.stream(
-                "POST", 
+                "POST",
                 "http://localhost:11434/api/generate",
                 json={"model": "llama3.1", "prompt": full_prompt, "stream": True}
             ) as response:
@@ -4550,85 +5246,25 @@ async def stream_ollama(prompt: str, context: str, strict: bool = False):
         except Exception as e:
             yield json.dumps({"type": "error", "text": str(e)}).encode("utf-8")
 
-@router.post("/chat")
+# --- Chat Endpoint (Firewall Gateway) ---
+
+@router.post("/chat", dependencies=[Depends(verify_api_key)])
 async def chat_endpoint(req: ChatRequest):
+    from app.core import state as state_mod
+    cfg = state_mod.config_state  # immutable snapshot — consistent for entire request
     prompt = req.prompt
     fw_on = "[FW=ON]" in prompt
     clean_prompt = prompt.replace("[FW=ON]", "").replace("[FW=OFF]", "").strip()
-    
-    # --- Structural Clause Segmentation (Language-Agnostic) ---
-    raw_clauses = [c.strip() for c in re.split(r'[.!?;:\n\-\|«»\u201c\u201d]+', clean_prompt) if len(c.strip()) > 4]
-    if not raw_clauses:
-        raw_clauses = [clean_prompt]
 
-    # Safety fallback: force-split long clauses into ≤15-word sub-chunks
-    clauses = []
-    for rc in raw_clauses:
-        words = rc.split()
-        if len(words) > 20:
-            for i in range(0, len(words), 15):
-                sub = " ".join(words[i:i+15])
-                if len(sub.strip()) > 4:
-                    clauses.append(sub.strip())
-        else:
-            clauses.append(rc)
-    if not clauses:
-        clauses = [clean_prompt]
+    # Segment prompt via the engine (language-agnostic + overflow chunking)
+    clauses = SemanticFirewall.segment(clean_prompt)
 
-    # --- Sequential Pipeline Engine ---
-    # Define the three filter functions. Each returns (passed: bool, reason: str, details: dict)
-    def run_noise_filter(cl_arr, db_arr, clause, **_kw):
-        avg_delta = float(np.mean(np.abs(cl_arr - db_arr)))
-        if avg_delta > config_state.global_noise_limit:
-            return False, "noise", {
-                "avg_delta": avg_delta,
-                "limit": config_state.global_noise_limit,
-                "clause": clause
-            }
-        return True, "noise", {"avg_delta": avg_delta}
-
-    def run_cosine_filter(cl_arr, db_arr, clause, **_kw):
-        cl_norm = np.linalg.norm(cl_arr)
-        db_norm = np.linalg.norm(db_arr)
-        sim = float(np.dot(cl_arr, db_arr) / (cl_norm * db_norm)) if cl_norm > 0 and db_norm > 0 else 0.0
-        if sim < config_state.cosine_threshold:
-            return False, "cosine", {"cosine_sim": sim, "clause": clause}
-        return True, "cosine", {"cosine_sim": sim}
-
-    def run_excitation_filter(cl_arr, db_arr, clause, word_count=0, **_kw):
-        delta = np.abs(cl_arr - db_arr)
-        seg_activations = int(np.sum(delta <= config_state.noise_tolerance))
-        base_threshold = config_state.excitation_threshold
-        is_short = word_count < 6
-        factor = config_state.adaptive_factor if is_short else 1.0
-        threshold = float(base_threshold) * factor
-        if seg_activations < threshold:
-            return False, "excitation", {
-                "activations": seg_activations,
-                "threshold": threshold,
-                "clause": clause,
-                "adaptive_applied": is_short,
-                "adaptive_factor": factor
-            }
-        return True, "excitation", {
-            "activations": seg_activations,
-            "threshold": threshold,
-            "adaptive_applied": is_short,
-            "adaptive_factor": factor
-        }
-
-    # Build ordered pipeline from config
-    pipeline_stages = sorted([
-        (config_state.cosine_order, "cosine", run_cosine_filter),
-        (config_state.excitation_order, "excitation", run_excitation_filter),
-        (config_state.noise_order, "noise", run_noise_filter),
-    ], key=lambda x: x[0])
-
+    # Evaluate each clause through the ordered pipeline
     context = ""
     failed_clause = None
     block_reason = ""
     block_details = {}
-    pipeline_results = []  # telemetry: ordered list of stage results
+    all_traces = []
     last_activations = 0
     last_cosine = 0.0
 
@@ -4636,90 +5272,46 @@ async def chat_endpoint(req: ChatRequest):
         cl_vec = embedder.embed(clause)
         results = storage.search_nearest(cl_vec, k=1)
         if not results:
-            # No context — all filters fail
             failed_clause = clause
             block_reason = "no_context"
             block_details = {"clause": clause}
-            pipeline_results.append({"stage": "no_context", "passed": False})
+            all_traces.append({"stage": "no_context", "passed": False})
             break
 
         db_vec = results[0]["vector"]
         if not context:
             context = results[0]["text"]
-        cl_arr = np.array(cl_vec, dtype=np.float32)
-        db_arr = np.array(db_vec, dtype=np.float32)
+        q_arr = np.array(cl_vec, dtype=np.float32)
+        c_arr = np.array(db_vec, dtype=np.float32)
         word_count = len(clause.split())
 
-        clause_breached = False
-        for _order, stage_name, stage_fn in pipeline_stages:
-            passed, reason, details = stage_fn(
-                cl_arr, db_arr, clause, word_count=word_count
-            )
-            pipeline_results.append({"stage": stage_name, "passed": passed, **details})
-            if passed:
-                if "activations" in details:
-                    last_activations = details["activations"]
-                if "cosine_sim" in details:
-                    last_cosine = details["cosine_sim"]
-            else:
-                failed_clause = clause
-                block_reason = reason
-                block_details = details
-                clause_breached = True
-                break  # stop pipeline on first breach
+        result = SemanticFirewall.evaluate_clause(q_arr, c_arr, cfg, word_count)
+        all_traces.extend(result["trace"])
+        last_activations = result["last_activations"]
+        last_cosine = result["last_cosine"]
 
-        if clause_breached:
+        if not result["passed"]:
+            failed_clause = clause
+            block_reason = result["breach_reason"]
+            block_details = result["breach_details"]
             break
 
+    # --- Telemetry Formatting & Response ---
     if fw_on:
         if failed_clause is not None:
-            if block_reason == "cosine":
-                block_msg = (
-                    f'🛑 [FW] Segment violation: "{failed_clause}". '
-                    f'Cosine: {block_details.get("cosine_sim", 0):.3f} '
-                    f'(Required: >={config_state.cosine_threshold:.2f}). '
-                    f'Vector direction diverges from corpus.'
-                )
-            elif block_reason == "noise":
-                block_msg = (
-                    f'🛑 [FW] Segment violation: "{failed_clause}". '
-                    f'Noise pre-filter: avg_delta={block_details.get("avg_delta", 0):.4f} '
-                    f'(Limit: {config_state.global_noise_limit:.3f}).'
-                )
-            elif block_reason == "no_context":
-                block_msg = (
-                    f'🛑 [FW] Segment violation: "{failed_clause}". '
-                    f'No context match in corpus.'
-                )
-            else:
-                adaptive_note = ""
-                if block_details.get("adaptive_applied"):
-                    adaptive_note = (
-                        f' [ADAPTIVE] Factor: {block_details.get("adaptive_factor", 1.0)}x.'
-                    )
-                block_msg = (
-                    f'🛑 [FW] Segment violation: "{failed_clause}". '
-                    f'Resonance: {block_details.get("activations", 0)}/{block_details.get("threshold", 0):.0f}.{adaptive_note}'
-                )
-
-            # Include pipeline execution order in telemetry
-            stage_summary = " → ".join(
-                f'{r["stage"]}:{"OK" if r["passed"] else "BREACH"}'
-                for r in pipeline_results
+            block_msg = _format_block_message(
+                failed_clause, block_reason, block_details, cfg, all_traces
             )
-            block_msg += f'\nPipeline: [{stage_summary}]'
-
             async def breach_stream():
                 yield json.dumps({"type": "content", "text": block_msg}).encode("utf-8") + b"\n"
             return StreamingResponse(breach_stream(), media_type="application/x-ndjson")
 
-        # Firewall passed — prepend telemetry badge before the LLM stream
         stage_summary = " → ".join(
-            f'{r["stage"]}:OK' for r in pipeline_results
+            f'{r["stage"]}:OK' for r in all_traces
         )
         pass_prefix = (
             f"🟢 [FW PASS] Resonance: "
-            f"{last_activations}/{config_state.excitation_threshold} dims | "
+            f"{last_activations}/{cfg.excitation_threshold} dims | "
             f"Cosine: {last_cosine:.3f} | "
             f"Pipeline: [{stage_summary}]\n"
             f"Routing to corpus...\n\n"
@@ -4732,6 +5324,46 @@ async def chat_endpoint(req: ChatRequest):
 
     return StreamingResponse(stream_ollama(clean_prompt, context), media_type="application/x-ndjson")
 
+
+def _format_block_message(
+    failed_clause: str, reason: str, details: dict, cfg: ConfigState, traces: list
+) -> str:
+    """Format the telemetry block message based on which filter breached."""
+    if reason == "cosine":
+        msg = (
+            f'🛑 [FW] Segment violation: "{failed_clause}". '
+            f'Cosine: {details.get("cosine_sim", 0):.3f} '
+            f'(Required: >={cfg.cosine_threshold:.2f}). '
+            f'Vector direction diverges from corpus.'
+        )
+    elif reason == "noise":
+        msg = (
+            f'🛑 [FW] Segment violation: "{failed_clause}". '
+            f'Noise pre-filter: avg_delta={details.get("avg_delta", 0):.4f} '
+            f'(Limit: {cfg.global_noise_limit:.3f}).'
+        )
+    elif reason == "no_context":
+        msg = (
+            f'🛑 [FW] Segment violation: "{failed_clause}". '
+            f'No context match in corpus.'
+        )
+    else:
+        adaptive_note = ""
+        if details.get("adaptive_applied"):
+            adaptive_note = f' [ADAPTIVE] Factor: {details.get("adaptive_factor", 1.0)}x.'
+        msg = (
+            f'🛑 [FW] Segment violation: "{failed_clause}". '
+            f'Resonance: {details.get("activations", 0)}/{details.get("threshold", 0):.0f}.{adaptive_note}'
+        )
+
+    stage_summary = " → ".join(
+        f'{r["stage"]}:{"OK" if r["passed"] else "BREACH"}' for r in traces
+    )
+    msg += f'\nPipeline: [{stage_summary}]'
+    return msg
+
+# --- System Stats Endpoint ---
+
 @router.get("/system/stats")
 async def system_stats():
     cpu = psutil.cpu_percent(interval=0.1)
@@ -4740,15 +5372,13 @@ async def system_stats():
     try:
         if torch.backends.mps.is_available():
             vram = torch.mps.current_allocated_memory() / (1024 * 1024)
-            # Logarithmic-like scaling for Mac MPS (max alloc usually caps lower dynamically)
             gpu_percent = min(100.0, (vram / 40.0))
-
         elif torch.cuda.is_available():
             vram = torch.cuda.memory_allocated() / (1024 * 1024)
             gpu_percent = min(100.0, (vram / 40.0))
     except Exception:
         pass
-    
+
     return {"cpu": cpu, "ram": ram, "gpu": gpu_percent}
 
 
