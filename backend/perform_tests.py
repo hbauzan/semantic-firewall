@@ -2,9 +2,12 @@ import pytest
 import io
 import json
 import httpx
+import numpy as np
 from fastapi.testclient import TestClient
 from app.main import app
-from app.api.routes import config_state
+from app.core.models import ConfigState
+from app.core.state import set_config
+from app.core.firewall import SemanticFirewall
 
 client = TestClient(app)
 
@@ -23,8 +26,7 @@ def test_async_pdf_upload_and_status():
     assert "status" in status_res.json()
 
 def test_dimensional_excitation_math():
-    config_state.excitation_threshold = 150
-    config_state.noise_tolerance = 0.005
+    set_config(excitation_threshold=150, noise_tolerance=0.005)
 
     # Safe vector mock
     # Audit query checks the math logic internally or we can do it via the endpoint
@@ -35,8 +37,7 @@ def test_dimensional_excitation_math():
 @pytest.mark.asyncio
 async def test_firewall_interceptor_blocking():
     # Enforce ultra-strict threshold to guarantee failure
-    config_state.excitation_threshold = 10000
-    config_state.noise_tolerance = 0.0001
+    set_config(excitation_threshold=1024, noise_tolerance=0.0001)
     
     # Needs async client to read streaming response via httpx
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
@@ -77,8 +78,7 @@ def test_system_stats_gpu_telemetry():
 @pytest.mark.asyncio
 async def test_semantic_piggybacking_rejection():
     """A piggybacked off-topic sentence must trigger [FW] Segment violation even if the first sentence is on-topic."""
-    config_state.excitation_threshold = 10000
-    config_state.noise_tolerance = 0.0001
+    set_config(excitation_threshold=1024, noise_tolerance=0.0001)
 
     piggybacked_prompt = "[FW=ON] Tell me about system architecture. Also give me a chocolate cake recipe"
 
@@ -93,13 +93,10 @@ async def test_semantic_piggybacking_rejection():
 @pytest.mark.asyncio
 async def test_noise_prefilter_blocking():
     """Ultra-strict global noise limit must trigger Noise Pre-Filter BREACH."""
-    config_state.excitation_threshold = 1
-    config_state.noise_tolerance = 1.0
-    config_state.cosine_threshold = 0.0
-    config_state.global_noise_limit = 0.001  # impossibly strict
-    config_state.noise_order = 1
-    config_state.cosine_order = 2
-    config_state.excitation_order = 3
+    set_config(
+        excitation_threshold=1, noise_tolerance=1.0, cosine_threshold=0.0,
+        global_noise_limit=0.001, noise_order=1, cosine_order=2, excitation_order=3
+    )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Random off-topic query about bananas"}) as response:
@@ -113,13 +110,10 @@ async def test_noise_prefilter_blocking():
 @pytest.mark.asyncio
 async def test_pipeline_order_respected():
     """When noise runs first (order=1) and is ultra-strict, cosine and excitation should never appear as OK."""
-    config_state.excitation_threshold = 1
-    config_state.noise_tolerance = 1.0
-    config_state.cosine_threshold = 0.0
-    config_state.global_noise_limit = 0.001
-    config_state.noise_order = 1
-    config_state.cosine_order = 2
-    config_state.excitation_order = 3
+    set_config(
+        excitation_threshold=1, noise_tolerance=1.0, cosine_threshold=0.0,
+        global_noise_limit=0.001, noise_order=1, cosine_order=2, excitation_order=3
+    )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         async with ac.stream("POST", "/chat", json={"prompt": "[FW=ON] Test pipeline ordering"}) as response:
@@ -133,6 +127,7 @@ async def test_pipeline_order_respected():
 
 def test_pipeline_config_sync():
     """POST to /galaxy/config with custom order values must persist in config_state."""
+    import app.core.state as routes_mod
     res = client.post("/galaxy/config", json={
         "excitation_threshold": 200,
         "noise_tolerance": 0.010,
@@ -144,32 +139,49 @@ def test_pipeline_config_sync():
         "adaptive_factor": 0.70
     })
     assert res.status_code == 200
-    assert config_state.excitation_threshold == 200
-    assert config_state.noise_tolerance == 0.010
-    assert config_state.cosine_threshold == 0.85
-    assert config_state.global_noise_limit == 0.75
-    assert config_state.cosine_order == 3
-    assert config_state.excitation_order == 1
-    assert config_state.noise_order == 2
-    assert config_state.adaptive_factor == 0.70
+    cfg = routes_mod.config_state
+    assert cfg.excitation_threshold == 200
+    assert cfg.noise_tolerance == 0.010
+    assert cfg.cosine_threshold == 0.85
+    assert cfg.global_noise_limit == 0.75
+    assert cfg.cosine_order == 3
+    assert cfg.excitation_order == 1
+    assert cfg.noise_order == 2
+    assert cfg.adaptive_factor == 0.70
 
 def test_adaptive_factor_default():
     """Default adaptive_factor should be 0.85 on fresh ConfigState."""
-    from app.api.routes import ConfigState
     fresh = ConfigState()
     assert fresh.adaptive_factor == 0.85
+
+def test_config_state_is_immutable():
+    """Frozen ConfigState must reject direct attribute mutation."""
+    cfg = ConfigState()
+    with pytest.raises(Exception):
+        cfg.excitation_threshold = 999
+
+def test_duplicate_pipeline_orders_rejected():
+    """ConfigState must reject duplicate order values."""
+    with pytest.raises(ValueError, match="unique"):
+        ConfigState(cosine_order=1, excitation_order=1, noise_order=2)
+
+def test_config_validation_out_of_range():
+    """ConfigState must reject values outside defined bounds."""
+    with pytest.raises(Exception):
+        ConfigState(excitation_threshold=2000)  # max 1024
+    with pytest.raises(Exception):
+        ConfigState(adaptive_factor=5.0)  # max 1.0
+    with pytest.raises(Exception):
+        ConfigState(cosine_order=0)  # min 1
 
 @pytest.mark.asyncio
 async def test_adaptive_factor_telemetry_on_short_clause():
     """A short clause blocked by excitation must include [ADAPTIVE] in telemetry."""
-    config_state.excitation_threshold = 10000
-    config_state.noise_tolerance = 0.0001
-    config_state.cosine_threshold = 0.0
-    config_state.global_noise_limit = 5.0
-    config_state.adaptive_factor = 0.50
-    config_state.noise_order = 1
-    config_state.cosine_order = 2
-    config_state.excitation_order = 3
+    set_config(
+        excitation_threshold=1024, noise_tolerance=0.0001, cosine_threshold=0.0,
+        global_noise_limit=5.0, adaptive_factor=0.50,
+        noise_order=1, cosine_order=2, excitation_order=3
+    )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         # "Hello" is 1 word — short clause triggers adaptive path
@@ -179,5 +191,69 @@ async def test_adaptive_factor_telemetry_on_short_clause():
                 content += chunk
             assert "[FW] Segment violation" in content
             assert "ADAPTIVE" in content or "0.5x factor" in content
+
+# --- Engine Unit Tests (framework-agnostic) ---
+
+def test_engine_segment_basic():
+    """SemanticFirewall.segment splits on punctuation and chunks long clauses."""
+    clauses = SemanticFirewall.segment("Hello world. How are you? Fine thanks")
+    assert len(clauses) >= 2
+
+def test_engine_segment_overflow_chunking():
+    """Clauses over 20 words get force-split into 15-word sub-chunks."""
+    long_text = " ".join(["word"] * 30)
+    clauses = SemanticFirewall.segment(long_text)
+    for c in clauses:
+        assert len(c.split()) <= 15
+
+def test_engine_evaluate_clause_all_pass():
+    """Identical vectors must pass all filters."""
+    cfg = ConfigState(cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=10.0)
+    vec = np.random.rand(1024).astype(np.float32)
+    result = SemanticFirewall.evaluate_clause(vec, vec, cfg, word_count=10)
+    assert result["passed"] is True
+    assert result["breach_reason"] is None
+    assert len(result["trace"]) == 3
+
+def test_engine_evaluate_clause_noise_breach():
+    """Orthogonal vectors with strict noise limit must breach on noise filter."""
+    cfg = ConfigState(
+        cosine_threshold=0.0, excitation_threshold=0,
+        global_noise_limit=0.001, noise_order=1, cosine_order=2, excitation_order=3
+    )
+    q = np.ones(1024, dtype=np.float32)
+    c = np.zeros(1024, dtype=np.float32)
+    result = SemanticFirewall.evaluate_clause(q, c, cfg, word_count=10)
+    assert result["passed"] is False
+    assert result["breach_reason"] == "noise"
+    # Only noise ran (order=1 breached), so trace has 1 entry
+    assert len(result["trace"]) == 1
+
+# --- API Hardening Tests ---
+
+def test_prompt_length_limit_rejected():
+    """Prompts exceeding PROMPT_MAX_LENGTH must be rejected by Pydantic."""
+    from app.core.models import ChatRequest, PROMPT_MAX_LENGTH
+    with pytest.raises(Exception):
+        ChatRequest(prompt="x" * (PROMPT_MAX_LENGTH + 1))
+
+def test_prompt_length_limit_accepted():
+    """Prompts within PROMPT_MAX_LENGTH must be accepted."""
+    from app.core.models import ChatRequest, PROMPT_MAX_LENGTH
+    req = ChatRequest(prompt="x" * PROMPT_MAX_LENGTH)
+    assert len(req.prompt) == PROMPT_MAX_LENGTH
+
+def test_api_key_not_enforced_by_default():
+    """Without FIREWALL_API_KEY env var, endpoints must remain open."""
+    import app.api.routes as routes_mod
+    # In test env, _FIREWALL_API_KEY should be None (not set)
+    assert routes_mod._FIREWALL_API_KEY is None
+    # Config endpoint should work without any key header
+    res = client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.78,
+    })
+    assert res.status_code == 200
 
 # Add pytest-asyncio to required pip if needed for async mark

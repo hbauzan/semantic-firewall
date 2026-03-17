@@ -8,10 +8,29 @@ The firewall operates by evaluating the raw 1024D embedding layers produced by `
 - **Explicit Chat Feedback:** When `[FW=ON]` is active, the chat endpoint injects human-readable telemetry into the response. A blocked query returns `🛑 [FW] Segment violation` with the exact metric that triggered the breach. A passed query prepends `🟢 [FW PASS]` with resonance/threshold and cosine values before routing to the LLM stream. All telemetry uses language-neutral technical terms.
 
 ## 2. Backend Architecture
-Utilizes **FastAPI** for route management yielding high execution throughput.
-- **Embedder Singleton (`embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU.
-- **Storage Layer (`storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation.
-- **Ingestor Protocol (`ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines (size: 2048 chars, 200 overlap).
+Utilizes **FastAPI** for route management yielding high execution throughput. The backend follows a **layered separation of concerns**:
+
+```
+app/
+├── core/                    # Framework-agnostic logic
+│   ├── models.py            # Pydantic models (ConfigState, ConfigUpdate, etc.)
+│   ├── state.py             # Global config singleton + asyncio.Lock + set_config()
+│   └── firewall.py          # SemanticFirewall engine (pure vector math)
+├── api/
+│   └── routes.py            # Thin FastAPI layer (HTTP, streaming, telemetry)
+└── modules/
+    ├── embedder.py          # BGE-M3 embedding singleton
+    ├── storage.py           # LanceDB vector store
+    └── ingestor.py          # PDF chunking pipeline
+```
+
+- **Firewall Engine (`core/firewall.py`):** `SemanticFirewall` class with static methods — completely agnostic of web framework, embedders, and storage. Receives numpy arrays and a frozen `ConfigState`, returns structured results. Portable for CLI tools, batch audits, or alternative API wrappers. Contains: `segment()`, `run_noise_filter()`, `run_cosine_filter()`, `run_excitation_filter()`, `build_pipeline()`, `evaluate_clause()`.
+- **Models (`core/models.py`):** All Pydantic schemas. `ConfigState` is a **frozen BaseModel** — immutable after construction. `Field` constraints enforce value ranges. `@model_validator` ensures pipeline order uniqueness.
+- **State (`core/state.py`):** Configuration singleton + `asyncio.Lock` for serialized writes + `set_config()` for atomic merge-validate-swap. Each request handler snapshots the reference at entry (`cfg = config_state`) for mid-request consistency.
+- **Routes (`api/routes.py`):** Thin HTTP layer — request parsing, embedding calls, storage queries, telemetry formatting, streaming responses. Delegates all firewall math to `SemanticFirewall`.
+- **Embedder Singleton (`modules/embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU.
+- **Storage Layer (`modules/storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation.
+- **Ingestor Protocol (`modules/ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines (size: 2048 chars, 200 overlap).
 
 ## 3. Execution Pipeline (Sequential Reorderable Firewall)
 The firewall executes three distinct validation stages in a **user-defined sequence** controlled via the HUD's `Seq` inputs. The pipeline is constructed at evaluation time by sorting the three stages based on their integer priority values:
@@ -62,3 +81,17 @@ If **any single clause or sub-chunk** fails any stage of the pipeline, the entir
 
 ### 6.2 System Prompt Hardening (Zero-Tolerance Context Confinement)
 As a secondary defense layer, `stream_ollama` injects a strict system instruction constraining the LLM to respond **exclusively** from the provided RAG context. If a query or sub-instruction cannot be answered from the context (e.g. recipes, jokes, unrelated code), the LLM is instructed to refuse that portion. This provides defense-in-depth even if the segmentation firewall is bypassed.
+
+## 7. API Security Hardening
+
+### 7.1 CORS Policy
+CORS is configured via the `ALLOWED_ORIGINS` environment variable (default: `http://localhost:5173`). The middleware enforces:
+- **Explicit origins only** — no wildcard `*` in production. If `*` is used (dev only), `allow_credentials` is automatically set to `false` to prevent the browser credential leak anti-pattern.
+- **Restricted methods** — only `GET`, `POST`, `DELETE` are allowed (no `PUT`, `PATCH`, `OPTIONS` beyond preflight).
+- **Restricted headers** — only `Content-Type` and `X-API-Key` are accepted.
+
+### 7.2 API Key Authentication (Opt-in)
+When the `FIREWALL_API_KEY` environment variable is set, all mutation endpoints (`/chat`, `/audit`, `/galaxy/config`) require the `X-API-Key` header to match. Returns HTTP 403 on mismatch. If the variable is unset, all endpoints remain open for local development. Configuration is documented in `.env.example`.
+
+### 7.3 Input Sanitization
+All inbound prompts (`ChatRequest`, `AuditRequest`) are constrained to `PROMPT_MAX_LENGTH` (4000 characters) at the Pydantic schema level. Payloads exceeding this limit are rejected with HTTP 422 before any embedding computation occurs, preventing memory exhaustion attacks on the vectorization stage.

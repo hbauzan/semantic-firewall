@@ -1,6 +1,6 @@
 {
     "project": "Phase-Lock Semantic Firewall",
-    "version": "v2.3.0",
+    "version": "v2.6.0",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -21,7 +21,13 @@
         "cosine_similarity_gate": true,
         "reorderable_sequential_pipeline": true,
         "noise_prefilter_global_delta": true,
-        "configurable_adaptive_factor": true
+        "configurable_adaptive_factor": true,
+        "atomic_config_state": true,
+        "pydantic_schema_validation": true,
+        "modular_firewall_engine": true,
+        "cors_hardening": true,
+        "opt_in_api_key_auth": true,
+        "input_length_sanitization": true
     },
     "state_schema": {
         "excitation_threshold": {"type": "int", "default": 150, "range": [0, 1024]},
