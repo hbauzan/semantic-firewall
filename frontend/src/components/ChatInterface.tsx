@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
+import { API_BASE_URL } from '../config';
 
 export const ChatInterface: React.FC = () => {
   const { messages, addMessage } = useStore();
@@ -14,8 +15,7 @@ export const ChatInterface: React.FC = () => {
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
 
-    // Create new id with BigInt Safety (explicit Number cast)
-    const newMessageId = Number(Date.now().toString());
+    const newMessageId = crypto.randomUUID();
     addMessage({ id: newMessageId, role: 'user', content: input });
 
     const currentInput = input;
@@ -23,7 +23,7 @@ export const ChatInterface: React.FC = () => {
     setIsStreaming(true);
 
     try {
-      const res = await fetch('http://localhost:8000/chat', {
+      const res = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: currentInput })
@@ -34,7 +34,7 @@ export const ChatInterface: React.FC = () => {
       const reader = res.body.getReader();
       const decoder = new TextDecoder('utf-8');
 
-      const assistantMessageId = Number(Date.now().toString()) + 1;
+      const assistantMessageId = crypto.randomUUID();
       let assistantContent = '';
 
       // We will add the assistant message first with an initial status
@@ -132,7 +132,7 @@ export const ChatInterface: React.FC = () => {
 
     } catch (err) {
       console.error(err);
-      addMessage({ id: Number(Date.now()), role: 'system', content: 'Failed to connect to backend engine.' });
+      addMessage({ id: crypto.randomUUID(), role: 'system', content: 'Failed to connect to backend engine.' });
       useStore.setState({ systemAction: 'CONNECTION_FAILED' });
     } finally {
       setIsStreaming(false);

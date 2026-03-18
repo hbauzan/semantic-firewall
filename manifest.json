@@ -1,6 +1,6 @@
 {
     "project": "Phase-Lock Semantic Firewall",
-    "version": "v2.7.0",
+    "version": "v2.10.0",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -28,13 +28,26 @@
         "cors_hardening": true,
         "opt_in_api_key_auth": true,
         "input_length_sanitization": true,
-        "per_filter_toggle_buttons": true
+        "per_filter_toggle_buttons": true,
+        "pdf_upload_hardening": true,
+        "sql_injection_prevention": true,
+        "async_config_lock": true,
+        "structured_logging": true,
+        "env_driven_settings": true,
+        "task_store_ttl_pruning": true,
+        "cosine_nan_inf_guard": true,
+        "frontend_centralized_api_url": true,
+        "crypto_uuid_message_ids": true,
+        "react_error_boundaries": true,
+        "health_check_endpoint": true,
+        "pinned_dependencies": true,
+        "env_driven_server_config": true
     },
     "state_schema": {
         "excitation_threshold": {"type": "int", "default": 150, "range": [0, 1024]},
-        "noise_tolerance": {"type": "float", "default": 0.005, "range": [0.001, 0.100]},
-        "cosine_threshold": {"type": "float", "default": 0.50, "range": [0.00, 1.00]},
-        "global_noise_limit": {"type": "float", "default": 0.50, "range": [0.10, 2.00]},
+        "noise_tolerance": {"type": "float", "default": 0.005, "range": [0.0, 1.0]},
+        "cosine_threshold": {"type": "float", "default": 0.50, "range": [0.0, 1.0]},
+        "global_noise_limit": {"type": "float", "default": 0.50, "range": [0.0, 10.0]},
         "cosine_order": {"type": "int", "default": 2, "range": [1, 3]},
         "excitation_order": {"type": "int", "default": 3, "range": [1, 3]},
         "noise_order": {"type": "int", "default": 1, "range": [1, 3]},

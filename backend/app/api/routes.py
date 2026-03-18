@@ -5,7 +5,9 @@ All models live in app.core.models.
 All state management lives in app.core.state.
 This file handles: HTTP parsing, embedding calls, storage calls, streaming, telemetry formatting.
 """
+import logging
 import os
+import re
 import psutil
 import torch
 import json
@@ -14,12 +16,20 @@ import httpx
 from fastapi import APIRouter, UploadFile, File, HTTPException, Header, Depends
 from fastapi.responses import StreamingResponse
 
+logger = logging.getLogger(__name__)
+
+# --- Upload constraints ---
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
+_PDF_MAGIC = b"%PDF"
+_SAFE_FILENAME_RE = re.compile(r'^[\w\s.\-()]+\.pdf$', re.UNICODE | re.IGNORECASE)
+
 from app.modules.ingestor import process_pdf_async, get_task_status
 from app.modules.embedder import embedder
 from app.modules.storage import storage
 from app.core.models import ConfigState, ConfigUpdate, AuditRequest, ChatRequest
-from app.core.state import config_state, _config_lock, set_config
+from app.core.state import config_state, _config_lock
 from app.core.firewall import SemanticFirewall
+from app.core.settings import OLLAMA_BASE_URL, OLLAMA_MODEL
 
 # --- Optional API Key Guard ---
 _FIREWALL_API_KEY = os.environ.get("FIREWALL_API_KEY")
@@ -35,8 +45,24 @@ router = APIRouter()
 
 @router.post("/corpus/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
+    # --- File size guard (read in chunks to avoid full RAM load on huge files) ---
     file_bytes = await file.read()
-    task_id = await process_pdf_async(file_bytes, file.filename)
+    if len(file_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"File exceeds {MAX_UPLOAD_BYTES // (1024*1024)} MB limit")
+
+    # --- PDF magic-byte validation ---
+    if not file_bytes[:4].startswith(_PDF_MAGIC):
+        raise HTTPException(status_code=400, detail="File is not a valid PDF")
+
+    # --- Filename sanitization ---
+    raw_name = file.filename or "upload.pdf"
+    safe_name = os.path.basename(raw_name)
+    if not _SAFE_FILENAME_RE.match(safe_name):
+        safe_name = re.sub(r'[^\w.\-]', '_', safe_name)
+        if not safe_name.lower().endswith('.pdf'):
+            safe_name += '.pdf'
+
+    task_id = await process_pdf_async(file_bytes, safe_name)
     return {"task_id": task_id}
 
 @router.get("/corpus/task-status/{task_id}")
@@ -49,7 +75,10 @@ async def list_packs():
 
 @router.delete("/corpus/packs/{filename}")
 async def delete_pack(filename: str):
-    storage.delete_pack(filename)
+    try:
+        storage.delete_pack(filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {"status": "deleted", "filename": filename}
 
 # --- Configuration Endpoint ---
@@ -102,14 +131,15 @@ async def stream_ollama(prompt: str, context: str, strict: bool = False):
         try:
             async with client.stream(
                 "POST",
-                "http://localhost:11434/api/generate",
-                json={"model": "llama3.1", "prompt": full_prompt, "stream": True}
+                f"{OLLAMA_BASE_URL}/api/generate",
+                json={"model": OLLAMA_MODEL, "prompt": full_prompt, "stream": True}
             ) as response:
                 async for chunk in response.aiter_lines():
                     if chunk:
                         yield (chunk + "\n").encode("utf-8")
         except Exception as e:
-            yield json.dumps({"response": f"🔴 [LLM OFFLINE] Cannot reach Ollama at localhost:11434. Error: {e}"}).encode("utf-8") + b"\n"
+            logger.error("Ollama connection failed: %s", e)
+            yield json.dumps({"response": f"🔴 [LLM OFFLINE] Cannot reach Ollama at {OLLAMA_BASE_URL}. Ensure 'ollama serve' is running."}).encode("utf-8") + b"\n"
 
 # --- Chat Endpoint (Firewall Gateway) ---
 
@@ -248,7 +278,22 @@ async def system_stats():
             allocated = torch.cuda.memory_allocated()
             total = torch.cuda.get_device_properties(0).total_mem
             gpu_percent = min(100.0, (allocated / total) * 100.0) if total > 0 else 0.0
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("GPU telemetry unavailable: %s", e)
 
     return {"cpu": cpu, "ram": ram, "gpu": gpu_percent}
+
+# --- Health Check ---
+
+@router.get("/health")
+async def health_check():
+    """Liveness/readiness probe for load balancers and orchestrators."""
+    from datetime import datetime, timezone
+    db_rows = storage.count_rows()
+    embedder_ok = hasattr(embedder, 'model') and embedder.model is not None
+    return {
+        "status": "healthy" if embedder_ok else "degraded",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "embedder_loaded": embedder_ok,
+        "corpus_chunks": db_rows,
+    }

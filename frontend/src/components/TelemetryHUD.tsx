@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
+import { API_BASE_URL } from '../config';
 
 // Alive monkey frames (animated mouth)
 const ALIVE_FRAMES = [
@@ -78,7 +79,7 @@ export const TelemetryHUD: React.FC = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch('http://localhost:8000/system/stats');
+        const res = await fetch(`${API_BASE_URL}/system/stats`);
         const data = await res.json();
         setTelemetry(data);
       } catch (err) {

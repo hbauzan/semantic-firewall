@@ -1,8 +1,15 @@
 import lancedb
 from lancedb.pydantic import Vector, LanceModel
+import logging
 import os
+import re
+
+logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "lancedb_data")
+
+# Whitelist: only allow safe characters in filenames used in queries
+_SAFE_FILENAME_RE = re.compile(r'^[\w\s.\-()]+$', re.UNICODE)
 
 class KnowledgeNode(LanceModel):
     id: int
@@ -73,19 +80,23 @@ class Storage:
                 m = json.loads(m_str)
                 fname = m.get("filename", "unknown")
                 packs[fname] = packs.get(fname, 0) + 1
-            except:
-                pass
+            except (ValueError, json.JSONDecodeError) as e:
+                logger.warning("Malformed metadata entry: %s", e)
                 
         return [{"filename": k, "chunks": v} for k, v in packs.items()]
 
     def delete_pack(self, filename: str):
         if self.table.count_rows() == 0:
             return
-            
-        # LanceDB SQL filter using LIKE on the metadata string
-        # metadata contains {"filename": "..."}
-        # A simple string match works for our purposes.
-        filter_str = f"metadata LIKE '%\"filename\": \"{filename}\"%'"
+
+        # Validate filename to prevent SQL injection via LIKE filter
+        if not filename or not _SAFE_FILENAME_RE.match(filename):
+            logger.warning("Rejected unsafe filename for deletion: %r", filename)
+            raise ValueError(f"Invalid filename: contains disallowed characters")
+
+        # Escape single quotes for the SQL LIKE clause
+        safe_name = filename.replace("'", "''")
+        filter_str = f"metadata LIKE '%\"filename\": \"{safe_name}\"%'"
         self.table.delete(filter_str)
 
 storage = Storage()

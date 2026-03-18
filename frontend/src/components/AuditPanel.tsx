@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { API_BASE_URL } from '../config';
 
 export const AuditPanel: React.FC = () => {
     const [auditQuery, setAuditQuery] = useState('');
@@ -10,7 +11,7 @@ export const AuditPanel: React.FC = () => {
         if (!auditQuery.trim()) return;
         setSystemAction("EXECUTING_STRESS_TEST...");
         try {
-            const res = await fetch('http://localhost:8000/audit', {
+            const res = await fetch(`${API_BASE_URL}/audit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query: auditQuery })

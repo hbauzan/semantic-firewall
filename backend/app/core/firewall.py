@@ -4,9 +4,12 @@ This module is completely agnostic of FastAPI, embedders, and storage layers.
 It receives numpy arrays and a frozen ConfigState, returns structured results.
 Portable across CLI tools, test harnesses, or alternative API wrappers.
 """
+import logging
 import re
 from typing import Any
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from app.core.models import ConfigState
 
@@ -61,7 +64,11 @@ class SemanticFirewall:
         """Cosine similarity gate using raw vectors."""
         q_norm = np.linalg.norm(q_arr)
         c_norm = np.linalg.norm(c_arr)
-        sim = float(np.dot(q_arr, c_arr) / (q_norm * c_norm)) if q_norm > 0 and c_norm > 0 else 0.0
+        if q_norm == 0 or c_norm == 0:
+            logger.warning("Zero-norm vector in cosine filter (q_norm=%.4f, c_norm=%.4f)", q_norm, c_norm)
+            return False, "cosine", {"cosine_sim": 0.0, "error": "zero_norm"}
+        raw = np.dot(q_arr, c_arr) / (q_norm * c_norm)
+        sim = float(np.clip(raw, -1.0, 1.0))
         if sim < cfg.cosine_threshold:
             return False, "cosine", {"cosine_sim": sim}
         return True, "cosine", {"cosine_sim": sim}

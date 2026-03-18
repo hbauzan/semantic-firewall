@@ -1,9 +1,15 @@
+import logging
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 
-app = FastAPI(title="Phase-Lock Semantic Firewall", version="2.6.0")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+)
+
+app = FastAPI(title="Phase-Lock Semantic Firewall", version="2.10.0")
 
 # --- CORS: env-driven, secure defaults ---
 _raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173")
@@ -23,4 +29,7 @@ app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "8000"))
+    reload = os.environ.get("RELOAD", "true").lower() == "true"
+    uvicorn.run("app.main:app", host=host, port=port, reload=reload)

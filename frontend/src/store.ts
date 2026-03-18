@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 interface Message {
-  id: number;
+  id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
 }

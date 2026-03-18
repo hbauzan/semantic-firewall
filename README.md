@@ -4,7 +4,7 @@ A local-first RAG security layer that validates query-to-corpus geometric alignm
 
 Built for sovereign AI deployments where data never leaves the machine.
 
-> **Version:** v2.6.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
+> **Version:** v2.10.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
 
 ---
 
@@ -131,8 +131,23 @@ cp backend/.env.example backend/.env
 |----------|---------|-------------|
 | `ALLOWED_ORIGINS` | `http://localhost:5173` | Comma-separated CORS origins. Use `*` only for development. |
 | `FIREWALL_API_KEY` | *(unset)* | If set, all `/chat`, `/audit`, and `/galaxy/config` endpoints require `X-API-Key` header. Leave unset for open local development. |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API endpoint. |
+| `OLLAMA_MODEL` | `llama3.1` | LLM model name for inference. |
+| `EMBEDDING_MODEL` | `BAAI/bge-m3` | HuggingFace embedding model ID. Change only if you reindex the corpus. |
+| `CHUNK_SIZE` | `2048` | PDF chunking size in characters. |
+| `CHUNK_OVERLAP` | `200` | Overlap between consecutive chunks. |
+| `EMBEDDING_BATCH_SIZE` | `10` | Embeddings per batch during ingestion. |
+| `HOST` | `0.0.0.0` | Bind address for uvicorn. Use `127.0.0.1` behind a reverse proxy. |
+| `PORT` | `8000` | Backend listen port. |
+| `RELOAD` | `true` | Hot-reload on code changes. Set to `false` in production. |
 
-**For local development, no `.env` file is required.** Defaults work out of the box.
+**Frontend** (set in `frontend/.env` or shell):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_BASE_URL` | `http://localhost:8000` | Backend API endpoint used by all frontend components. |
+
+**For local development, no `.env` files are required.** Defaults work out of the box.
 
 ---
 
@@ -191,7 +206,7 @@ All firewall parameters are adjustable in real-time. Changes are synced to the b
 | Slider | Default | Range | Purpose |
 |--------|---------|-------|---------|
 | **Noise Threshold** | 0.50 | 0.0 – 10.0 | Global delta sanity limit |
-| **Cosine Threshold** | 0.78 | 0.0 – 1.0 | Minimum cosine similarity |
+| **Cosine Threshold** | 0.50 | 0.0 – 1.0 | Minimum cosine similarity |
 | **Excitation Threshold** | 150 | 0 – 1024 | Minimum activated dimensions |
 | **Noise Tolerance** | 0.005 | 0.0 – 1.0 | Per-dimension activation sensitivity |
 | **Adaptive Factor** | 0.85 | 0.01 – 1.0 | Threshold reduction for short queries (< 6 words) |
@@ -298,7 +313,8 @@ semantic-firewall/
 │       ├── core/
 │       │   ├── models.py         # Pydantic schemas (ConfigState, etc.)
 │       │   ├── state.py          # Global config singleton + lock
-│       │   └── firewall.py       # SemanticFirewall engine (pure math)
+│       │   ├── firewall.py       # SemanticFirewall engine (pure math)
+│       │   └── settings.py       # Environment-driven settings
 │       ├── api/
 │       │   └── routes.py         # HTTP routes (thin FastAPI layer)
 │       └── modules/
@@ -309,12 +325,15 @@ semantic-firewall/
 └── frontend/
     ├── package.json
     └── src/
-        ├── App.tsx               # Main layout
+        ├── App.tsx               # Main layout + ErrorBoundary wrappers
+        ├── config.ts             # Centralized API URL (env-driven)
+        ├── store.ts              # Zustand state management
         └── components/
             ├── ControlPanel.tsx   # Firewall sliders + pipeline ordering
-            ├── ChatInterface.tsx  # Chat with FW=ON/OFF support
+            ├── ChatInterface.tsx  # Chat with firewall toggle support
             ├── AuditPanel.tsx     # Query audit + activation inspector
-            └── TelemetryHUD.tsx   # System metrics display
+            ├── TelemetryHUD.tsx   # System metrics display
+            └── ErrorBoundary.tsx  # React error boundary (per-component isolation)
 ```
 
 ---
@@ -333,6 +352,7 @@ All endpoints are served at `http://localhost:8000`.
 | `GET` | `/corpus/packs` | — | List all uploaded document packs with chunk counts. |
 | `DELETE` | `/corpus/packs/{filename}` | — | Remove a document pack from the vector store. |
 | `GET` | `/system/stats` | — | CPU, RAM, GPU utilization metrics. |
+| `GET` | `/health` | — | Liveness probe: embedder status, corpus size, UTC timestamp. |
 
 *\* API Key required only if `FIREWALL_API_KEY` environment variable is set.*
 
@@ -348,8 +368,11 @@ This system implements multiple defense layers:
 4. **CORS Hardening** — Explicit origin allowlist, no wildcard credentials.
 5. **API Key Authentication** — Opt-in header-based auth for mutation endpoints.
 6. **Input Sanitization** — 4000-character prompt limit enforced at schema level before vectorization.
-7. **Atomic Configuration** — Frozen Pydantic models prevent race conditions on concurrent config updates.
+7. **Atomic Configuration** — Frozen Pydantic models + async lock prevent race conditions on concurrent config updates.
 8. **Pipeline Order Validation** — Duplicate filter priorities are rejected at the schema level.
+9. **PDF Upload Hardening** — 50 MB size limit, PDF magic-byte validation, filename sanitization against path traversal.
+10. **SQL Injection Prevention** — Filename whitelist regex + quote escaping on all storage layer queries.
+11. **Structured Logging** — All modules use Python `logging` with severity levels. Client-facing error messages are generic (no stack traces leaked).
 
 ---
 

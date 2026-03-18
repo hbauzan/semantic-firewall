@@ -1,6 +1,10 @@
-import os
+import logging
 import torch
 from sentence_transformers import SentenceTransformer
+from app.core.settings import EMBEDDING_MODEL
+
+logger = logging.getLogger(__name__)
+
 
 class Embedder:
     _instance = None
@@ -12,21 +16,19 @@ class Embedder:
         return cls._instance
 
     def initialize(self):
-        # Determine device
         if torch.backends.mps.is_available():
             self.device = "mps"
         elif torch.cuda.is_available():
             self.device = "cuda"
         else:
             self.device = "cpu"
-        
-        print(f"Loading BGE-M3 on {self.device}...")
-        self.model = SentenceTransformer("BAAI/bge-m3", device=self.device)
-        print("BGE-M3 Loaded.")
+
+        logger.info("Loading %s on %s...", EMBEDDING_MODEL, self.device)
+        self.model = SentenceTransformer(EMBEDDING_MODEL, device=self.device)
+        logger.info("%s loaded.", EMBEDDING_MODEL)
 
     def embed(self, text: str):
         """Embeds a single string and returns a flat list of 1024 floats."""
-        # BGE-M3 produces 1024D vectors
         output = self.model.encode(text, normalize_embeddings=False)
         return output.tolist()
 
@@ -34,5 +36,6 @@ class Embedder:
         """Embeds a batch of strings."""
         outputs = self.model.encode(texts, normalize_embeddings=False)
         return outputs.tolist()
+
 
 embedder = Embedder()

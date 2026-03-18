@@ -6,7 +6,7 @@ import numpy as np
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.models import ConfigState
-from app.core.state import set_config
+from app.core.state import set_config_sync as set_config
 from app.core.firewall import SemanticFirewall
 
 client = TestClient(app)
@@ -298,4 +298,12 @@ def test_config_sync_with_enabled_flags():
     assert cfg.cosine_enabled is True
     assert cfg.excitation_enabled is False
 
-# Add pytest-asyncio to required pip if needed for async mark
+def test_health_endpoint():
+    """Health check must return status, timestamp, embedder_loaded, and corpus_chunks."""
+    res = client.get("/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] in ("healthy", "degraded")
+    assert "timestamp" in data
+    assert isinstance(data["embedder_loaded"], bool)
+    assert isinstance(data["corpus_chunks"], int)

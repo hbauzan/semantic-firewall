@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../store';
+import { API_BASE_URL } from '../config';
 
 // Shared toggle button style generator
 const toggleStyle = (on: boolean): React.CSSProperties => ({
@@ -57,7 +58,7 @@ export const ControlPanel: React.FC = () => {
 
   const fetchPacks = async () => {
     try {
-      const res = await fetch('http://localhost:8000/corpus/packs');
+      const res = await fetch(`${API_BASE_URL}/corpus/packs`);
       const data = await res.json();
       setPacks(data.packs || []);
     } catch (err) {
@@ -70,7 +71,7 @@ export const ControlPanel: React.FC = () => {
   // Debounce API calls for config
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetch('http://localhost:8000/galaxy/config', {
+      fetch(`${API_BASE_URL}/galaxy/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -97,7 +98,7 @@ export const ControlPanel: React.FC = () => {
     if (ingestionStatus.taskId && (ingestionStatus.status === 'pending' || ingestionStatus.status === 'processing')) {
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`http://localhost:8000/corpus/task-status/${ingestionStatus.taskId}`);
+          const res = await fetch(`${API_BASE_URL}/corpus/task-status/${ingestionStatus.taskId}`);
           const data = await res.json();
           setIngestionStatus({
             status: data.status,
@@ -124,7 +125,7 @@ export const ControlPanel: React.FC = () => {
     formData.append('file', file);
     setSystemAction("UPLOADING_PDF...");
     try {
-      const res = await fetch('http://localhost:8000/corpus/upload-pdf', {
+      const res = await fetch(`${API_BASE_URL}/corpus/upload-pdf`, {
         method: 'POST',
         body: formData
       });
@@ -139,7 +140,7 @@ export const ControlPanel: React.FC = () => {
   const handleDeletePack = async (filename: string) => {
     setSystemAction("DELETING_PACK...");
     try {
-      await fetch(`http://localhost:8000/corpus/packs/${filename}`, { method: 'DELETE' });
+      await fetch(`${API_BASE_URL}/corpus/packs/${filename}`, { method: 'DELETE' });
       fetchPacks();
     } catch (err) {
       console.error("Failed to delete pack", err);
