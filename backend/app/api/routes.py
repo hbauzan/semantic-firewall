@@ -29,14 +29,14 @@ from app.modules.storage import storage
 from app.core.models import ConfigState, ConfigUpdate, AuditRequest, ChatRequest
 from app.core.state import config_state, _config_lock
 from app.core.firewall import SemanticFirewall
-from app.core.settings import OLLAMA_BASE_URL, OLLAMA_MODEL
+from app.core.settings import settings
 
 # --- Optional API Key Guard ---
-_FIREWALL_API_KEY = os.environ.get("FIREWALL_API_KEY")
 
 async def verify_api_key(x_api_key: str | None = Header(default=None)):
     """Opt-in API key check. Only enforced if FIREWALL_API_KEY env var is set."""
-    if _FIREWALL_API_KEY and x_api_key != _FIREWALL_API_KEY:
+    api_key = settings.api_key_value
+    if api_key and x_api_key != api_key:
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
 router = APIRouter()
@@ -131,15 +131,15 @@ async def stream_ollama(prompt: str, context: str, strict: bool = False):
         try:
             async with client.stream(
                 "POST",
-                f"{OLLAMA_BASE_URL}/api/generate",
-                json={"model": OLLAMA_MODEL, "prompt": full_prompt, "stream": True}
+                f"{settings.ollama_base_url}/api/generate",
+                json={"model": settings.ollama_model, "prompt": full_prompt, "stream": True}
             ) as response:
                 async for chunk in response.aiter_lines():
                     if chunk:
                         yield (chunk + "\n").encode("utf-8")
         except Exception as e:
             logger.error("Ollama connection failed: %s", e)
-            yield json.dumps({"response": f"🔴 [LLM OFFLINE] Cannot reach Ollama at {OLLAMA_BASE_URL}. Ensure 'ollama serve' is running."}).encode("utf-8") + b"\n"
+            yield json.dumps({"response": f"🔴 [LLM OFFLINE] Cannot reach Ollama at {settings.ollama_base_url}. Ensure 'ollama serve' is running."}).encode("utf-8") + b"\n"
 
 # --- Chat Endpoint (Firewall Gateway) ---
 

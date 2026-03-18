@@ -1,4 +1,4 @@
-# Phase-Lock Semantic Firewall Architecture Specification
+# Three-Headed Semantic Firewall Architecture Specification
 
 ## 1. Dimensional Excitation Firewall (FED Math)
 The firewall operates by evaluating the raw 1024D embedding layers produced by `BAAI/bge-m3` between a given Query Vector (`Q`) and a Context Vector from the nearest knowledge entry (`C`).
@@ -29,10 +29,10 @@ app/
 - **Models (`core/models.py`):** All Pydantic schemas. `ConfigState` is a **frozen BaseModel** — immutable after construction. `Field` constraints enforce value ranges. `@model_validator` ensures pipeline order uniqueness.
 - **State (`core/state.py`):** Configuration singleton + `asyncio.Lock` for serialized writes. `set_config()` is an **async** function that acquires the lock before performing merge-validate-swap, guaranteeing no concurrent config corruption. A separate `set_config_sync()` exists for single-threaded test harnesses only. Each request handler snapshots the reference at entry (`cfg = config_state`) for mid-request consistency.
 - **Routes (`api/routes.py`):** Thin HTTP layer — request parsing, embedding calls, storage queries, telemetry formatting, streaming responses. Delegates all firewall math to `SemanticFirewall`.
-- **Embedder Singleton (`modules/embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU. The model name is configurable via `EMBEDDING_MODEL` env var.
+- **Embedder Singleton (`modules/embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU. The model name is read from the `settings` singleton.
 - **Storage Layer (`modules/storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation. Filename validation prevents SQL injection on delete operations.
-- **Ingestor Protocol (`modules/ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines. Chunk size, overlap, and batch size are configurable via `CHUNK_SIZE`, `CHUNK_OVERLAP`, `EMBEDDING_BATCH_SIZE` env vars (defaults: 2048, 200, 10). Completed/failed tasks are automatically pruned after 1 hour (`TaskStore` with TTL).
-- **Settings (`core/settings.py`):** Centralized environment-driven configuration. All previously hardcoded values (Ollama URL, model name, embedding model, chunk parameters) are read from environment variables with sensible defaults. See `.env.example` for the full list.
+- **Ingestor Protocol (`modules/ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines. Chunk size, overlap, and batch size are read from the `settings` singleton (defaults: 2048, 200, 10). Completed/failed tasks are automatically pruned after 1 hour (`TaskStore` with TTL).
+- **Settings (`core/settings.py`):** Uses `pydantic-settings` (`BaseSettings`) for typed, validated configuration following 12-Factor App principles. All env vars are declared in a single `Settings` class with type annotations, default values, and range constraints. The `.env` file is loaded automatically at boot — no `source` or manual export required. If a variable has an invalid type or fails validation, the app crashes immediately with a clear Pydantic error (fail-fast). Secrets (`FIREWALL_API_KEY`) use `SecretStr` to prevent accidental logging. A singleton `settings` instance is created at import time and imported by all modules. See `backend/.env.example` for the full list.
 
 ## 3. Execution Pipeline (Sequential Reorderable Firewall)
 The firewall executes three distinct validation stages in a **user-defined sequence** controlled via the HUD's `Seq` inputs. The pipeline is constructed at evaluation time by sorting the three stages based on their integer priority values:
@@ -63,7 +63,7 @@ When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, 
 
 ## 5. Frontend Control Logic
 - **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads (including `cosineOrder`, `excitationOrder`, `noiseOrder`, `globalNoiseLimit`, `adaptiveFactor`), an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
-- **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings mapping system metrics underneath a custom ASCII-art **Pirate Monkey** multi-frame cycle. On Apple Silicon (MPS), GPU% is calculated as `torch.mps.current_allocated_memory() / psutil.virtual_memory().total * 100` — reflecting actual allocation against total unified memory. On CUDA, it uses `torch.cuda.memory_allocated() / torch.cuda.get_device_properties(0).total_mem * 100`.
+- **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings. Displays **Three Monkey Heads** (one per filter: Noise, Cosine, Excitation) — each head animates when its filter is enabled and goes dark when disabled, providing visual pipeline status. Also shows the current `systemAction` state and a compact telemetry line (CPU/RAM/GPU). On Apple Silicon (MPS), GPU% is calculated as `torch.mps.current_allocated_memory() / psutil.virtual_memory().total * 100` — reflecting actual allocation against total unified memory. On CUDA, it uses `torch.cuda.memory_allocated() / torch.cuda.get_device_properties(0).total_mem * 100`.
 - **Pipeline Ordering UI (`ControlPanel.tsx`):** Slider groups are visually ordered to match the default pipeline execution sequence: **Noise Pre-Filter (Seq 1)** → **Cosine Gate (Seq 2)** → **Excitation Threshold + Noise Tolerance (Seq 3)** → **Adaptive Factor**. Each filter includes a **Seq** numerical input (1–3) that controls pipeline execution order and an **ON/OFF toggle button** that enables or disables that individual filter. When a filter is toggled OFF, its slider group dims to 40% opacity and the filter is excluded from the pipeline entirely (via `build_pipeline()` in the engine). The firewall is considered active when at least one filter is enabled (`fw_on = noise_enabled || cosine_enabled || excitation_enabled`). The legacy `[FW=OFF]` prompt prefix is still supported as a bypass override. All values including enabled states are synced to the backend via debounced `POST /galaxy/config`.
 - **Interface Guardrails (`ChatInterface.tsx`):** Uses `crypto.randomUUID()` for collision-free message IDs. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically. Each component is wrapped in an `ErrorBoundary` to prevent cascading UI crashes — a single panel failure renders a retry button instead of killing the entire app.
 - **Centralized API Config (`config.ts`):** All API calls reference `API_BASE_URL` from `import.meta.env.VITE_API_BASE_URL` (default: `http://localhost:8000`). Zero hardcoded URLs in components.
@@ -129,3 +129,43 @@ All backend modules use Python's `logging` module instead of `print()`. Log leve
 - `CRITICAL` / `EXCEPTION` — unexpected failures with full traceback (ingestion crash).
 
 Error messages returned to clients are generic and do not leak stack traces or internal paths.
+
+## 8. Performance Testing
+
+### 8.1 Async Load Test Suite (`tests/load_test_suite.py`)
+An asyncio + httpx-based load testing harness that extracts hard performance metrics from the `/audit` endpoint under concurrent load. The suite is self-contained (no external load testing tools required).
+
+**Three Payload Profiles:**
+
+| Profile | Words | Triggers |
+|---------|-------|----------|
+| `short_query` | < 5 | Adaptive factor threshold reduction |
+| `long_query` | > 50 | Multi-clause segmentation (punctuation split) |
+| `overflow_query` | > 100, no punctuation | 15-word overflow chunking fallback |
+
+**Concurrency Levels:** 10, 50, and 200 simultaneous connections per profile.
+
+**Metrics Collected:**
+- **Latency:** Min, Average, P95, Max (milliseconds).
+- **Throughput:** Requests per Second (RPS).
+- **Reliability:** HTTP 200 success count, HTTP 4xx/5xx failure count, timeouts, error rate %.
+
+**Output:** Formatted console table + `metrics_report.csv` for documentation and CI integration.
+
+### 8.2 Vector DB Bulk Saturation Test (`tests/db_stress_suite.py`)
+Measures how retrieval latency and firewall evaluation time scale as the LanceDB knowledge base grows. Uses a temporary isolated database (cleaned up after each run) to avoid polluting the production corpus.
+
+**Methodology:**
+- **Mock Data Generator:** Produces synthetic 1024D unit-norm vectors and pseudo-random technical text chunks. The `--use-embedder` flag enables real BGE-M3 embeddings for higher fidelity (at the cost of speed).
+- **Incremental Injection:** Vectors are injected in configurable batches (default 500). The database grows through milestones without being rebuilt.
+- **Retrieval Benchmark:** At each milestone, a fixed pool of 100 query vectors fires through `table.search(vector).limit(1)`, isolating LanceDB search latency.
+- **Firewall Benchmark:** Each retrieved vector pair is then evaluated through `SemanticFirewall.evaluate_clause()` with the default `ConfigState`, isolating pure firewall math cost.
+
+**Default Milestones:** 1,000 → 10,000 → 50,000 rows.
+
+**Metrics Collected (per milestone):**
+- **Retrieval:** Avg, P95, Max latency (milliseconds).
+- **Firewall:** Avg, P95, Max evaluation time (milliseconds).
+- **Injection:** Total time to fill the DB to that milestone (seconds).
+
+**Output:** Formatted console table + `tests/db_scaling_metrics.md` Markdown report with graph-ready tables (DB Size vs Avg Retrieval vs Avg Firewall vs Injection Time).

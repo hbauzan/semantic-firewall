@@ -1,7 +1,7 @@
 import logging
 import torch
 from sentence_transformers import SentenceTransformer
-from app.core.settings import EMBEDDING_MODEL
+from app.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,9 @@ class Embedder:
         else:
             self.device = "cpu"
 
-        logger.info("Loading %s on %s...", EMBEDDING_MODEL, self.device)
-        self.model = SentenceTransformer(EMBEDDING_MODEL, device=self.device)
-        logger.info("%s loaded.", EMBEDDING_MODEL)
+        logger.info("Loading %s on %s...", settings.embedding_model, self.device)
+        self.model = SentenceTransformer(settings.embedding_model, device=self.device)
+        logger.info("%s loaded.", settings.embedding_model)
 
     def embed(self, text: str):
         """Embeds a single string and returns a flat list of 1024 floats."""

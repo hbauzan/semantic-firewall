@@ -22,22 +22,24 @@ app/
 ├── core/                    # Framework-agnostic logic
 │   ├── models.py            # Pydantic models (ConfigState, ConfigUpdate, etc.)
 │   ├── state.py             # Global config singleton + asyncio.Lock + set_config()
-│   └── firewall.py          # SemanticFirewall engine (pure vector math)
+│   ├── firewall.py          # SemanticFirewall engine (pure vector math)
+│   └── settings.py          # Environment-driven settings (Ollama, embedder, chunks)
 ├── api/
 │   └── routes.py            # Thin FastAPI layer (HTTP, streaming, telemetry)
 └── modules/
     ├── embedder.py          # BGE-M3 embedding singleton
     ├── storage.py           # LanceDB vector store
-    └── ingestor.py          # PDF chunking pipeline
+    └── ingestor.py          # PDF chunking pipeline + TaskStore with TTL
 ```
 
 - **Firewall Engine (`core/firewall.py`):** `SemanticFirewall` class with static methods — completely agnostic of web framework, embedders, and storage. Receives numpy arrays and a frozen `ConfigState`, returns structured results. Portable for CLI tools, batch audits, or alternative API wrappers. Contains: `segment()`, `run_noise_filter()`, `run_cosine_filter()`, `run_excitation_filter()`, `build_pipeline()`, `evaluate_clause()`.
 - **Models (`core/models.py`):** All Pydantic schemas. `ConfigState` is a **frozen BaseModel** — immutable after construction. `Field` constraints enforce value ranges. `@model_validator` ensures pipeline order uniqueness.
-- **State (`core/state.py`):** Configuration singleton + `asyncio.Lock` for serialized writes + `set_config()` for atomic merge-validate-swap. Each request handler snapshots the reference at entry (`cfg = config_state`) for mid-request consistency.
+- **State (`core/state.py`):** Configuration singleton + `asyncio.Lock` for serialized writes. `set_config()` is an **async** function that acquires the lock before performing merge-validate-swap, guaranteeing no concurrent config corruption. A separate `set_config_sync()` exists for single-threaded test harnesses only. Each request handler snapshots the reference at entry (`cfg = config_state`) for mid-request consistency.
 - **Routes (`api/routes.py`):** Thin HTTP layer — request parsing, embedding calls, storage queries, telemetry formatting, streaming responses. Delegates all firewall math to `SemanticFirewall`.
-- **Embedder Singleton (`modules/embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU.
-- **Storage Layer (`modules/storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation.
-- **Ingestor Protocol (`modules/ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines (size: 2048 chars, 200 overlap).
+- **Embedder Singleton (`modules/embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU. The model name is configurable via `EMBEDDING_MODEL` env var.
+- **Storage Layer (`modules/storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation. Filename validation prevents SQL injection on delete operations.
+- **Ingestor Protocol (`modules/ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines. Chunk size, overlap, and batch size are configurable via `CHUNK_SIZE`, `CHUNK_OVERLAP`, `EMBEDDING_BATCH_SIZE` env vars (defaults: 2048, 200, 10). Completed/failed tasks are automatically pruned after 1 hour (`TaskStore` with TTL).
+- **Settings (`core/settings.py`):** Centralized environment-driven configuration. All previously hardcoded values (Ollama URL, model name, embedding model, chunk parameters) are read from environment variables with sensible defaults. See `.env.example` for the full list.
 
 ## 3. Execution Pipeline (Sequential Reorderable Firewall)
 The firewall executes three distinct validation stages in a **user-defined sequence** controlled via the HUD's `Seq` inputs. The pipeline is constructed at evaluation time by sorting the three stages based on their integer priority values:
@@ -70,7 +72,8 @@ When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, 
 - **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads (including `cosineOrder`, `excitationOrder`, `noiseOrder`, `globalNoiseLimit`, `adaptiveFactor`), an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
 - **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings mapping system metrics underneath a custom ASCII-art **Pirate Monkey** multi-frame cycle. On Apple Silicon (MPS), GPU% is calculated as `torch.mps.current_allocated_memory() / psutil.virtual_memory().total * 100` — reflecting actual allocation against total unified memory. On CUDA, it uses `torch.cuda.memory_allocated() / torch.cuda.get_device_properties(0).total_mem * 100`.
 - **Pipeline Ordering UI (`ControlPanel.tsx`):** Slider groups are visually ordered to match the default pipeline execution sequence: **Noise Pre-Filter (Seq 1)** → **Cosine Gate (Seq 2)** → **Excitation Threshold + Noise Tolerance (Seq 3)** → **Adaptive Factor**. Each filter includes a **Seq** numerical input (1–3) that controls pipeline execution order and an **ON/OFF toggle button** that enables or disables that individual filter. When a filter is toggled OFF, its slider group dims to 40% opacity and the filter is excluded from the pipeline entirely (via `build_pipeline()` in the engine). The firewall is considered active when at least one filter is enabled (`fw_on = noise_enabled || cosine_enabled || excitation_enabled`). The legacy `[FW=OFF]` prompt prefix is still supported as a bypass override. All values including enabled states are synced to the backend via debounced `POST /galaxy/config`.
-- **Interface Guardrails (`ChatInterface.tsx`):** Implements **BigInt Safety** explicitly casting all interaction `Date.now()` iterations recursively. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically.
+- **Interface Guardrails (`ChatInterface.tsx`):** Uses `crypto.randomUUID()` for collision-free message IDs. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically. Each component is wrapped in an `ErrorBoundary` to prevent cascading UI crashes — a single panel failure renders a retry button instead of killing the entire app.
+- **Centralized API Config (`config.ts`):** All API calls reference `API_BASE_URL` from `import.meta.env.VITE_API_BASE_URL` (default: `http://localhost:8000`). Zero hardcoded URLs in components.
 
 ## 6. Anti-Semantic Piggybacking Defense
 Addresses the attack vector where a malicious or off-topic instruction is appended to an otherwise legitimate prompt, causing the averaged embedding to pass dimensional excitation while the piggybacked payload executes unchecked.
@@ -102,6 +105,37 @@ When the `FIREWALL_API_KEY` environment variable is set, all mutation endpoints 
 
 ### 7.3 Input Sanitization
 All inbound prompts (`ChatRequest`, `AuditRequest`) are constrained to `PROMPT_MAX_LENGTH` (4000 characters) at the Pydantic schema level. Payloads exceeding this limit are rejected with HTTP 422 before any embedding computation occurs, preventing memory exhaustion attacks on the vectorization stage.
+
+### 7.4 PDF Upload Hardening
+The `/corpus/upload-pdf` endpoint enforces three-layer validation before accepting any file:
+- **Size limit:** Files exceeding 50 MB are rejected with HTTP 413 before processing.
+- **Magic-byte validation:** The first 4 bytes must match the PDF signature (`%PDF`). Non-PDF files are rejected with HTTP 400 regardless of the declared MIME type or file extension.
+- **Filename sanitization:** Filenames are stripped to `os.path.basename()` (preventing path traversal), then validated against a whitelist regex (`[\w\s.\-()]+\.pdf`). Unsafe characters are replaced with underscores.
+
+### 7.5 SQL Injection Prevention (Storage Layer)
+The `delete_pack()` method in `storage.py` validates filenames against a whitelist regex before interpolating into the LanceDB SQL LIKE clause. Filenames containing quotes, semicolons, or other SQL metacharacters are rejected with a `ValueError`. Single quotes in valid filenames are escaped via SQL doubling (`'` → `''`).
+
+### 7.6 Health Check Endpoint
+`GET /health` returns the system's liveness status for load balancers, Kubernetes probes, and monitoring dashboards. Response includes:
+- `status`: `"healthy"` (embedder loaded) or `"degraded"` (embedder missing).
+- `timestamp`: UTC ISO 8601.
+- `embedder_loaded`: boolean.
+- `corpus_chunks`: total chunks in LanceDB.
+
+### 7.7 Production Server Configuration
+`main.py` reads `HOST`, `PORT`, and `RELOAD` from environment variables. `reload=True` is the default for development; production deployments should set `RELOAD=false`. Structured logging (`logging.basicConfig`) is initialized at app startup with `INFO` level.
+
+### 7.8 Dependency Pinning
+`requirements.txt` pins all production dependencies to exact versions (e.g. `fastapi==0.135.1`). This prevents silent breakage from upstream updates — particularly critical for `sentence-transformers` and `torch`, where version changes can alter embedding output and invalidate the entire corpus index.
+
+### 7.9 Structured Logging
+All backend modules use Python's `logging` module instead of `print()`. Log levels:
+- `INFO` — successful operations (ingestion complete, model loaded).
+- `WARNING` — non-fatal issues (malformed metadata, GPU telemetry unavailable, unsafe filename rejected).
+- `ERROR` — recoverable failures (Ollama unreachable, invalid PDF).
+- `CRITICAL` / `EXCEPTION` — unexpected failures with full traceback (ingestion crash).
+
+Error messages returned to clients are generic and do not leak stack traces or internal paths.
 
 
 === ./run_pack.sh ===
@@ -170,7 +204,7 @@ A local-first RAG security layer that validates query-to-corpus geometric alignm
 
 Built for sovereign AI deployments where data never leaves the machine.
 
-> **Version:** v2.6.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
+> **Version:** v2.10.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
 
 ---
 
@@ -297,8 +331,23 @@ cp backend/.env.example backend/.env
 |----------|---------|-------------|
 | `ALLOWED_ORIGINS` | `http://localhost:5173` | Comma-separated CORS origins. Use `*` only for development. |
 | `FIREWALL_API_KEY` | *(unset)* | If set, all `/chat`, `/audit`, and `/galaxy/config` endpoints require `X-API-Key` header. Leave unset for open local development. |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API endpoint. |
+| `OLLAMA_MODEL` | `llama3.1` | LLM model name for inference. |
+| `EMBEDDING_MODEL` | `BAAI/bge-m3` | HuggingFace embedding model ID. Change only if you reindex the corpus. |
+| `CHUNK_SIZE` | `2048` | PDF chunking size in characters. |
+| `CHUNK_OVERLAP` | `200` | Overlap between consecutive chunks. |
+| `EMBEDDING_BATCH_SIZE` | `10` | Embeddings per batch during ingestion. |
+| `HOST` | `0.0.0.0` | Bind address for uvicorn. Use `127.0.0.1` behind a reverse proxy. |
+| `PORT` | `8000` | Backend listen port. |
+| `RELOAD` | `true` | Hot-reload on code changes. Set to `false` in production. |
 
-**For local development, no `.env` file is required.** Defaults work out of the box.
+**Frontend** (set in `frontend/.env` or shell):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_BASE_URL` | `http://localhost:8000` | Backend API endpoint used by all frontend components. |
+
+**For local development, no `.env` files are required.** Defaults work out of the box.
 
 ---
 
@@ -357,7 +406,7 @@ All firewall parameters are adjustable in real-time. Changes are synced to the b
 | Slider | Default | Range | Purpose |
 |--------|---------|-------|---------|
 | **Noise Threshold** | 0.50 | 0.0 – 10.0 | Global delta sanity limit |
-| **Cosine Threshold** | 0.78 | 0.0 – 1.0 | Minimum cosine similarity |
+| **Cosine Threshold** | 0.50 | 0.0 – 1.0 | Minimum cosine similarity |
 | **Excitation Threshold** | 150 | 0 – 1024 | Minimum activated dimensions |
 | **Noise Tolerance** | 0.005 | 0.0 – 1.0 | Per-dimension activation sensitivity |
 | **Adaptive Factor** | 0.85 | 0.01 – 1.0 | Threshold reduction for short queries (< 6 words) |
@@ -464,7 +513,8 @@ semantic-firewall/
 │       ├── core/
 │       │   ├── models.py         # Pydantic schemas (ConfigState, etc.)
 │       │   ├── state.py          # Global config singleton + lock
-│       │   └── firewall.py       # SemanticFirewall engine (pure math)
+│       │   ├── firewall.py       # SemanticFirewall engine (pure math)
+│       │   └── settings.py       # Environment-driven settings
 │       ├── api/
 │       │   └── routes.py         # HTTP routes (thin FastAPI layer)
 │       └── modules/
@@ -475,12 +525,15 @@ semantic-firewall/
 └── frontend/
     ├── package.json
     └── src/
-        ├── App.tsx               # Main layout
+        ├── App.tsx               # Main layout + ErrorBoundary wrappers
+        ├── config.ts             # Centralized API URL (env-driven)
+        ├── store.ts              # Zustand state management
         └── components/
             ├── ControlPanel.tsx   # Firewall sliders + pipeline ordering
-            ├── ChatInterface.tsx  # Chat with FW=ON/OFF support
+            ├── ChatInterface.tsx  # Chat with firewall toggle support
             ├── AuditPanel.tsx     # Query audit + activation inspector
-            └── TelemetryHUD.tsx   # System metrics display
+            ├── TelemetryHUD.tsx   # System metrics display
+            └── ErrorBoundary.tsx  # React error boundary (per-component isolation)
 ```
 
 ---
@@ -499,6 +552,7 @@ All endpoints are served at `http://localhost:8000`.
 | `GET` | `/corpus/packs` | — | List all uploaded document packs with chunk counts. |
 | `DELETE` | `/corpus/packs/{filename}` | — | Remove a document pack from the vector store. |
 | `GET` | `/system/stats` | — | CPU, RAM, GPU utilization metrics. |
+| `GET` | `/health` | — | Liveness probe: embedder status, corpus size, UTC timestamp. |
 
 *\* API Key required only if `FIREWALL_API_KEY` environment variable is set.*
 
@@ -514,8 +568,11 @@ This system implements multiple defense layers:
 4. **CORS Hardening** — Explicit origin allowlist, no wildcard credentials.
 5. **API Key Authentication** — Opt-in header-based auth for mutation endpoints.
 6. **Input Sanitization** — 4000-character prompt limit enforced at schema level before vectorization.
-7. **Atomic Configuration** — Frozen Pydantic models prevent race conditions on concurrent config updates.
+7. **Atomic Configuration** — Frozen Pydantic models + async lock prevent race conditions on concurrent config updates.
 8. **Pipeline Order Validation** — Duplicate filter priorities are rejected at the schema level.
+9. **PDF Upload Hardening** — 50 MB size limit, PDF magic-byte validation, filename sanitization against path traversal.
+10. **SQL Injection Prevention** — Filename whitelist regex + quote escaping on all storage layer queries.
+11. **Structured Logging** — All modules use Python `logging` with severity levels. Client-facing error messages are generic (no stack traces leaked).
 
 ---
 
@@ -595,7 +652,7 @@ pytest -v perform_tests.py
 === ./manifest.json ===
 {
     "project": "Phase-Lock Semantic Firewall",
-    "version": "v2.7.0",
+    "version": "v2.10.0",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -623,13 +680,26 @@ pytest -v perform_tests.py
         "cors_hardening": true,
         "opt_in_api_key_auth": true,
         "input_length_sanitization": true,
-        "per_filter_toggle_buttons": true
+        "per_filter_toggle_buttons": true,
+        "pdf_upload_hardening": true,
+        "sql_injection_prevention": true,
+        "async_config_lock": true,
+        "structured_logging": true,
+        "env_driven_settings": true,
+        "task_store_ttl_pruning": true,
+        "cosine_nan_inf_guard": true,
+        "frontend_centralized_api_url": true,
+        "crypto_uuid_message_ids": true,
+        "react_error_boundaries": true,
+        "health_check_endpoint": true,
+        "pinned_dependencies": true,
+        "env_driven_server_config": true
     },
     "state_schema": {
         "excitation_threshold": {"type": "int", "default": 150, "range": [0, 1024]},
-        "noise_tolerance": {"type": "float", "default": 0.005, "range": [0.001, 0.100]},
-        "cosine_threshold": {"type": "float", "default": 0.50, "range": [0.00, 1.00]},
-        "global_noise_limit": {"type": "float", "default": 0.50, "range": [0.10, 2.00]},
+        "noise_tolerance": {"type": "float", "default": 0.005, "range": [0.0, 1.0]},
+        "cosine_threshold": {"type": "float", "default": 0.50, "range": [0.0, 1.0]},
+        "global_noise_limit": {"type": "float", "default": 0.50, "range": [0.0, 10.0]},
         "cosine_order": {"type": "int", "default": 2, "range": [1, 3]},
         "excitation_order": {"type": "int", "default": 3, "range": [1, 3]},
         "noise_order": {"type": "int", "default": 1, "range": [1, 3]},
@@ -3858,17 +3928,26 @@ import { TelemetryHUD } from './components/TelemetryHUD';
 import { ControlPanel } from './components/ControlPanel';
 import { ChatInterface } from './components/ChatInterface';
 import { AuditPanel } from './components/AuditPanel';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function App() {
   return (
     <div className="app-container">
       <div className="side-panel">
-        <TelemetryHUD />
-        <ControlPanel />
+        <ErrorBoundary label="TelemetryHUD">
+          <TelemetryHUD />
+        </ErrorBoundary>
+        <ErrorBoundary label="ControlPanel">
+          <ControlPanel />
+        </ErrorBoundary>
       </div>
       <div className="main-content-area">
-        <ChatInterface />
-        <AuditPanel />
+        <ErrorBoundary label="ChatInterface">
+          <ChatInterface />
+        </ErrorBoundary>
+        <ErrorBoundary label="AuditPanel">
+          <AuditPanel />
+        </ErrorBoundary>
       </div>
     </div>
   );
@@ -3890,11 +3969,17 @@ createRoot(document.getElementById('root')!).render(
 )
 
 
+=== ./frontend/src/config.ts ===
+/** Centralized frontend configuration — reads from Vite env vars with defaults. */
+export const API_BASE_URL: string =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+
 === ./frontend/src/store.ts ===
 import { create } from 'zustand';
 
 interface Message {
-  id: number;
+  id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
 }
@@ -3992,6 +4077,7 @@ export const useStore = create<StoreState>((set) => ({
 === ./frontend/src/components/TelemetryHUD.tsx ===
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
+import { API_BASE_URL } from '../config';
 
 // Alive monkey frames (animated mouth)
 const ALIVE_FRAMES = [
@@ -4070,7 +4156,7 @@ export const TelemetryHUD: React.FC = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch('http://localhost:8000/system/stats');
+        const res = await fetch(`${API_BASE_URL}/system/stats`);
         const data = await res.json();
         setTelemetry(data);
       } catch (err) {
@@ -4124,6 +4210,7 @@ export const TelemetryHUD: React.FC = () => {
 === ./frontend/src/components/ChatInterface.tsx ===
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
+import { API_BASE_URL } from '../config';
 
 export const ChatInterface: React.FC = () => {
   const { messages, addMessage } = useStore();
@@ -4138,8 +4225,7 @@ export const ChatInterface: React.FC = () => {
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
 
-    // Create new id with BigInt Safety (explicit Number cast)
-    const newMessageId = Number(Date.now().toString());
+    const newMessageId = crypto.randomUUID();
     addMessage({ id: newMessageId, role: 'user', content: input });
 
     const currentInput = input;
@@ -4147,7 +4233,7 @@ export const ChatInterface: React.FC = () => {
     setIsStreaming(true);
 
     try {
-      const res = await fetch('http://localhost:8000/chat', {
+      const res = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: currentInput })
@@ -4158,7 +4244,7 @@ export const ChatInterface: React.FC = () => {
       const reader = res.body.getReader();
       const decoder = new TextDecoder('utf-8');
 
-      const assistantMessageId = Number(Date.now().toString()) + 1;
+      const assistantMessageId = crypto.randomUUID();
       let assistantContent = '';
 
       // We will add the assistant message first with an initial status
@@ -4256,7 +4342,7 @@ export const ChatInterface: React.FC = () => {
 
     } catch (err) {
       console.error(err);
-      addMessage({ id: Number(Date.now()), role: 'system', content: 'Failed to connect to backend engine.' });
+      addMessage({ id: crypto.randomUUID(), role: 'system', content: 'Failed to connect to backend engine.' });
       useStore.setState({ systemAction: 'CONNECTION_FAILED' });
     } finally {
       setIsStreaming(false);
@@ -4303,6 +4389,7 @@ export const ChatInterface: React.FC = () => {
 === ./frontend/src/components/AuditPanel.tsx ===
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { API_BASE_URL } from '../config';
 
 export const AuditPanel: React.FC = () => {
     const [auditQuery, setAuditQuery] = useState('');
@@ -4313,7 +4400,7 @@ export const AuditPanel: React.FC = () => {
         if (!auditQuery.trim()) return;
         setSystemAction("EXECUTING_STRESS_TEST...");
         try {
-            const res = await fetch('http://localhost:8000/audit', {
+            const res = await fetch(`${API_BASE_URL}/audit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query: auditQuery })
@@ -4358,6 +4445,7 @@ export const AuditPanel: React.FC = () => {
 === ./frontend/src/components/ControlPanel.tsx ===
 import React, { useRef, useState, useEffect } from 'react';
 import { useStore } from '../store';
+import { API_BASE_URL } from '../config';
 
 // Shared toggle button style generator
 const toggleStyle = (on: boolean): React.CSSProperties => ({
@@ -4371,6 +4459,32 @@ const toggleStyle = (on: boolean): React.CSSProperties => ({
 const seqInputStyle: React.CSSProperties = {
   width: '2.2rem', textAlign: 'center', background: '#111',
   color: 'var(--accent)', border: '1px solid var(--accent)', padding: '1px', fontSize: '0.7rem',
+};
+
+// Step button style
+const stepBtnStyle: React.CSSProperties = {
+  width: '1.4rem', height: '1.2rem', fontSize: '0.7rem', fontWeight: 'bold',
+  padding: 0, border: '1px solid #444', background: '#1a1a1a', color: 'var(--accent)',
+  cursor: 'pointer', borderRadius: '2px', flexShrink: 0, lineHeight: 1,
+};
+
+// Reusable slider with - / + step buttons
+const StepSlider: React.FC<{
+  value: number; min: number; max: number; step: number;
+  onChange: (v: number) => void; style?: React.CSSProperties;
+}> = ({ value, min, max, step, onChange, style }) => {
+  const clamp = (v: number) => Math.min(max, Math.max(min, parseFloat(v.toFixed(10))));
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+      <button type="button" style={stepBtnStyle}
+        onClick={() => onChange(clamp(value - step))}>-</button>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ flex: 1, height: '12px', ...style }} />
+      <button type="button" style={stepBtnStyle}
+        onClick={() => onChange(clamp(value + step))}>+</button>
+    </div>
+  );
 };
 
 export const ControlPanel: React.FC = () => {
@@ -4389,7 +4503,7 @@ export const ControlPanel: React.FC = () => {
 
   const fetchPacks = async () => {
     try {
-      const res = await fetch('http://localhost:8000/corpus/packs');
+      const res = await fetch(`${API_BASE_URL}/corpus/packs`);
       const data = await res.json();
       setPacks(data.packs || []);
     } catch (err) {
@@ -4402,7 +4516,7 @@ export const ControlPanel: React.FC = () => {
   // Debounce API calls for config
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetch('http://localhost:8000/galaxy/config', {
+      fetch(`${API_BASE_URL}/galaxy/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4429,7 +4543,7 @@ export const ControlPanel: React.FC = () => {
     if (ingestionStatus.taskId && (ingestionStatus.status === 'pending' || ingestionStatus.status === 'processing')) {
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`http://localhost:8000/corpus/task-status/${ingestionStatus.taskId}`);
+          const res = await fetch(`${API_BASE_URL}/corpus/task-status/${ingestionStatus.taskId}`);
           const data = await res.json();
           setIngestionStatus({
             status: data.status,
@@ -4456,7 +4570,7 @@ export const ControlPanel: React.FC = () => {
     formData.append('file', file);
     setSystemAction("UPLOADING_PDF...");
     try {
-      const res = await fetch('http://localhost:8000/corpus/upload-pdf', {
+      const res = await fetch(`${API_BASE_URL}/corpus/upload-pdf`, {
         method: 'POST',
         body: formData
       });
@@ -4471,7 +4585,7 @@ export const ControlPanel: React.FC = () => {
   const handleDeletePack = async (filename: string) => {
     setSystemAction("DELETING_PACK...");
     try {
-      await fetch(`http://localhost:8000/corpus/packs/${filename}`, { method: 'DELETE' });
+      await fetch(`${API_BASE_URL}/corpus/packs/${filename}`, { method: 'DELETE' });
       fetchPacks();
     } catch (err) {
       console.error("Failed to delete pack", err);
@@ -4491,9 +4605,7 @@ export const ControlPanel: React.FC = () => {
         </button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong></div>
-          <input type="range" min="0.10" max="2.00" step="0.01" value={globalNoiseLimit}
-            onChange={(e) => setGlobalNoiseLimit(Number(e.target.value))}
-            style={{ width: '100%', height: '12px' }} />
+          <StepSlider value={globalNoiseLimit} min={0.10} max={2.00} step={0.01} onChange={setGlobalNoiseLimit} />
         </div>
         <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
           <div style={{ opacity: 0.5 }}>Seq</div>
@@ -4509,9 +4621,7 @@ export const ControlPanel: React.FC = () => {
         </button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Cosine Gate: <strong>{cosineThreshold.toFixed(2)}</strong></div>
-          <input type="range" min="0.00" max="1.00" step="0.01" value={cosineThreshold}
-            onChange={(e) => setCosineThreshold(Number(e.target.value))}
-            style={{ width: '100%', height: '12px' }} />
+          <StepSlider value={cosineThreshold} min={0.00} max={1.00} step={0.01} onChange={setCosineThreshold} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.55rem', opacity: 0.4, marginTop: '-2px' }}>
             <span>0 LAX</span><span>STRICT 1</span>
           </div>
@@ -4530,15 +4640,11 @@ export const ControlPanel: React.FC = () => {
         </button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Excitation: <strong>{excitationThreshold}</strong></div>
-          <input type="range" min="0" max="1024" step="1" value={excitationThreshold}
-            onChange={(e) => setExcitationThreshold(Number(e.target.value))}
-            style={{ width: '100%', height: '12px' }} />
+          <StepSlider value={excitationThreshold} min={0} max={1024} step={1} onChange={setExcitationThreshold} />
           <div style={{ fontSize: '0.65rem', opacity: 0.5, marginTop: '-1px' }}>
             Noise Tolerance: {noiseTolerance.toFixed(3)}
           </div>
-          <input type="range" min="0.001" max="0.100" step="0.001" value={noiseTolerance}
-            onChange={(e) => setNoiseTolerance(Number(e.target.value))}
-            style={{ width: '100%', height: '12px' }} />
+          <StepSlider value={noiseTolerance} min={0.001} max={0.100} step={0.001} onChange={setNoiseTolerance} />
         </div>
         <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
           <div style={{ opacity: 0.5 }}>Seq</div>
@@ -4550,9 +4656,7 @@ export const ControlPanel: React.FC = () => {
       {/* --- Adaptive Factor --- */}
       <div style={{ marginBottom: '0.5rem', padding: '0.3rem 0', borderTop: '1px solid #222' }}>
         <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Adaptive Factor: <strong>{adaptiveFactor.toFixed(2)}</strong></div>
-        <input type="range" min="0.01" max="1.00" step="0.01" value={adaptiveFactor}
-          onChange={(e) => setAdaptiveFactor(Number(e.target.value))}
-          style={{ width: '100%', height: '12px' }} />
+        <StepSlider value={adaptiveFactor} min={0.01} max={1.00} step={0.01} onChange={setAdaptiveFactor} />
         <div style={{ fontSize: '0.6rem', opacity: 0.5, display: 'flex', justifyContent: 'space-between' }}>
           <span>Short: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
           <span>Full: {excitationThreshold} dims</span>
@@ -4599,6 +4703,55 @@ export const ControlPanel: React.FC = () => {
 };
 
 
+=== ./frontend/src/components/ErrorBoundary.tsx ===
+import React from 'react';
+
+interface State {
+  hasError: boolean;
+  error: Error | null;
+}
+
+export class ErrorBoundary extends React.Component<
+  { children: React.ReactNode; label?: string },
+  State
+> {
+  state: State = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error(`[ErrorBoundary${this.props.label ? `: ${this.props.label}` : ''}]`, error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          padding: '1rem',
+          background: '#1a0000',
+          border: '1px solid var(--danger, #f44)',
+          borderRadius: '4px',
+          fontSize: '0.8rem',
+          color: '#f88',
+        }}>
+          <strong>Component Error{this.props.label ? ` (${this.props.label})` : ''}</strong>
+          <div style={{ marginTop: '0.5rem', opacity: 0.7 }}>{this.state.error?.message}</div>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{ marginTop: '0.5rem', fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+
 === ./.claude/settings.local.json ===
 {
   "permissions": {
@@ -4636,7 +4789,12 @@ export const ControlPanel: React.FC = () => {
       "Bash(ls /Users/hbauzan/treepwood/semantic_guardtrails/sg_env/bin/py*)",
       "Bash(/Users/hbauzan/treepwood/semantic_guardtrails/sg_env/bin/pip install:*)",
       "Bash(/Users/hbauzan/treepwood/semantic_guardtrails/sg_env/bin/python -c \":*)",
-      "Bash(/Users/hbauzan/treepwood/semantic_guardtrails/sg_env/bin/python -m pytest perform_tests.py::test_system_stats_gpu_telemetry -v)"
+      "Bash(/Users/hbauzan/treepwood/semantic_guardtrails/sg_env/bin/python -m pytest perform_tests.py::test_system_stats_gpu_telemetry -v)",
+      "Bash(find /Users/hbauzan/treepwood/semantic-firewall/frontend/src -type f \\\\\\(-name *.ts -o -name *.tsx -o -name *.css \\\\\\))",
+      "Bash(source ../sg_env/bin/activate)",
+      "Bash(find /Users/hbauzan -maxdepth 4 -name pytest -path */bin/*)",
+      "Bash(.venv/bin/python -m pytest perform_tests.py -v)",
+      "Bash(.venv/bin/pip freeze:*)"
     ]
   }
 }
@@ -4671,7 +4829,7 @@ import numpy as np
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.models import ConfigState
-from app.core.state import set_config
+from app.core.state import set_config_sync as set_config
 from app.core.firewall import SemanticFirewall
 
 client = TestClient(app)
@@ -4963,16 +5121,30 @@ def test_config_sync_with_enabled_flags():
     assert cfg.cosine_enabled is True
     assert cfg.excitation_enabled is False
 
-# Add pytest-asyncio to required pip if needed for async mark
+def test_health_endpoint():
+    """Health check must return status, timestamp, embedder_loaded, and corpus_chunks."""
+    res = client.get("/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] in ("healthy", "degraded")
+    assert "timestamp" in data
+    assert isinstance(data["embedder_loaded"], bool)
+    assert isinstance(data["corpus_chunks"], int)
 
 
 === ./backend/app/main.py ===
+import logging
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 
-app = FastAPI(title="Phase-Lock Semantic Firewall", version="2.6.0")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+)
+
+app = FastAPI(title="Phase-Lock Semantic Firewall", version="2.10.0")
 
 # --- CORS: env-driven, secure defaults ---
 _raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173")
@@ -4992,7 +5164,10 @@ app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "8000"))
+    reload = os.environ.get("RELOAD", "true").lower() == "true"
+    uvicorn.run("app.main:app", host=host, port=port, reload=reload)
 
 
 === ./backend/app/core/models.py ===
@@ -5069,9 +5244,12 @@ This module is completely agnostic of FastAPI, embedders, and storage layers.
 It receives numpy arrays and a frozen ConfigState, returns structured results.
 Portable across CLI tools, test harnesses, or alternative API wrappers.
 """
+import logging
 import re
 from typing import Any
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from app.core.models import ConfigState
 
@@ -5126,7 +5304,11 @@ class SemanticFirewall:
         """Cosine similarity gate using raw vectors."""
         q_norm = np.linalg.norm(q_arr)
         c_norm = np.linalg.norm(c_arr)
-        sim = float(np.dot(q_arr, c_arr) / (q_norm * c_norm)) if q_norm > 0 and c_norm > 0 else 0.0
+        if q_norm == 0 or c_norm == 0:
+            logger.warning("Zero-norm vector in cosine filter (q_norm=%.4f, c_norm=%.4f)", q_norm, c_norm)
+            return False, "cosine", {"cosine_sim": 0.0, "error": "zero_norm"}
+        raw = np.dot(q_arr, c_arr) / (q_norm * c_norm)
+        sim = float(np.clip(raw, -1.0, 1.0))
         if sim < cfg.cosine_threshold:
             return False, "cosine", {"cosine_sim": sim}
         return True, "cosine", {"cosine_sim": sim}
@@ -5223,6 +5405,27 @@ class SemanticFirewall:
 # app.core — Semantic Firewall core logic (framework-agnostic)
 
 
+=== ./backend/app/core/settings.py ===
+"""Centralized environment-driven settings.
+
+All hardcoded values (URLs, model names, limits) are externalized here.
+Defaults match local development — override via environment variables.
+"""
+import os
+
+# --- Ollama ---
+OLLAMA_BASE_URL: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "llama3.1")
+
+# --- Embedding ---
+EMBEDDING_MODEL: str = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-m3")
+
+# --- PDF Ingestion ---
+CHUNK_SIZE: int = int(os.environ.get("CHUNK_SIZE", "2048"))
+CHUNK_OVERLAP: int = int(os.environ.get("CHUNK_OVERLAP", "200"))
+EMBEDDING_BATCH_SIZE: int = int(os.environ.get("EMBEDDING_BATCH_SIZE", "10"))
+
+
 === ./backend/app/core/state.py ===
 """Global configuration state management with thread-safety guarantees.
 
@@ -5238,9 +5441,20 @@ config_state: ConfigState = ConfigState()
 _config_lock = asyncio.Lock()
 
 
-def set_config(**kwargs) -> ConfigState:
-    """Atomically replace global config. Merges kwargs over current state.
-    Used by update_config route and test harness."""
+async def set_config(**kwargs) -> ConfigState:
+    """Atomically replace global config under the async lock.
+    Merges kwargs over current state, validates, and swaps."""
+    global config_state
+    async with _config_lock:
+        current = config_state.model_dump()
+        current.update(kwargs)
+        config_state = ConfigState(**current)
+        return config_state
+
+
+def set_config_sync(**kwargs) -> ConfigState:
+    """Synchronous config setter for single-threaded test harness ONLY.
+    Does NOT acquire the async lock — safe only when no event loop is running."""
     global config_state
     current = config_state.model_dump()
     current.update(kwargs)
@@ -5256,7 +5470,9 @@ All models live in app.core.models.
 All state management lives in app.core.state.
 This file handles: HTTP parsing, embedding calls, storage calls, streaming, telemetry formatting.
 """
+import logging
 import os
+import re
 import psutil
 import torch
 import json
@@ -5265,12 +5481,20 @@ import httpx
 from fastapi import APIRouter, UploadFile, File, HTTPException, Header, Depends
 from fastapi.responses import StreamingResponse
 
+logger = logging.getLogger(__name__)
+
+# --- Upload constraints ---
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
+_PDF_MAGIC = b"%PDF"
+_SAFE_FILENAME_RE = re.compile(r'^[\w\s.\-()]+\.pdf$', re.UNICODE | re.IGNORECASE)
+
 from app.modules.ingestor import process_pdf_async, get_task_status
 from app.modules.embedder import embedder
 from app.modules.storage import storage
 from app.core.models import ConfigState, ConfigUpdate, AuditRequest, ChatRequest
-from app.core.state import config_state, _config_lock, set_config
+from app.core.state import config_state, _config_lock
 from app.core.firewall import SemanticFirewall
+from app.core.settings import OLLAMA_BASE_URL, OLLAMA_MODEL
 
 # --- Optional API Key Guard ---
 _FIREWALL_API_KEY = os.environ.get("FIREWALL_API_KEY")
@@ -5286,8 +5510,24 @@ router = APIRouter()
 
 @router.post("/corpus/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
+    # --- File size guard (read in chunks to avoid full RAM load on huge files) ---
     file_bytes = await file.read()
-    task_id = await process_pdf_async(file_bytes, file.filename)
+    if len(file_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"File exceeds {MAX_UPLOAD_BYTES // (1024*1024)} MB limit")
+
+    # --- PDF magic-byte validation ---
+    if not file_bytes[:4].startswith(_PDF_MAGIC):
+        raise HTTPException(status_code=400, detail="File is not a valid PDF")
+
+    # --- Filename sanitization ---
+    raw_name = file.filename or "upload.pdf"
+    safe_name = os.path.basename(raw_name)
+    if not _SAFE_FILENAME_RE.match(safe_name):
+        safe_name = re.sub(r'[^\w.\-]', '_', safe_name)
+        if not safe_name.lower().endswith('.pdf'):
+            safe_name += '.pdf'
+
+    task_id = await process_pdf_async(file_bytes, safe_name)
     return {"task_id": task_id}
 
 @router.get("/corpus/task-status/{task_id}")
@@ -5300,7 +5540,10 @@ async def list_packs():
 
 @router.delete("/corpus/packs/{filename}")
 async def delete_pack(filename: str):
-    storage.delete_pack(filename)
+    try:
+        storage.delete_pack(filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {"status": "deleted", "filename": filename}
 
 # --- Configuration Endpoint ---
@@ -5353,14 +5596,15 @@ async def stream_ollama(prompt: str, context: str, strict: bool = False):
         try:
             async with client.stream(
                 "POST",
-                "http://localhost:11434/api/generate",
-                json={"model": "llama3.1", "prompt": full_prompt, "stream": True}
+                f"{OLLAMA_BASE_URL}/api/generate",
+                json={"model": OLLAMA_MODEL, "prompt": full_prompt, "stream": True}
             ) as response:
                 async for chunk in response.aiter_lines():
                     if chunk:
                         yield (chunk + "\n").encode("utf-8")
         except Exception as e:
-            yield json.dumps({"response": f"🔴 [LLM OFFLINE] Cannot reach Ollama at localhost:11434. Error: {e}"}).encode("utf-8") + b"\n"
+            logger.error("Ollama connection failed: %s", e)
+            yield json.dumps({"response": f"🔴 [LLM OFFLINE] Cannot reach Ollama at {OLLAMA_BASE_URL}. Ensure 'ollama serve' is running."}).encode("utf-8") + b"\n"
 
 # --- Chat Endpoint (Firewall Gateway) ---
 
@@ -5499,19 +5743,42 @@ async def system_stats():
             allocated = torch.cuda.memory_allocated()
             total = torch.cuda.get_device_properties(0).total_mem
             gpu_percent = min(100.0, (allocated / total) * 100.0) if total > 0 else 0.0
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("GPU telemetry unavailable: %s", e)
 
     return {"cpu": cpu, "ram": ram, "gpu": gpu_percent}
+
+# --- Health Check ---
+
+@router.get("/health")
+async def health_check():
+    """Liveness/readiness probe for load balancers and orchestrators."""
+    from datetime import datetime, timezone
+    db_rows = storage.count_rows()
+    embedder_ok = hasattr(embedder, 'model') and embedder.model is not None
+    return {
+        "status": "healthy" if embedder_ok else "degraded",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "embedder_loaded": embedder_ok,
+        "corpus_chunks": db_rows,
+    }
 
 
 === ./backend/app/modules/ingestor.py ===
 import asyncio
+import logging
+import time
 import fitz  # PyMuPDF
 import uuid
 from pydantic import BaseModel
 from app.modules.embedder import embedder
 from app.modules.storage import storage
+from app.core.settings import CHUNK_SIZE, CHUNK_OVERLAP, EMBEDDING_BATCH_SIZE
+
+logger = logging.getLogger(__name__)
+
+TASK_TTL_SECONDS = 3600  # Completed/failed tasks are pruned after 1 hour
+
 
 class TaskStatus(BaseModel):
     task_id: str
@@ -5519,9 +5786,39 @@ class TaskStatus(BaseModel):
     progress: float
     message: str
 
-tasks = {}
 
-def chunk_text(text: str, chunk_size: int = 2048, overlap: int = 200) -> list[str]:
+class TaskStore:
+    """In-memory task tracker with automatic TTL-based pruning."""
+
+    def __init__(self, ttl: int = TASK_TTL_SECONDS):
+        self._tasks: dict[str, tuple[TaskStatus, float]] = {}
+        self._ttl = ttl
+
+    def put(self, task_id: str, status: TaskStatus) -> None:
+        self._tasks[task_id] = (status, time.monotonic())
+
+    def get(self, task_id: str) -> TaskStatus:
+        entry = self._tasks.get(task_id)
+        if entry is None:
+            return TaskStatus(task_id=task_id, status="not_found", progress=0.0, message="Task not found")
+        return entry[0]
+
+    def prune(self) -> None:
+        """Remove terminal tasks older than TTL."""
+        now = time.monotonic()
+        expired = [
+            tid for tid, (st, ts) in self._tasks.items()
+            if st.status in ("completed", "failed") and (now - ts) > self._ttl
+        ]
+        for tid in expired:
+            del self._tasks[tid]
+        if expired:
+            logger.info("Pruned %d expired tasks", len(expired))
+
+
+tasks = TaskStore()
+
+def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
     chunks = []
     start = 0
     text_length = len(text)
@@ -5536,29 +5833,27 @@ def chunk_text(text: str, chunk_size: int = 2048, overlap: int = 200) -> list[st
     return chunks
 
 def _process_pdf_sync(file_bytes: bytes, filename: str, task_id: str):
+    import json
+    doc = None
     try:
-        tasks[task_id] = TaskStatus(task_id=task_id, status="processing", progress=10.0, message="Extracting text")
+        tasks.put(task_id, TaskStatus(task_id=task_id, status="processing", progress=10.0, message="Extracting text"))
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         full_text = ""
         for page in doc:
             full_text += page.get_text() + "\n"
-        
-        tasks[task_id].progress = 30.0
-        tasks[task_id].message = "Chunking text"
-        
+
+        tasks.put(task_id, TaskStatus(task_id=task_id, status="processing", progress=30.0, message="Chunking text"))
+
         text_chunks = chunk_text(full_text)
         total_chunks = len(text_chunks)
-        
-        tasks[task_id].message = "Embedding chunks"
-        
+
         start_id = storage.get_max_id() + 1
         nodes = []
-        batch_size = 10
+        batch_size = EMBEDDING_BATCH_SIZE
         for i in range(0, total_chunks, batch_size):
             batch_chunks = text_chunks[i:i+batch_size]
             embeddings = embedder.embed_batch(batch_chunks)
             for j, emb in enumerate(embeddings):
-                import json
                 nodes.append({
                     "id": start_id,
                     "vector": emb,
@@ -5566,35 +5861,50 @@ def _process_pdf_sync(file_bytes: bytes, filename: str, task_id: str):
                     "metadata": json.dumps({"filename": filename, "chunk_index": i+j})
                 })
                 start_id += 1
-            tasks[task_id].progress = 30.0 + (70.0 * min(i + batch_size, total_chunks) / total_chunks)
-        
+            progress = 30.0 + (70.0 * min(i + batch_size, total_chunks) / total_chunks)
+            tasks.put(task_id, TaskStatus(task_id=task_id, status="processing", progress=progress, message="Embedding chunks"))
+
         if nodes:
             storage.add_nodes(nodes)
-            
-        tasks[task_id].status = "completed"
-        tasks[task_id].progress = 100.0
-        tasks[task_id].message = "Ingestion complete"
+
+        tasks.put(task_id, TaskStatus(task_id=task_id, status="completed", progress=100.0, message="Ingestion complete"))
+        logger.info("Ingestion complete: %s (%d chunks)", filename, len(nodes))
+    except fitz.FileDataError as e:
+        logger.error("Invalid PDF '%s': %s", filename, e)
+        tasks.put(task_id, TaskStatus(task_id=task_id, status="failed", progress=0.0, message="Invalid or corrupted PDF file"))
     except Exception as e:
-        tasks[task_id].status = "failed"
-        tasks[task_id].message = str(e)
+        logger.exception("Ingestion failed for '%s'", filename)
+        tasks.put(task_id, TaskStatus(task_id=task_id, status="failed", progress=0.0, message="Processing failed"))
+    finally:
+        if doc is not None:
+            doc.close()
+
 
 async def process_pdf_async(file_bytes: bytes, filename: str) -> str:
     task_id = str(uuid.uuid4())
-    tasks[task_id] = TaskStatus(task_id=task_id, status="pending", progress=0.0, message="Task queued")
-    # Dispatch to thread pool to not block main event loop
+    tasks.put(task_id, TaskStatus(task_id=task_id, status="pending", progress=0.0, message="Task queued"))
+    tasks.prune()  # Clean up old tasks on each new upload
     asyncio.create_task(asyncio.to_thread(_process_pdf_sync, file_bytes, filename, task_id))
     return task_id
 
+
 def get_task_status(task_id: str) -> TaskStatus:
-    return tasks.get(task_id, TaskStatus(task_id=task_id, status="not_found", progress=0.0, message="Task not found"))
+    return tasks.get(task_id)
 
 
 === ./backend/app/modules/storage.py ===
 import lancedb
 from lancedb.pydantic import Vector, LanceModel
+import logging
 import os
+import re
+
+logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "lancedb_data")
+
+# Whitelist: only allow safe characters in filenames used in queries
+_SAFE_FILENAME_RE = re.compile(r'^[\w\s.\-()]+$', re.UNICODE)
 
 class KnowledgeNode(LanceModel):
     id: int
@@ -5665,28 +5975,36 @@ class Storage:
                 m = json.loads(m_str)
                 fname = m.get("filename", "unknown")
                 packs[fname] = packs.get(fname, 0) + 1
-            except:
-                pass
+            except (ValueError, json.JSONDecodeError) as e:
+                logger.warning("Malformed metadata entry: %s", e)
                 
         return [{"filename": k, "chunks": v} for k, v in packs.items()]
 
     def delete_pack(self, filename: str):
         if self.table.count_rows() == 0:
             return
-            
-        # LanceDB SQL filter using LIKE on the metadata string
-        # metadata contains {"filename": "..."}
-        # A simple string match works for our purposes.
-        filter_str = f"metadata LIKE '%\"filename\": \"{filename}\"%'"
+
+        # Validate filename to prevent SQL injection via LIKE filter
+        if not filename or not _SAFE_FILENAME_RE.match(filename):
+            logger.warning("Rejected unsafe filename for deletion: %r", filename)
+            raise ValueError(f"Invalid filename: contains disallowed characters")
+
+        # Escape single quotes for the SQL LIKE clause
+        safe_name = filename.replace("'", "''")
+        filter_str = f"metadata LIKE '%\"filename\": \"{safe_name}\"%'"
         self.table.delete(filter_str)
 
 storage = Storage()
 
 
 === ./backend/app/modules/embedder.py ===
-import os
+import logging
 import torch
 from sentence_transformers import SentenceTransformer
+from app.core.settings import EMBEDDING_MODEL
+
+logger = logging.getLogger(__name__)
+
 
 class Embedder:
     _instance = None
@@ -5698,21 +6016,19 @@ class Embedder:
         return cls._instance
 
     def initialize(self):
-        # Determine device
         if torch.backends.mps.is_available():
             self.device = "mps"
         elif torch.cuda.is_available():
             self.device = "cuda"
         else:
             self.device = "cpu"
-        
-        print(f"Loading BGE-M3 on {self.device}...")
-        self.model = SentenceTransformer("BAAI/bge-m3", device=self.device)
-        print("BGE-M3 Loaded.")
+
+        logger.info("Loading %s on %s...", EMBEDDING_MODEL, self.device)
+        self.model = SentenceTransformer(EMBEDDING_MODEL, device=self.device)
+        logger.info("%s loaded.", EMBEDDING_MODEL)
 
     def embed(self, text: str):
         """Embeds a single string and returns a flat list of 1024 floats."""
-        # BGE-M3 produces 1024D vectors
         output = self.model.encode(text, normalize_embeddings=False)
         return output.tolist()
 
@@ -5720,6 +6036,7 @@ class Embedder:
         """Embeds a batch of strings."""
         outputs = self.model.encode(texts, normalize_embeddings=False)
         return outputs.tolist()
+
 
 embedder = Embedder()
 

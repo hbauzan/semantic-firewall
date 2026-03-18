@@ -6,7 +6,7 @@ import uuid
 from pydantic import BaseModel
 from app.modules.embedder import embedder
 from app.modules.storage import storage
-from app.core.settings import CHUNK_SIZE, CHUNK_OVERLAP, EMBEDDING_BATCH_SIZE
+from app.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class TaskStore:
 
 tasks = TaskStore()
 
-def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+def chunk_text(text: str, chunk_size: int = settings.chunk_size, overlap: int = settings.chunk_overlap) -> list[str]:
     chunks = []
     start = 0
     text_length = len(text)
@@ -82,7 +82,7 @@ def _process_pdf_sync(file_bytes: bytes, filename: str, task_id: str):
 
         start_id = storage.get_max_id() + 1
         nodes = []
-        batch_size = EMBEDDING_BATCH_SIZE
+        batch_size = settings.embedding_batch_size
         for i in range(0, total_chunks, batch_size):
             batch_chunks = text_chunks[i:i+batch_size]
             embeddings = embedder.embed_batch(batch_chunks)

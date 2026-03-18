@@ -1,0 +1,32 @@
+# Environment files (may contain secrets)
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+*.egg
+
+# Vector database (local data, not code)
+lancedb_data/
+lancedb_stress_test/
+
+# Test artifacts
+backend/tests/metrics_report.csv
+backend/tests/db_scaling_metrics.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated
+context.txt

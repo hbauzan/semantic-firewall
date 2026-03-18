@@ -2,7 +2,7 @@
 while true; do
   clear
   echo "======================================"
-  echo " PHASE-LOCK SEMANTIC FIREWALL COMMANDER"
+  echo " THREE-HEADED SEMANTIC FIREWALL COMMANDER"
   echo "======================================"
   echo " [S] Start Server"
   echo " [U] Start UI"
