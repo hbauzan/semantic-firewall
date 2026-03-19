@@ -245,9 +245,9 @@ def test_prompt_length_limit_accepted():
 
 def test_api_key_not_enforced_by_default():
     """Without FIREWALL_API_KEY env var, endpoints must remain open."""
-    import app.api.routes as routes_mod
-    # In test env, _FIREWALL_API_KEY should be None (not set)
-    assert routes_mod._FIREWALL_API_KEY is None
+    from app.core.settings import settings
+    # In test env, firewall_api_key should be None (not set)
+    assert settings.api_key_value is None
     # Config endpoint should work without any key header
     res = client.post("/galaxy/config", json={
         "excitation_threshold": 150,

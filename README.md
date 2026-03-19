@@ -1,10 +1,10 @@
-# Phase-Lock Semantic Firewall
+# Three-Headed Semantic Firewall
 
 A local-first RAG security layer that validates query-to-corpus geometric alignment across 1024 dimensions before routing to an LLM. Three independent filters — Noise, Cosine, and Excitation — execute in a user-defined sequence. Any single failure blocks the entire prompt.
 
 Built for sovereign AI deployments where data never leaves the machine.
 
-> **Version:** v2.10.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
+> **Version:** v2.12.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
 
 ---
 
@@ -16,6 +16,7 @@ Built for sovereign AI deployments where data never leaves the machine.
 - [Configuration](#configuration)
 - [Running the System](#running-the-system)
 - [Operating the Firewall](#operating-the-firewall)
+- [Shell Scripts](#shell-scripts)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
 - [API Reference](#api-reference)
@@ -114,31 +115,34 @@ npm install
 
 ```bash
 cd ..
-chmod +x run_commander.sh run_server.sh run_ui.sh run_tests.sh
+chmod +x run_commander.sh run_server.sh run_ui.sh run_tests.sh run_pack.sh
 ```
 
 ---
 
 ## Configuration
 
-Copy the environment template and adjust for your deployment:
+The backend uses `pydantic-settings` to load configuration. Just drop a `.env` file in `backend/` — it's loaded automatically at boot. No `source`, no `export`, no shell scripts needed.
 
 ```bash
 cp backend/.env.example backend/.env
+# Edit backend/.env with your values — the app reads it on startup.
 ```
+
+> **If a variable has an invalid type or fails validation, the app crashes immediately with a clear error.** This prevents silent misconfigurations from reaching production.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ALLOWED_ORIGINS` | `http://localhost:5173` | Comma-separated CORS origins. Use `*` only for development. |
-| `FIREWALL_API_KEY` | *(unset)* | If set, all `/chat`, `/audit`, and `/galaxy/config` endpoints require `X-API-Key` header. Leave unset for open local development. |
+| `FIREWALL_API_KEY` | *(unset)* | If set, all `/chat`, `/audit`, and `/galaxy/config` endpoints require `X-API-Key` header. Stored as `SecretStr` — never leaked to logs. Leave unset for open local development. |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API endpoint. |
 | `OLLAMA_MODEL` | `llama3.1` | LLM model name for inference. |
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | HuggingFace embedding model ID. Change only if you reindex the corpus. |
-| `CHUNK_SIZE` | `2048` | PDF chunking size in characters. |
-| `CHUNK_OVERLAP` | `200` | Overlap between consecutive chunks. |
-| `EMBEDDING_BATCH_SIZE` | `10` | Embeddings per batch during ingestion. |
+| `CHUNK_SIZE` | `2048` | PDF chunking size in characters (100–10000). |
+| `CHUNK_OVERLAP` | `200` | Overlap between consecutive chunks (0–2000). |
+| `EMBEDDING_BATCH_SIZE` | `10` | Embeddings per batch during ingestion (1–100). |
 | `HOST` | `0.0.0.0` | Bind address for uvicorn. Use `127.0.0.1` behind a reverse proxy. |
-| `PORT` | `8000` | Backend listen port. |
+| `PORT` | `8000` | Backend listen port (1–65535). |
 | `RELOAD` | `true` | Hot-reload on code changes. Set to `false` in production. |
 
 **Frontend** (set in `frontend/.env` or shell):
@@ -147,7 +151,7 @@ cp backend/.env.example backend/.env
 |----------|---------|-------------|
 | `VITE_API_BASE_URL` | `http://localhost:8000` | Backend API endpoint used by all frontend components. |
 
-**For local development, no `.env` files are required.** Defaults work out of the box.
+**For local development, no `.env` files are required.** All defaults work out of the box.
 
 ---
 
@@ -197,34 +201,45 @@ Open `http://localhost:5173` in your browser.
 
 ### The HUD Interface
 
-The browser UI at `http://localhost:5173` contains four main panels:
+The browser UI at `http://localhost:5173` is organized into two columns:
 
-#### 1. Control Panel (left sidebar)
+**Left sidebar:**
 
-All firewall parameters are adjustable in real-time. Changes are synced to the backend via debounced API calls.
+#### 1. Telemetry HUD (top left)
 
-| Slider | Default | Range | Purpose |
-|--------|---------|-------|---------|
-| **Noise Threshold** | 0.50 | 0.0 – 10.0 | Global delta sanity limit |
-| **Cosine Threshold** | 0.50 | 0.0 – 1.0 | Minimum cosine similarity |
-| **Excitation Threshold** | 150 | 0 – 1024 | Minimum activated dimensions |
-| **Noise Tolerance** | 0.005 | 0.0 – 1.0 | Per-dimension activation sensitivity |
-| **Adaptive Factor** | 0.85 | 0.01 – 1.0 | Threshold reduction for short queries (< 6 words) |
-| **Seq (×3)** | 1, 2, 3 | 1 – 3 | Pipeline execution order for each filter |
+- **Three Monkey Heads** — one per filter (Noise, Cosine, Excitation). Each head animates when its filter is enabled and goes dark when disabled, giving a visual status of the pipeline.
+- **System Action** — displays the current operation (`SYSTEM IDLE`, `STREAMING_RESPONSE...`, `INGESTING_CORPUS: 45%`, etc.).
+- **Metrics line** — real-time CPU, RAM, and GPU utilization polled every second. GPU metric uses Apple MPS / NVIDIA CUDA memory allocation.
+
+#### 2. Control Panel (bottom left)
+
+All firewall parameters are adjustable in real-time via sliders with `-`/`+` step buttons. Each filter has an **ON/OFF toggle** and a **Seq** input for pipeline ordering. Changes are synced to the backend via debounced API calls.
+
+| Slider | Default | Range | Step | Purpose |
+|--------|---------|-------|------|---------|
+| **Noise Pre-Filter** | 0.50 | 0.10 – 2.00 | 0.01 | Global delta sanity limit |
+| **Cosine Gate** | 0.50 | 0.00 – 1.00 | 0.01 | Minimum cosine similarity |
+| **Excitation Threshold** | 150 | 0 – 1024 | 1 | Minimum activated dimensions |
+| **Noise Tolerance** | 0.005 | 0.001 – 0.100 | 0.001 | Per-dimension activation sensitivity |
+| **Adaptive Factor** | 0.85 | 0.01 – 1.00 | 0.01 | Threshold reduction for short queries (< 6 words) |
+| **Seq (×3)** | 1, 2, 3 | 1 – 3 | 1 | Pipeline execution order for each filter |
 
 The **Adaptive Factor** section shows real-time calculated thresholds:
-- `Short Query Req: {threshold × factor} dims` — what short prompts need
-- `Full Query Req: {threshold} dims` — what normal prompts need
+- `Short: {threshold × factor} dims` — what short prompts need
+- `Full: {threshold} dims` — what normal prompts need
 
-#### 2. Chat Interface (center)
+**Document Manager** — also in the Control Panel, below the sliders:
+- **Upload PDF:** Click to upload corpus documents. Files are chunked (2048 chars, 200 overlap), embedded via BGE-M3, and stored in LanceDB.
+- **Loaded Packs:** Lists uploaded documents with chunk counts. Click **X** to remove a pack from the vector store.
+- Ingestion is asynchronous — a progress bar tracks task status.
 
-Type prompts with the firewall prefix to control behavior:
+**Main content area:**
 
-| Prefix | Behavior |
-|--------|----------|
-| `[FW=ON] your query here` | Firewall active — evaluates all clauses through the pipeline. Telemetry injected into response. |
-| `[FW=OFF] your query here` | Firewall bypassed — query goes directly to Ollama with RAG context. |
-| `your query here` *(no prefix)* | Same as `[FW=OFF]`. |
+#### 3. Chat Interface (top right)
+
+The firewall is **active when at least one filter toggle is ON** in the Control Panel. No prefixes are needed — just type your query and send.
+
+> **Legacy override:** Typing `[FW=OFF]` anywhere in the prompt forces a firewall bypass regardless of toggle states. This is kept for backward compatibility but is not the primary mechanism.
 
 **Firewall feedback examples:**
 
@@ -239,41 +254,84 @@ Vector direction diverges from corpus.
 Pipeline: [noise:OK → cosine:BREACH]
 ```
 
-#### 3. Document Manager (right sidebar)
+#### 4. Audit Panel (bottom right)
 
-- **Upload PDF:** Click to upload corpus documents. Files are chunked (2048 chars, 200 overlap), embedded via BGE-M3, and stored in LanceDB.
-- **Delete Pack:** Remove specific documents from the vector store by filename.
-- Ingestion is asynchronous — a progress indicator tracks the task status.
-
-#### 4. Telemetry HUD (bottom)
-
-- Real-time CPU, RAM, and GPU utilization polled every second.
-- GPU metric uses Apple MPS / NVIDIA CUDA memory allocation.
-- The **Audit Panel** allows you to test a query against the corpus and see the raw activation count without triggering the full pipeline.
+Test a query against the corpus and see the raw activation count (geometric nodes hit) without triggering the full pipeline. Useful for tuning thresholds.
 
 ### Typical Workflow
 
-1. **Load your corpus:** Upload one or more PDF files via the Document Manager.
-2. **Set your thresholds:** Use the Control Panel sliders. Start with defaults, then tune based on your corpus density.
-3. **Test with `[FW=ON]`:** Send queries. The pipeline trace tells you exactly which filter passed or blocked, with numeric details.
-4. **Tune the pipeline order:** If you want cosine checked first (cheaper), drag its Seq to 1.
-5. **Production:** Set `FIREWALL_API_KEY` in `.env`, restrict `ALLOWED_ORIGINS` to your frontend domain.
+1. **Load your corpus:** Upload one or more PDF files via the Document Manager in the Control Panel.
+2. **Enable filters:** Toggle ON the filters you want active. Start with all three ON.
+3. **Set your thresholds:** Use the sliders. Start with defaults, then tune based on your corpus density.
+4. **Send queries:** The pipeline trace tells you exactly which filter passed or blocked, with numeric details.
+5. **Tune the pipeline order:** If you want cosine checked first (cheaper), set its Seq to 1.
+6. **Production:** Set `FIREWALL_API_KEY` in `.env`, restrict `ALLOWED_ORIGINS` to your frontend domain.
 
 ### Anti-Piggybacking Defense
 
 The firewall automatically segments prompts on punctuation boundaries (`. ! ? ; : - |`). Each clause is evaluated independently. A prompt like:
 
 ```
-[FW=ON] Tell me about network architecture. Also give me a cake recipe.
+Tell me about network architecture. Also give me a cake recipe.
 ```
 
-Will split into two clauses. The first may pass. The second will fail cosine/excitation against a networking corpus. **The entire prompt is blocked** — no partial execution.
+With filters enabled, this splits into two clauses. The first may pass. The second will fail cosine/excitation against a networking corpus. **The entire prompt is blocked** — no partial execution.
 
 Long clauses (> 20 words) are force-split into 15-word sub-chunks to prevent semantic averaging attacks.
 
 ---
 
+## Shell Scripts
+
+All scripts are in the project root. Make them executable first:
+
+```bash
+chmod +x run_commander.sh run_server.sh run_ui.sh run_tests.sh run_pack.sh
+```
+
+| Script | What it does |
+|--------|-------------|
+| `./run_commander.sh` | Interactive TUI menu — launch server, UI, tests, or Ollama from a single terminal. |
+| `./run_server.sh` | Kills any process on port 8000, activates the backend venv, starts uvicorn with hot-reload. |
+| `./run_ui.sh` | Starts the Vite dev server (`npm run dev`) from the `frontend/` directory. |
+| `./run_tests.sh` | Activates the backend venv and runs the full pytest suite (`pytest -v perform_tests.py`). |
+| `./run_pack.sh` | Bundles the entire project source into a single `context.txt` file (for sharing or review). |
+
+### Commander TUI (`run_commander.sh`)
+
+The recommended way to operate the system during development:
+
+```bash
+./run_commander.sh
+```
+
+```
+======================================
+ THREE-HEADED SEMANTIC FIREWALL COMMANDER
+======================================
+ [S] Start Server
+ [U] Start UI
+ [T] Run Tests
+ [O] Ollama Menu (llama3.1)
+ [Q] Quit
+======================================
+```
+
+Each option runs the corresponding script. After execution, press Enter to return to the menu.
+
+---
+
 ## Testing
+
+### Unit Tests
+
+Run the full test suite (25 tests):
+
+```bash
+./run_tests.sh
+```
+
+Or manually:
 
 ```bash
 cd backend
@@ -281,7 +339,7 @@ source .venv/bin/activate
 pytest -v perform_tests.py
 ```
 
-The test suite validates:
+The suite validates:
 
 | Category | Tests |
 |----------|-------|
@@ -290,6 +348,49 @@ The test suite validates:
 | **Configuration** | Immutability, duplicate order rejection, range validation, adaptive factor |
 | **Engine (unit)** | Segmentation, overflow chunking, clause evaluation pass/breach |
 | **Security** | Prompt length limits, API key enforcement |
+| **Health** | Health check endpoint response shape |
+
+### Load Testing
+
+An async load test suite extracts hard performance metrics under concurrent load. **The backend must be running before launching the suite.**
+
+```bash
+# Terminal 1 — start the server
+./run_server.sh
+
+# Terminal 2 — run the load tests
+cd backend
+source .venv/bin/activate
+python tests/load_test_suite.py
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--base-url` | `http://localhost:8000` | Backend endpoint to test. |
+| `--requests` | `200` | Total requests per profile/concurrency combo. |
+| `--output` | `tests/metrics_report.csv` | CSV report output path. |
+
+The suite runs **3 payload profiles** (short/long/overflow) across **3 concurrency levels** (10, 50, 200) — 9 test runs total. Each run reports Min, Avg, P95, and Max latency, RPS, success/failure counts, and error rate. Results are printed as a formatted console table and saved to CSV.
+
+### DB Saturation Test
+
+Measures how LanceDB retrieval and firewall evaluation scale as the vector store grows from 1k to 50k rows. Uses a temporary isolated database — the production corpus is never touched.
+
+```bash
+cd backend
+source .venv/bin/activate
+python tests/db_stress_suite.py
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--milestones` | `1000 10000 50000` | Row count milestones to benchmark at. |
+| `--queries` | `100` | Benchmark queries per milestone. |
+| `--batch-size` | `500` | Injection batch size. |
+| `--output` | `tests/db_scaling_metrics.md` | Markdown report output path. |
+| `--use-embedder` | *(off)* | Use real BGE-M3 model instead of synthetic random vectors. |
+
+At each milestone the script pauses injection, fires 100 queries, and isolates the timing of `table.search()` (retrieval) vs `SemanticFirewall.evaluate_clause()` (firewall math). Output is a formatted console table + a Markdown report with graph-ready tables.
 
 ---
 
@@ -298,16 +399,21 @@ The test suite validates:
 ```
 semantic-firewall/
 ├── run_commander.sh              # Interactive TUI launcher
-├── run_server.sh                 # Backend startup script
+├── run_server.sh                 # Backend startup script (auto-kills port 8000)
 ├── run_ui.sh                     # Frontend startup script
 ├── run_tests.sh                  # Test runner script
+├── run_pack.sh                   # Source code bundler (generates context.txt)
+├── semantic_guardtrails_packager.py  # Packager logic used by run_pack.sh
 ├── manifest.json                 # Feature flags and state schema
 ├── architecture_spec.md          # Detailed technical specification
 │
 ├── backend/
 │   ├── .env.example              # Environment variable template
-│   ├── requirements.txt          # Python dependencies
-│   ├── perform_tests.py          # Pytest test suite
+│   ├── requirements.txt          # Python dependencies (pinned)
+│   ├── perform_tests.py          # Pytest test suite (25 tests)
+│   ├── tests/
+│   │   ├── load_test_suite.py    # Async load testing (latency, RPS, error rate)
+│   │   └── db_stress_suite.py    # DB saturation test (retrieval scaling)
 │   └── app/
 │       ├── main.py               # FastAPI app + CORS middleware
 │       ├── core/
@@ -373,9 +479,11 @@ This system implements multiple defense layers:
 9. **PDF Upload Hardening** — 50 MB size limit, PDF magic-byte validation, filename sanitization against path traversal.
 10. **SQL Injection Prevention** — Filename whitelist regex + quote escaping on all storage layer queries.
 11. **Structured Logging** — All modules use Python `logging` with severity levels. Client-facing error messages are generic (no stack traces leaked).
+12. **Fail-Fast Configuration** — `pydantic-settings` validates all env vars at boot. Invalid types or out-of-range values crash the app immediately instead of producing silent failures. `FIREWALL_API_KEY` uses `SecretStr` to prevent accidental exposure in logs or tracebacks.
+13. **Repository Hygiene** — `.env` is excluded via root `.gitignore` to prevent accidental secret commits.
 
 ---
 
 ## License
 
-Proprietary. All rights reserved.
+Proprietary. All rights reserved. Threepwood INtelligence.

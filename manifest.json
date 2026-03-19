@@ -1,6 +1,6 @@
 {
-    "project": "Phase-Lock Semantic Firewall",
-    "version": "v2.10.0",
+    "project": "Three-Headed Semantic Firewall",
+    "version": "v2.12.0",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -41,7 +41,10 @@
         "react_error_boundaries": true,
         "health_check_endpoint": true,
         "pinned_dependencies": true,
-        "env_driven_server_config": true
+        "env_driven_server_config": true,
+        "async_load_test_suite": true,
+        "db_bulk_saturation_test": true,
+        "pydantic_settings_12factor": true
     },
     "state_schema": {
         "excitation_threshold": {"type": "int", "default": 150, "range": [0, 1024]},
