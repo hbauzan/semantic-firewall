@@ -21,6 +21,7 @@ export const ChatInterface: React.FC = () => {
     const currentInput = input;
     setInput('');
     setIsStreaming(true);
+    let connectionFailed = false;
 
     try {
       const res = await fetch(`${API_BASE_URL}/chat`, {
@@ -28,6 +29,11 @@ export const ChatInterface: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: currentInput })
       });
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`Server error ${res.status}: ${errBody}`);
+      }
 
       if (!res.body) throw new Error("No body in response");
 
@@ -123,20 +129,21 @@ export const ChatInterface: React.FC = () => {
               }));
             }
           } catch (e) {
-            // Some chunks might just be raw strings or incomplete JSON if not NDJSON. 
-            // The python backend yields plain bytes from ollama which IS NDJSON mostly (`{ "response": "..." } `).
-            // If it's pure string from error or breach, we handle it above, wait, Ollama yields {"model": "...", "response": "..."}.
+            console.warn('[NDJSON parse] Skipping malformed line:', line);
           }
         }
       }
 
     } catch (err) {
+      connectionFailed = true;
       console.error(err);
       addMessage({ id: crypto.randomUUID(), role: 'system', content: 'Failed to connect to backend engine.' });
       useStore.setState({ systemAction: 'CONNECTION_FAILED' });
     } finally {
       setIsStreaming(false);
-      useStore.setState({ systemAction: 'SYSTEM IDLE' });
+      if (!connectionFailed) {
+        useStore.setState({ systemAction: 'SYSTEM IDLE' });
+      }
     }
   };
 

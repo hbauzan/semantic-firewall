@@ -32,7 +32,7 @@ app/
 - **Embedder Singleton (`modules/embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU. The model name is read from the `settings` singleton.
 - **Storage Layer (`modules/storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation. Filename validation prevents SQL injection on delete operations.
 - **Ingestor Protocol (`modules/ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines. Chunk size, overlap, and batch size are read from the `settings` singleton (defaults: 2048, 200, 10). Completed/failed tasks are automatically pruned after 1 hour (`TaskStore` with TTL).
-- **Settings (`core/settings.py`):** Uses `pydantic-settings` (`BaseSettings`) for typed, validated configuration following 12-Factor App principles. All env vars are declared in a single `Settings` class with type annotations, default values, and range constraints. The `.env` file is loaded automatically at boot — no `source` or manual export required. If a variable has an invalid type or fails validation, the app crashes immediately with a clear Pydantic error (fail-fast). Secrets (`FIREWALL_API_KEY`) use `SecretStr` to prevent accidental logging. A singleton `settings` instance is created at import time and imported by all modules. See `backend/.env.example` for the full list.
+- **Settings (`core/settings.py`):** Uses `pydantic-settings` (`BaseSettings`) for typed, validated configuration following 12-Factor App principles. All env vars are declared in a single `Settings` class with type annotations, default values, and range constraints. The `.env` file is loaded automatically at boot — no `source` or manual export required. If a variable has an invalid type or fails validation, the app crashes immediately with a clear Pydantic error (fail-fast). Secrets (`FIREWALL_API_KEY`) use `SecretStr` to prevent accidental logging. A singleton `settings` instance is created at import time and imported by all modules. The backend and frontend share a single root-level `.env` file — see `.env.example` for the full list. Vite reads the same file via `envDir: '..'` in `vite.config.ts`.
 
 ## 3. Execution Pipeline (Sequential Reorderable Firewall)
 The firewall executes three distinct validation stages in a **user-defined sequence** controlled via the HUD's `Seq` inputs. The pipeline is constructed at evaluation time by sorting the three stages based on their integer priority values:
@@ -43,11 +43,11 @@ The firewall executes three distinct validation stages in a **user-defined seque
 | B | **Cosine Filter** | `cosine_order` | 2 |
 | C | **Excitation Filter** | `excitation_order` | 3 |
 
-**Stage A — Cosine Filter:** Traditional cosine similarity gate. Computes `cos(Q, C) = dot(Q, C) / (‖Q‖ × ‖C‖)` using **raw vectors** (no normalization). Blocks if `cos(Q, C) < cosine_threshold`.
+**Stage A — Noise Pre-Filter (Global Delta Sanity):** Computes the average absolute delta across all 1024 dimensions: `avg_delta = np.mean(np.abs(Q - C))`. If `avg_delta > global_noise_limit`, the query is blocked immediately. This catches gross semantic drift before finer-grained filters run.
 
-**Stage B — Excitation Filter:** Dimensional resonance count. For each of 1024 dimensions, counts activations where `|Q_i - C_i| <= noise_tolerance`. Uses **raw vectors**. Applies the adaptive threshold (see Section 4). Blocks if `activations < threshold`.
+**Stage B — Cosine Filter:** Traditional cosine similarity gate. Computes `cos(Q, C) = dot(Q, C) / (‖Q‖ × ‖C‖)` using **raw vectors** (no normalization). Includes zero-norm guard and `np.clip(raw, -1.0, 1.0)` for floating-point safety. Blocks if `cos(Q, C) < cosine_threshold`.
 
-**Stage C — Noise Pre-Filter (Global Delta Sanity):** Computes the average absolute delta across all 1024 dimensions: `avg_delta = np.mean(np.abs(Q - C))`. If `avg_delta > global_noise_limit`, the query is blocked immediately. This catches gross semantic drift before finer-grained filters run.
+**Stage C — Excitation Filter:** Dimensional resonance count. For each of 1024 dimensions, counts activations where `|Q_i - C_i| <= noise_tolerance`. Uses **raw vectors**. Applies the adaptive threshold (see Section 4). Blocks if `activations < threshold`.
 
 **Execution semantics:** Stages are sorted by their `_order` integer (ascending). If Stage N returns BREACH, Stages N+1..3 are **never evaluated**. Each clause from the segmentation defense (Section 5) must independently pass the **entire** ordered pipeline. Telemetry trace format: `Pipeline: [cosine:OK → excitation:OK → noise:OK]` or `[cosine:OK → excitation:BREACH]`.
 
@@ -64,7 +64,7 @@ When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, 
 ## 5. Frontend Control Logic
 - **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads (including `cosineOrder`, `excitationOrder`, `noiseOrder`, `globalNoiseLimit`, `adaptiveFactor`), an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
 - **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings. Displays **Three Monkey Heads** (one per filter: Noise, Cosine, Excitation) — each head animates when its filter is enabled and goes dark when disabled, providing visual pipeline status. Also shows the current `systemAction` state and a compact telemetry line (CPU/RAM/GPU). On Apple Silicon (MPS), GPU% is calculated as `torch.mps.current_allocated_memory() / psutil.virtual_memory().total * 100` — reflecting actual allocation against total unified memory. On CUDA, it uses `torch.cuda.memory_allocated() / torch.cuda.get_device_properties(0).total_mem * 100`.
-- **Pipeline Ordering UI (`ControlPanel.tsx`):** Slider groups are visually ordered to match the default pipeline execution sequence: **Noise Pre-Filter (Seq 1)** → **Cosine Gate (Seq 2)** → **Excitation Threshold + Noise Tolerance (Seq 3)** → **Adaptive Factor**. Each filter includes a **Seq** numerical input (1–3) that controls pipeline execution order and an **ON/OFF toggle button** that enables or disables that individual filter. When a filter is toggled OFF, its slider group dims to 40% opacity and the filter is excluded from the pipeline entirely (via `build_pipeline()` in the engine). The firewall is considered active when at least one filter is enabled (`fw_on = noise_enabled || cosine_enabled || excitation_enabled`). The legacy `[FW=OFF]` prompt prefix is still supported as a bypass override. All values including enabled states are synced to the backend via debounced `POST /galaxy/config`.
+- **Pipeline Ordering UI (`ControlPanel.tsx`):** Slider groups are visually ordered to match the default pipeline execution sequence: **Noise Pre-Filter (Seq 1)** → **Cosine Gate (Seq 2)** → **Excitation Threshold + Noise Tolerance (Seq 3)** → **Adaptive Factor**. Each filter includes a **Seq** numerical input (1–3) that controls pipeline execution order and an **ON/OFF toggle button** that enables or disables that individual filter. When a filter is toggled OFF, its slider group dims to 40% opacity and the filter is excluded from the pipeline entirely (via `build_pipeline()` in the engine). The firewall is considered active when at least one filter is enabled (`fw_on = noise_enabled || cosine_enabled || excitation_enabled`). There is no user-prompt bypass — the firewall can only be disabled via the authenticated HUD toggles. All values including enabled states are synced to the backend via debounced `POST /galaxy/config`.
 - **Interface Guardrails (`ChatInterface.tsx`):** Uses `crypto.randomUUID()` for collision-free message IDs. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically. Each component is wrapped in an `ErrorBoundary` to prevent cascading UI crashes — a single panel failure renders a retry button instead of killing the entire app.
 - **Centralized API Config (`config.ts`):** All API calls reference `API_BASE_URL` from `import.meta.env.VITE_API_BASE_URL` (default: `http://localhost:8000`). Zero hardcoded URLs in components.
 
@@ -94,7 +94,7 @@ CORS is configured via the `ALLOWED_ORIGINS` environment variable (default: `htt
 - **Restricted headers** — only `Content-Type` and `X-API-Key` are accepted.
 
 ### 7.2 API Key Authentication (Opt-in)
-When the `FIREWALL_API_KEY` environment variable is set, all mutation endpoints (`/chat`, `/audit`, `/galaxy/config`) require the `X-API-Key` header to match. Returns HTTP 403 on mismatch. If the variable is unset, all endpoints remain open for local development. Configuration is documented in `.env.example`.
+When the `FIREWALL_API_KEY` environment variable is set, **all endpoints except `/health`** require the `X-API-Key` header to match. Returns HTTP 403 on mismatch. If the variable is unset, all endpoints remain open for local development. Configuration is documented in `.env.example`.
 
 ### 7.3 Input Sanitization
 All inbound prompts (`ChatRequest`, `AuditRequest`) are constrained to `PROMPT_MAX_LENGTH` (4000 characters) at the Pydantic schema level. Payloads exceeding this limit are rejected with HTTP 422 before any embedding computation occurs, preventing memory exhaustion attacks on the vectorization stage.
@@ -109,11 +109,11 @@ The `/corpus/upload-pdf` endpoint enforces three-layer validation before accepti
 The `delete_pack()` method in `storage.py` validates filenames against a whitelist regex before interpolating into the LanceDB SQL LIKE clause. Filenames containing quotes, semicolons, or other SQL metacharacters are rejected with a `ValueError`. Single quotes in valid filenames are escaped via SQL doubling (`'` → `''`).
 
 ### 7.6 Health Check Endpoint
-`GET /health` returns the system's liveness status for load balancers, Kubernetes probes, and monitoring dashboards. Response includes:
-- `status`: `"healthy"` (embedder loaded) or `"degraded"` (embedder missing).
+`GET /health` returns a minimal liveness response for load balancers, Kubernetes probes, and monitoring dashboards. Response includes only:
+- `status`: `"healthy"`.
 - `timestamp`: UTC ISO 8601.
-- `embedder_loaded`: boolean.
-- `corpus_chunks`: total chunks in LanceDB.
+
+No internal state (embedder status, corpus size) is exposed. This is the only endpoint that does not require API key authentication when `FIREWALL_API_KEY` is set.
 
 ### 7.7 Production Server Configuration
 `main.py` reads `HOST`, `PORT`, and `RELOAD` from environment variables. `reload=True` is the default for development; production deployments should set `RELOAD=false`. Structured logging (`logging.basicConfig`) is initialized at app startup with `INFO` level.
@@ -121,7 +121,26 @@ The `delete_pack()` method in `storage.py` validates filenames against a whiteli
 ### 7.8 Dependency Pinning
 `requirements.txt` pins all production dependencies to exact versions (e.g. `fastapi==0.135.1`). This prevents silent breakage from upstream updates — particularly critical for `sentence-transformers` and `torch`, where version changes can alter embedding output and invalidate the entire corpus index.
 
-### 7.9 Structured Logging
+### 7.9 Rate Limiting
+Per-IP rate limiting is enforced via `slowapi` (a FastAPI-compatible wrapper around `limits`). Three configurable tiers:
+- `/chat` and `/audit`: `RATE_LIMIT_CHAT` (default: `30/minute`).
+- `/corpus/upload-pdf`: `RATE_LIMIT_UPLOAD` (default: `10/minute`).
+- All other endpoints: `RATE_LIMIT_DEFAULT` (default: `60/minute`).
+
+When a client exceeds its limit, the server returns HTTP 429 (Too Many Requests). Rate limits are keyed on the client's remote IP address.
+
+### 7.10 LLM Response Validation
+`stream_ollama` validates every chunk from the Ollama inference server before forwarding it to the client:
+- **Status code check:** If Ollama returns a non-200 status, the stream immediately yields a generic error message and terminates. No raw error payloads from the LLM reach the client.
+- **JSON line validation:** Each NDJSON line is parsed through `json.loads()` before forwarding. Malformed lines are dropped and logged at WARNING level with a truncated preview (max 200 chars).
+
+### 7.11 Conditional Swagger Documentation
+When `FIREWALL_API_KEY` is set, both `/docs` (Swagger UI) and `/redoc` (ReDoc) are disabled (`docs_url=None`, `redoc_url=None`). This prevents unauthenticated schema enumeration in production deployments. In local development (no API key), docs remain accessible for convenience.
+
+### 7.12 HSTS (HTTP Strict Transport Security)
+All responses include `Strict-Transport-Security: max-age=63072000; includeSubDomains` (2-year duration). This instructs browsers to always use HTTPS for subsequent requests, preventing protocol downgrade attacks.
+
+### 7.13 Structured Logging
 All backend modules use Python's `logging` module instead of `print()`. Log levels:
 - `INFO` — successful operations (ingestion complete, model loaded).
 - `WARNING` — non-fatal issues (malformed metadata, GPU telemetry unavailable, unsafe filename rejected).

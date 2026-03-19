@@ -31,7 +31,7 @@ export class ErrorBoundary extends React.Component<
           color: '#f88',
         }}>
           <strong>Component Error{this.props.label ? ` (${this.props.label})` : ''}</strong>
-          <div style={{ marginTop: '0.5rem', opacity: 0.7 }}>{this.state.error?.message}</div>
+          <div style={{ marginTop: '0.5rem', opacity: 0.7 }}>An unexpected error occurred. Check the browser console for details.</div>
           <button
             onClick={() => this.setState({ hasError: false, error: null })}
             style={{ marginTop: '0.5rem', fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}

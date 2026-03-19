@@ -4,7 +4,7 @@ A local-first RAG security layer that validates query-to-corpus geometric alignm
 
 Built for sovereign AI deployments where data never leaves the machine.
 
-> **Version:** v2.12.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
+> **Version:** v2.14.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
 
 ---
 
@@ -122,14 +122,16 @@ chmod +x run_commander.sh run_server.sh run_ui.sh run_tests.sh run_pack.sh
 
 ## Configuration
 
-The backend uses `pydantic-settings` to load configuration. Just drop a `.env` file in `backend/` — it's loaded automatically at boot. No `source`, no `export`, no shell scripts needed.
+A single `.env` file in the **project root** configures both backend and frontend. The backend reads it via `pydantic-settings` at runtime; the frontend reads it via Vite at build time. No `source`, no `export` — just drop the file and start.
 
 ```bash
-cp backend/.env.example backend/.env
-# Edit backend/.env with your values — the app reads it on startup.
+cp .env.example .env
+# Edit .env with your values — both backend and frontend read from this single file.
 ```
 
-> **If a variable has an invalid type or fails validation, the app crashes immediately with a clear error.** This prevents silent misconfigurations from reaching production.
+> **If a variable has an invalid type or fails validation, the backend crashes immediately with a clear error.** This prevents silent misconfigurations from reaching production.
+
+**Backend variables** (loaded by `pydantic-settings`):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -138,20 +140,52 @@ cp backend/.env.example backend/.env
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API endpoint. |
 | `OLLAMA_MODEL` | `llama3.1` | LLM model name for inference. |
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | HuggingFace embedding model ID. Change only if you reindex the corpus. |
+| `MAX_UPLOAD_MB` | `50` | Maximum PDF upload size in megabytes (1–500). |
 | `CHUNK_SIZE` | `2048` | PDF chunking size in characters (100–10000). |
 | `CHUNK_OVERLAP` | `200` | Overlap between consecutive chunks (0–2000). |
 | `EMBEDDING_BATCH_SIZE` | `10` | Embeddings per batch during ingestion (1–100). |
+| `RATE_LIMIT_CHAT` | `30/minute` | Rate limit for `/chat` and `/audit` endpoints per client IP. |
+| `RATE_LIMIT_DEFAULT` | `60/minute` | Rate limit for all other endpoints per client IP. |
+| `RATE_LIMIT_UPLOAD` | `10/minute` | Rate limit for `/corpus/upload-pdf` per client IP. |
 | `HOST` | `0.0.0.0` | Bind address for uvicorn. Use `127.0.0.1` behind a reverse proxy. |
 | `PORT` | `8000` | Backend listen port (1–65535). |
-| `RELOAD` | `true` | Hot-reload on code changes. Set to `false` in production. |
+| `RELOAD` | `false` | Hot-reload on code changes. Set to `true` for development only. |
 
-**Frontend** (set in `frontend/.env` or shell):
+**Frontend variables** (loaded by Vite — must be prefixed with `VITE_`):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VITE_API_BASE_URL` | `http://localhost:8000` | Backend API endpoint used by all frontend components. |
 
-**For local development, no `.env` files are required.** All defaults work out of the box.
+**For local development, no `.env` file is required.** All defaults work out of the box.
+
+### How the frontend reads configuration
+
+All frontend components import the backend URL from a single module (`frontend/src/config.ts`) instead of hardcoding `http://localhost:8000` in each file:
+
+```typescript
+// config.ts
+export const API_BASE_URL: string =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+```
+
+Every component uses this constant:
+
+```typescript
+import { API_BASE_URL } from '../config';
+fetch(`${API_BASE_URL}/chat`, ...)
+```
+
+Vite injects `VITE_API_BASE_URL` at **build time** (not runtime). This means:
+- During `npm run dev`, Vite reads the root `.env` and replaces the variable in-memory.
+- During `npm run build`, the value is baked into the compiled JS bundle.
+- If the variable is not set, the fallback `http://localhost:8000` is used automatically.
+
+To point the frontend at a different backend (e.g., production), just set the variable in `.env` before building:
+
+```env
+VITE_API_BASE_URL=https://api.yourdomain.com
+```
 
 ---
 
@@ -237,9 +271,7 @@ The **Adaptive Factor** section shows real-time calculated thresholds:
 
 #### 3. Chat Interface (top right)
 
-The firewall is **active when at least one filter toggle is ON** in the Control Panel. No prefixes are needed — just type your query and send.
-
-> **Legacy override:** Typing `[FW=OFF]` anywhere in the prompt forces a firewall bypass regardless of toggle states. This is kept for backward compatibility but is not the primary mechanism.
+The firewall is **active when at least one filter toggle is ON** in the Control Panel. No prefixes are needed — just type your query and send. The firewall can only be bypassed by disabling all three filter toggles in the HUD — there is no user-prompt override.
 
 **Firewall feedback examples:**
 
@@ -265,7 +297,7 @@ Test a query against the corpus and see the raw activation count (geometric node
 3. **Set your thresholds:** Use the sliders. Start with defaults, then tune based on your corpus density.
 4. **Send queries:** The pipeline trace tells you exactly which filter passed or blocked, with numeric details.
 5. **Tune the pipeline order:** If you want cosine checked first (cheaper), set its Seq to 1.
-6. **Production:** Set `FIREWALL_API_KEY` in `.env`, restrict `ALLOWED_ORIGINS` to your frontend domain.
+6. **Production:** Set `FIREWALL_API_KEY` in the root `.env`, restrict `ALLOWED_ORIGINS` to your frontend domain.
 
 ### Anti-Piggybacking Defense
 
@@ -398,6 +430,8 @@ At each milestone the script pauses injection, fires 100 queries, and isolates t
 
 ```
 semantic-firewall/
+├── .env.example                  # Environment variable template (backend + frontend)
+├── .gitignore                    # Excludes .env, __pycache__, node_modules, etc.
 ├── run_commander.sh              # Interactive TUI launcher
 ├── run_server.sh                 # Backend startup script (auto-kills port 8000)
 ├── run_ui.sh                     # Frontend startup script
@@ -408,14 +442,13 @@ semantic-firewall/
 ├── architecture_spec.md          # Detailed technical specification
 │
 ├── backend/
-│   ├── .env.example              # Environment variable template
 │   ├── requirements.txt          # Python dependencies (pinned)
 │   ├── perform_tests.py          # Pytest test suite (25 tests)
 │   ├── tests/
 │   │   ├── load_test_suite.py    # Async load testing (latency, RPS, error rate)
 │   │   └── db_stress_suite.py    # DB saturation test (retrieval scaling)
 │   └── app/
-│       ├── main.py               # FastAPI app + CORS middleware
+│       ├── main.py               # FastAPI app + CORS + security headers + rate limiting
 │       ├── core/
 │       │   ├── models.py         # Pydantic schemas (ConfigState, etc.)
 │       │   ├── state.py          # Global config singleton + lock
@@ -451,14 +484,14 @@ All endpoints are served at `http://localhost:8000`.
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `POST` | `/chat` | API Key* | Send a prompt through the firewall pipeline. Streaming NDJSON response. |
-| `POST` | `/audit` | API Key* | Test a query against the corpus. Returns activation count and nearest vector. |
+| `POST` | `/audit` | API Key* | Test a query against the corpus. Returns activation count and nearest text match. |
 | `POST` | `/galaxy/config` | API Key* | Update firewall configuration (thresholds, orders, factor). |
-| `POST` | `/corpus/upload-pdf` | — | Upload a PDF for async vectorization into LanceDB. |
-| `GET` | `/corpus/task-status/{id}` | — | Poll PDF ingestion task progress. |
-| `GET` | `/corpus/packs` | — | List all uploaded document packs with chunk counts. |
-| `DELETE` | `/corpus/packs/{filename}` | — | Remove a document pack from the vector store. |
-| `GET` | `/system/stats` | — | CPU, RAM, GPU utilization metrics. |
-| `GET` | `/health` | — | Liveness probe: embedder status, corpus size, UTC timestamp. |
+| `POST` | `/corpus/upload-pdf` | API Key* | Upload a PDF for async vectorization into LanceDB. |
+| `GET` | `/corpus/task-status/{id}` | API Key* | Poll PDF ingestion task progress. |
+| `GET` | `/corpus/packs` | API Key* | List all uploaded document packs with chunk counts. |
+| `DELETE` | `/corpus/packs/{filename}` | API Key* | Remove a document pack from the vector store. |
+| `GET` | `/system/stats` | API Key* | CPU, RAM, GPU utilization metrics. |
+| `GET` | `/health` | — | Liveness probe: status and UTC timestamp. Minimal response — no internal state exposed. |
 
 *\* API Key required only if `FIREWALL_API_KEY` environment variable is set.*
 
@@ -466,21 +499,64 @@ All endpoints are served at `http://localhost:8000`.
 
 ## Security
 
-This system implements multiple defense layers:
+Security hardening measures applied to the application infrastructure:
 
-1. **Semantic Firewall** — Three-stage vector validation pipeline with short-circuit evaluation.
-2. **Anti-Piggybacking** — Language-agnostic clause segmentation prevents malicious prompt injection via appended instructions.
-3. **Strict RAG Confinement** — LLM system prompt constrains responses exclusively to corpus context.
-4. **CORS Hardening** — Explicit origin allowlist, no wildcard credentials.
-5. **API Key Authentication** — Opt-in header-based auth for mutation endpoints.
-6. **Input Sanitization** — 4000-character prompt limit enforced at schema level before vectorization.
-7. **Atomic Configuration** — Frozen Pydantic models + async lock prevent race conditions on concurrent config updates.
-8. **Pipeline Order Validation** — Duplicate filter priorities are rejected at the schema level.
-9. **PDF Upload Hardening** — 50 MB size limit, PDF magic-byte validation, filename sanitization against path traversal.
-10. **SQL Injection Prevention** — Filename whitelist regex + quote escaping on all storage layer queries.
-11. **Structured Logging** — All modules use Python `logging` with severity levels. Client-facing error messages are generic (no stack traces leaked).
-12. **Fail-Fast Configuration** — `pydantic-settings` validates all env vars at boot. Invalid types or out-of-range values crash the app immediately instead of producing silent failures. `FIREWALL_API_KEY` uses `SecretStr` to prevent accidental exposure in logs or tracebacks.
-13. **Repository Hygiene** — `.env` is excluded via root `.gitignore` to prevent accidental secret commits.
+1. **CORS Hardening** — Explicit origin allowlist, no wildcard credentials. Credentials are auto-disabled when `*` is configured.
+2. **API Key Authentication** — Opt-in header-based auth. When enabled, protects all endpoints except `/health`. Comparison uses `hmac.compare_digest` (constant-time, timing-attack safe).
+3. **Input Sanitization** — 4000-character prompt limit enforced at schema level before vectorization.
+4. **Atomic Configuration** — Frozen Pydantic models + async lock prevent race conditions on concurrent config updates.
+5. **Pipeline Order Validation** — Duplicate filter priorities are rejected at the schema level.
+6. **PDF Upload Hardening** — Configurable size limit (default 50 MB), streamed read with early rejection (never loads full payload into RAM), PDF magic-byte validation, filename sanitization against path traversal.
+7. **SQL Injection Prevention** — Filename whitelist regex + quote escaping on all storage layer queries.
+8. **Structured Logging** — All modules use Python `logging` with severity levels. Client-facing error messages are generic (no stack traces or internal URLs leaked).
+9. **Fail-Fast Configuration** — `pydantic-settings` validates all env vars at boot. Invalid types or out-of-range values crash the app immediately. `FIREWALL_API_KEY` uses `SecretStr` to prevent accidental exposure in logs. Startup warning logged when API key is not configured.
+10. **Repository Hygiene** — `.env` is excluded via root `.gitignore` to prevent accidental secret commits.
+11. **Security Headers** — All responses include `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'`, `Referrer-Policy`, `Permissions-Policy`, and `Strict-Transport-Security` (HSTS, 2-year max-age).
+12. **DoS Mitigation** — Concurrent PDF ingestion capped at 3 threads via semaphore. Ollama streaming has a 300-second read timeout. Upload size enforced during chunked read (before full allocation).
+13. **Data Integrity** — Storage ID generation is serialized via `threading.Lock` to prevent duplicate IDs from concurrent uploads.
+14. **Protocol Safety** — Frontend API URL fallback inherits the page's protocol (`https://` in production) instead of hardcoding `http://`.
+15. **Rate Limiting** — Per-IP rate limits via `slowapi`: `/chat` and `/audit` at 30/min, `/corpus/upload-pdf` at 10/min, all other endpoints at 60/min. Configurable via `.env`. Returns HTTP 429 when exceeded.
+16. **LLM Response Validation** — Ollama streaming validates HTTP status code and JSON format on every line before forwarding to the client. Malformed lines are dropped and logged.
+17. **Conditional Swagger Docs** — `/docs` and `/redoc` are automatically disabled when `FIREWALL_API_KEY` is set, preventing schema enumeration in production.
+18. **Minimal Health Endpoint** — `/health` returns only `status` and `timestamp`. No internal state (embedder status, corpus size) is exposed to unauthenticated callers.
+
+### API Key Authentication
+
+The `FIREWALL_API_KEY` variable is an **opt-in** authentication layer for the backend's sensitive endpoints.
+
+**Disabled (default — local development):** When the variable is not set, all endpoints are open. Any process that can reach port 8000 can send queries, change firewall configuration, and upload PDFs. This is the expected behavior for local development.
+
+**Enabled (production):** Add the variable to the root `.env`:
+
+```env
+FIREWALL_API_KEY=your-secret-key-here
+```
+
+Once set, **all endpoints except `/health`** require every request to include the header:
+
+```
+X-API-Key: your-secret-key-here
+```
+
+Requests without the header, or with an incorrect key, receive a **403 Forbidden** response. Only `/health` remains open (for load balancer probes).
+
+**Protected endpoints:**
+
+| Endpoint | Requires API Key |
+|----------|:---:|
+| `POST /chat` | Yes |
+| `POST /audit` | Yes |
+| `POST /galaxy/config` | Yes |
+| `POST /corpus/upload-pdf` | Yes |
+| `GET /corpus/packs` | Yes |
+| `DELETE /corpus/packs/{filename}` | Yes |
+| `GET /corpus/task-status/{id}` | Yes |
+| `GET /system/stats` | Yes |
+| `GET /health` | No |
+
+The key comparison uses `hmac.compare_digest` (constant-time) to prevent timing side-channel attacks. The key is stored internally as a Pydantic `SecretStr` — if the settings object is accidentally logged or printed, the value appears as `**********` instead of the real key.
+
+To disable the key, comment out or remove the line from `.env` and restart the backend.
 
 ---
 

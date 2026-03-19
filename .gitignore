@@ -1,13 +1,16 @@
 # Environment files (may contain secrets)
 .env
-backend/.env
 
 # Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+sg_env/
 *.egg
+
+# Node
+node_modules/
 
 # Vector database (local data, not code)
 lancedb_data/

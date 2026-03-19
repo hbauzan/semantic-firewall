@@ -10,6 +10,7 @@ httpx==0.28.1
 pydantic==2.12.5
 pydantic-settings==2.13.1
 python-multipart==0.0.22
+slowapi==0.1.9
 
 # --- Dev / test dependencies ---
 pytest==9.0.2

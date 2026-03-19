@@ -16,6 +16,9 @@ export const AuditPanel: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query: auditQuery })
             });
+            if (!res.ok) {
+                throw new Error(`Server error ${res.status}`);
+            }
             const data = await res.json();
             setAuditResult(data);
         } catch (err) {

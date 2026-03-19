@@ -15,9 +15,9 @@ class Settings(BaseSettings):
     """Single source of truth for all backend configuration."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file="../.env",           # single root-level .env for the whole project
         env_file_encoding="utf-8",
-        extra="ignore",  # ignore unknown vars in .env without crashing
+        extra="ignore",  # ignore unknown VITE_* etc. without crashing
     )
 
     # --- CORS ---
@@ -49,14 +49,37 @@ class Settings(BaseSettings):
     )
 
     # --- PDF Ingestion ---
+    max_upload_mb: int = Field(
+        default=50, ge=1, le=500,
+        description="Maximum PDF upload size in megabytes.",
+    )
     chunk_size: int = Field(default=2048, ge=100, le=10000)
     chunk_overlap: int = Field(default=200, ge=0, le=2000)
     embedding_batch_size: int = Field(default=10, ge=1, le=100)
 
+    @property
+    def max_upload_bytes(self) -> int:
+        """Convert MB setting to bytes for upload validation."""
+        return self.max_upload_mb * 1024 * 1024
+
+    # --- Rate Limiting ---
+    rate_limit_chat: str = Field(
+        default="30/minute",
+        description="Rate limit for /chat endpoint per client IP.",
+    )
+    rate_limit_default: str = Field(
+        default="60/minute",
+        description="Rate limit for all other endpoints per client IP.",
+    )
+    rate_limit_upload: str = Field(
+        default="10/minute",
+        description="Rate limit for /corpus/upload-pdf per client IP.",
+    )
+
     # --- Server ---
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000, ge=1, le=65535)
-    reload: bool = Field(default=True)
+    reload: bool = Field(default=False)
 
     # --- Derived helpers (not env vars) ---
 

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import { API_BASE_URL } from '../config';
 
@@ -56,17 +56,21 @@ export const ControlPanel: React.FC = () => {
   const [packs, setPacks] = useState<{ filename: string, chunks: number }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchPacks = async () => {
+  const fetchPacks = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/corpus/packs`);
+      if (!res.ok) {
+        console.warn(`fetchPacks: server returned ${res.status}`);
+        return;
+      }
       const data = await res.json();
       setPacks(data.packs || []);
     } catch (err) {
       console.error("Failed to fetch packs:", err);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchPacks(); }, []);
+  useEffect(() => { fetchPacks(); }, [fetchPacks]);
 
   // Debounce API calls for config
   useEffect(() => {
@@ -87,6 +91,8 @@ export const ControlPanel: React.FC = () => {
           cosine_enabled: cosineEnabled,
           excitation_enabled: excitationEnabled
         })
+      }).then(res => {
+        if (!res.ok) console.warn(`Config sync failed: ${res.status}`);
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
@@ -99,6 +105,10 @@ export const ControlPanel: React.FC = () => {
       interval = setInterval(async () => {
         try {
           const res = await fetch(`${API_BASE_URL}/corpus/task-status/${ingestionStatus.taskId}`);
+          if (!res.ok) {
+            console.warn(`Task status poll: ${res.status}`);
+            return;
+          }
           const data = await res.json();
           setIngestionStatus({
             status: data.status,
@@ -116,7 +126,7 @@ export const ControlPanel: React.FC = () => {
       }, 1000);
     }
     return () => { if (interval) clearInterval(interval); }
-  }, [ingestionStatus.taskId, ingestionStatus.status, setIngestionStatus, fetchPacks]);
+  }, [ingestionStatus.taskId, ingestionStatus.status, setIngestionStatus, setSystemAction, fetchPacks]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -129,18 +139,24 @@ export const ControlPanel: React.FC = () => {
         method: 'POST',
         body: formData
       });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Upload failed (${res.status}): ${errText}`);
+      }
       const data = await res.json();
       setIngestionStatus({ taskId: data.task_id, status: 'pending', progress: 0, message: 'Upload started...' });
     } catch (err) {
       console.error("Upload failed", err);
-      setSystemAction("SYSTEM IDLE");
+      setSystemAction("UPLOAD_FAILED");
+      setTimeout(() => setSystemAction("SYSTEM IDLE"), 3000);
     }
   };
 
   const handleDeletePack = async (filename: string) => {
     setSystemAction("DELETING_PACK...");
     try {
-      await fetch(`${API_BASE_URL}/corpus/packs/${filename}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE_URL}/corpus/packs/${filename}`, { method: 'DELETE' });
+      if (!res.ok) console.warn(`Delete pack failed: ${res.status}`);
       fetchPacks();
     } catch (err) {
       console.error("Failed to delete pack", err);

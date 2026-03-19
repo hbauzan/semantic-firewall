@@ -6,7 +6,7 @@ Portable across CLI tools, test harnesses, or alternative API wrappers.
 """
 import logging
 import re
-from typing import Any
+from typing import Any, Callable
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ class SemanticFirewall:
     # --- Pipeline Engine ---
 
     @staticmethod
-    def build_pipeline(cfg: ConfigState) -> list[tuple[int, str, callable]]:
+    def build_pipeline(cfg: ConfigState) -> list[tuple[int, str, "Callable"]]:
         """Build ordered list of (priority, name, function) sorted by config order.
         Disabled filters are excluded from the pipeline."""
         stages = []

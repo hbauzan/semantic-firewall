@@ -80,6 +80,7 @@ export const TelemetryHUD: React.FC = () => {
     const fetchStats = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/system/stats`);
+        if (!res.ok) return;
         const data = await res.json();
         setTelemetry(data);
       } catch (err) {

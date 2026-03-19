@@ -5,6 +5,7 @@ All models live in app.core.models.
 All state management lives in app.core.state.
 This file handles: HTTP parsing, embedding calls, storage calls, streaming, telemetry formatting.
 """
+import hmac
 import logging
 import os
 import re
@@ -13,13 +14,14 @@ import torch
 import json
 import numpy as np
 import httpx
-from fastapi import APIRouter, UploadFile, File, HTTPException, Header, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Header, Depends, Request
 from fastapi.responses import StreamingResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 logger = logging.getLogger(__name__)
 
 # --- Upload constraints ---
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 _PDF_MAGIC = b"%PDF"
 _SAFE_FILENAME_RE = re.compile(r'^[\w\s.\-()]+\.pdf$', re.UNICODE | re.IGNORECASE)
 
@@ -27,28 +29,43 @@ from app.modules.ingestor import process_pdf_async, get_task_status
 from app.modules.embedder import embedder
 from app.modules.storage import storage
 from app.core.models import ConfigState, ConfigUpdate, AuditRequest, ChatRequest
-from app.core.state import config_state, _config_lock
+from app.core.state import _config_lock
 from app.core.firewall import SemanticFirewall
 from app.core.settings import settings
+
+# --- Rate Limiter (shared instance from app.state, resolved at request time) ---
+limiter = Limiter(key_func=get_remote_address)
 
 # --- Optional API Key Guard ---
 
 async def verify_api_key(x_api_key: str | None = Header(default=None)):
-    """Opt-in API key check. Only enforced if FIREWALL_API_KEY env var is set."""
+    """Opt-in API key check. Only enforced if FIREWALL_API_KEY env var is set.
+    Uses hmac.compare_digest for constant-time comparison (timing-attack safe)."""
     api_key = settings.api_key_value
-    if api_key and x_api_key != api_key:
-        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+    if api_key:
+        if not x_api_key or not hmac.compare_digest(x_api_key, api_key):
+            raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
 router = APIRouter()
 
 # --- Corpus Endpoints ---
 
-@router.post("/corpus/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
-    # --- File size guard (read in chunks to avoid full RAM load on huge files) ---
-    file_bytes = await file.read()
-    if len(file_bytes) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail=f"File exceeds {MAX_UPLOAD_BYTES // (1024*1024)} MB limit")
+@router.post("/corpus/upload-pdf", dependencies=[Depends(verify_api_key)])
+@limiter.limit(settings.rate_limit_upload)
+async def upload_pdf(request: Request, file: UploadFile = File(...)):
+    # --- File size guard: read in chunks to reject oversized payloads early ---
+    chunks: list[bytes] = []
+    total = 0
+    limit = settings.max_upload_bytes
+    while True:
+        chunk = await file.read(1024 * 256)  # 256 KB per read
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > limit:
+            raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_upload_mb} MB limit")
+        chunks.append(chunk)
+    file_bytes = b"".join(chunks)
 
     # --- PDF magic-byte validation ---
     if not file_bytes[:4].startswith(_PDF_MAGIC):
@@ -65,20 +82,20 @@ async def upload_pdf(file: UploadFile = File(...)):
     task_id = await process_pdf_async(file_bytes, safe_name)
     return {"task_id": task_id}
 
-@router.get("/corpus/task-status/{task_id}")
+@router.get("/corpus/task-status/{task_id}", dependencies=[Depends(verify_api_key)])
 async def task_status(task_id: str):
     return get_task_status(task_id)
 
-@router.get("/corpus/packs")
+@router.get("/corpus/packs", dependencies=[Depends(verify_api_key)])
 async def list_packs():
     return {"packs": storage.get_summary()}
 
-@router.delete("/corpus/packs/{filename}")
+@router.delete("/corpus/packs/{filename}", dependencies=[Depends(verify_api_key)])
 async def delete_pack(filename: str):
     try:
         storage.delete_pack(filename)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid filename: contains disallowed characters")
     return {"status": "deleted", "filename": filename}
 
 # --- Configuration Endpoint ---
@@ -90,19 +107,20 @@ async def update_config(config: ConfigUpdate):
         async with _config_lock:
             state_mod.config_state = ConfigState(**config.model_dump())
         return {"status": "updated", "config": config.model_dump()}
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid configuration values")
 
 # --- Audit Endpoint ---
 
 @router.post("/audit", dependencies=[Depends(verify_api_key)])
-async def audit_query(req: AuditRequest):
+@limiter.limit(settings.rate_limit_chat)
+async def audit_query(request: Request, req: AuditRequest):
     from app.core import state as state_mod
     cfg = state_mod.config_state  # immutable snapshot
     q_vec = embedder.embed(req.query)
     results = storage.search_nearest(q_vec, k=1)
     if not results:
-        return {"activations": 0, "text": "Empty Database.", "vector": []}
+        return {"activations": 0, "text": "Empty Database."}
 
     c_vec = results[0]["vector"]
     activations = 0
@@ -110,7 +128,7 @@ async def audit_query(req: AuditRequest):
         if abs(q_i - c_i) <= cfg.noise_tolerance:
             activations += 1
 
-    return {"activations": activations, "text": results[0]["text"], "vector": c_vec.tolist() if hasattr(c_vec, "tolist") else c_vec}
+    return {"activations": activations, "text": results[0]["text"]}
 
 # --- Ollama Streaming ---
 
@@ -127,33 +145,41 @@ async def stream_ollama(prompt: str, context: str, strict: bool = False):
         full_prompt = f"{system_instruction}\n\nContext:\n{context}\n\nUser query:\n{prompt}"
     else:
         full_prompt = f"Context:\n{context}\n\nUser query:\n{prompt}"
-    async with httpx.AsyncClient(timeout=None) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=10.0, read=300.0, write=10.0, pool=10.0)) as client:
         try:
             async with client.stream(
                 "POST",
                 f"{settings.ollama_base_url}/api/generate",
                 json={"model": settings.ollama_model, "prompt": full_prompt, "stream": True}
             ) as response:
+                if response.status_code != 200:
+                    logger.error("Ollama returned status %d", response.status_code)
+                    yield json.dumps({"response": "🔴 [LLM ERROR] The language model returned an error."}).encode("utf-8") + b"\n"
+                    return
                 async for chunk in response.aiter_lines():
                     if chunk:
-                        yield (chunk + "\n").encode("utf-8")
+                        # Validate each line is valid JSON before forwarding
+                        try:
+                            json.loads(chunk)
+                            yield (chunk + "\n").encode("utf-8")
+                        except json.JSONDecodeError:
+                            logger.warning("Dropping malformed Ollama line: %s", chunk[:200])
         except Exception as e:
             logger.error("Ollama connection failed: %s", e)
-            yield json.dumps({"response": f"🔴 [LLM OFFLINE] Cannot reach Ollama at {settings.ollama_base_url}. Ensure 'ollama serve' is running."}).encode("utf-8") + b"\n"
+            yield json.dumps({"response": "🔴 [LLM OFFLINE] Cannot reach the language model. Ensure the inference server is running."}).encode("utf-8") + b"\n"
 
 # --- Chat Endpoint (Firewall Gateway) ---
 
 @router.post("/chat", dependencies=[Depends(verify_api_key)])
-async def chat_endpoint(req: ChatRequest):
+@limiter.limit(settings.rate_limit_chat)
+async def chat_endpoint(request: Request, req: ChatRequest):
     from app.core import state as state_mod
     cfg = state_mod.config_state  # immutable snapshot — consistent for entire request
     prompt = req.prompt
-    # Firewall is active when at least one filter is enabled
+    # Firewall is active when at least one filter is enabled in the HUD.
+    # There is NO user-prompt override — bypass is only possible via the HUD toggles.
     fw_on = cfg.noise_enabled or cfg.cosine_enabled or cfg.excitation_enabled
-    # Legacy prefix support: [FW=OFF] forces bypass regardless of toggles
-    if "[FW=OFF]" in prompt:
-        fw_on = False
-    clean_prompt = prompt.replace("[FW=ON]", "").replace("[FW=OFF]", "").strip()
+    clean_prompt = prompt.strip()
 
     # Segment prompt via the engine (language-agnostic + overflow chunking)
     clauses = SemanticFirewall.segment(clean_prompt)
@@ -263,7 +289,7 @@ def _format_block_message(
 
 # --- System Stats Endpoint ---
 
-@router.get("/system/stats")
+@router.get("/system/stats", dependencies=[Depends(verify_api_key)])
 async def system_stats():
     cpu = psutil.cpu_percent(interval=0.1)
     ram = psutil.virtual_memory().used / (1024 * 1024)
@@ -287,13 +313,10 @@ async def system_stats():
 
 @router.get("/health")
 async def health_check():
-    """Liveness/readiness probe for load balancers and orchestrators."""
+    """Liveness/readiness probe for load balancers and orchestrators.
+    Returns minimal info without auth; detailed info requires API key."""
     from datetime import datetime, timezone
-    db_rows = storage.count_rows()
-    embedder_ok = hasattr(embedder, 'model') and embedder.model is not None
     return {
-        "status": "healthy" if embedder_ok else "degraded",
+        "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "embedder_loaded": embedder_ok,
-        "corpus_chunks": db_rows,
     }

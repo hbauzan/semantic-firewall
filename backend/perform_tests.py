@@ -53,16 +53,22 @@ async def test_firewall_interceptor_blocking():
 
 @pytest.mark.asyncio
 async def test_rag_context_injection():
-    # With FW=OFF it should bypass the block and try to reach Ollama
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
-        async with ac.stream("POST", "/chat", json={"prompt": "[FW=OFF] Safe query"}) as response:
-            assert response.status_code == 200
-            content = ""
-            async for chunk in response.aiter_text():
-                content += chunk
-            # Depending on if ollama is running or not, we might get an error or a stream, 
-            # but we definitely shouldn't get a SECURITY BREACH block from the interceptor.
-            assert "[FW] Segment violation" not in content and "FIREWALL BLOCKED" not in content
+    # With ALL filters disabled via config, the firewall should be bypassed and try to reach Ollama.
+    # Note: [FW=OFF] prompt prefix was removed (OWASP A01 — no user-controlled bypass).
+    from app.core.state import set_config_sync
+    set_config_sync(noise_enabled=False, cosine_enabled=False, excitation_enabled=False)
+    try:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+            async with ac.stream("POST", "/chat", json={"prompt": "Safe query"}) as response:
+                assert response.status_code == 200
+                content = ""
+                async for chunk in response.aiter_text():
+                    content += chunk
+                # With all filters off, we should NOT get a firewall block.
+                assert "[FW] Segment violation" not in content and "FIREWALL BLOCKED" not in content
+    finally:
+        # Restore defaults
+        set_config_sync(noise_enabled=True, cosine_enabled=True, excitation_enabled=True)
 
 def test_system_stats_gpu_telemetry():
     response = client.get("/system/stats")
@@ -299,11 +305,12 @@ def test_config_sync_with_enabled_flags():
     assert cfg.excitation_enabled is False
 
 def test_health_endpoint():
-    """Health check must return status, timestamp, embedder_loaded, and corpus_chunks."""
+    """Health check returns minimal info (status + timestamp) — no internal details (OWASP)."""
     res = client.get("/health")
     assert res.status_code == 200
     data = res.json()
-    assert data["status"] in ("healthy", "degraded")
+    assert data["status"] == "healthy"
     assert "timestamp" in data
-    assert isinstance(data["embedder_loaded"], bool)
-    assert isinstance(data["corpus_chunks"], int)
+    # OWASP API Security: /health must NOT expose internal state
+    assert "embedder_loaded" not in data
+    assert "corpus_chunks" not in data

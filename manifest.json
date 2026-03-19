@@ -1,6 +1,6 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.12.0",
+    "version": "v2.14.0",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -44,7 +44,19 @@
         "env_driven_server_config": true,
         "async_load_test_suite": true,
         "db_bulk_saturation_test": true,
-        "pydantic_settings_12factor": true
+        "pydantic_settings_12factor": true,
+        "owasp_2025_hardening": true,
+        "security_headers_middleware": true,
+        "timing_safe_api_key": true,
+        "chunked_upload_read": true,
+        "ingestion_semaphore": true,
+        "storage_id_lock": true,
+        "rate_limiting_slowapi": true,
+        "hsts_header": true,
+        "ollama_response_validation": true,
+        "conditional_docs_disabled": true,
+        "minimal_health_endpoint": true,
+        "owasp_api_security_2023": true
     },
     "state_schema": {
         "excitation_threshold": {"type": "int", "default": 150, "range": [0, 1024]},

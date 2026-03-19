@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 import time
 import fitz  # PyMuPDF
 import uuid
@@ -11,6 +12,10 @@ from app.core.settings import settings
 logger = logging.getLogger(__name__)
 
 TASK_TTL_SECONDS = 3600  # Completed/failed tasks are pruned after 1 hour
+MAX_CONCURRENT_INGESTIONS = 3  # Limit concurrent PDF processing threads
+
+_ingestion_semaphore = asyncio.Semaphore(MAX_CONCURRENT_INGESTIONS)
+_storage_lock = threading.Lock()  # Serialize get_max_id + add_nodes to prevent ID collisions
 
 
 class TaskStatus(BaseModel):
@@ -80,7 +85,6 @@ def _process_pdf_sync(file_bytes: bytes, filename: str, task_id: str):
         text_chunks = chunk_text(full_text)
         total_chunks = len(text_chunks)
 
-        start_id = storage.get_max_id() + 1
         nodes = []
         batch_size = settings.embedding_batch_size
         for i in range(0, total_chunks, batch_size):
@@ -88,17 +92,20 @@ def _process_pdf_sync(file_bytes: bytes, filename: str, task_id: str):
             embeddings = embedder.embed_batch(batch_chunks)
             for j, emb in enumerate(embeddings):
                 nodes.append({
-                    "id": start_id,
                     "vector": emb,
                     "text": batch_chunks[j],
                     "metadata": json.dumps({"filename": filename, "chunk_index": i+j})
                 })
-                start_id += 1
             progress = 30.0 + (70.0 * min(i + batch_size, total_chunks) / total_chunks)
             tasks.put(task_id, TaskStatus(task_id=task_id, status="processing", progress=progress, message="Embedding chunks"))
 
         if nodes:
-            storage.add_nodes(nodes)
+            # Lock ensures get_max_id + add_nodes is atomic across concurrent threads
+            with _storage_lock:
+                start_id = storage.get_max_id() + 1
+                for idx, node in enumerate(nodes):
+                    node["id"] = start_id + idx
+                storage.add_nodes(nodes)
 
         tasks.put(task_id, TaskStatus(task_id=task_id, status="completed", progress=100.0, message="Ingestion complete"))
         logger.info("Ingestion complete: %s (%d chunks)", filename, len(nodes))
@@ -117,7 +124,12 @@ async def process_pdf_async(file_bytes: bytes, filename: str) -> str:
     task_id = str(uuid.uuid4())
     tasks.put(task_id, TaskStatus(task_id=task_id, status="pending", progress=0.0, message="Task queued"))
     tasks.prune()  # Clean up old tasks on each new upload
-    asyncio.create_task(asyncio.to_thread(_process_pdf_sync, file_bytes, filename, task_id))
+
+    async def _guarded_ingestion():
+        async with _ingestion_semaphore:
+            await asyncio.to_thread(_process_pdf_sync, file_bytes, filename, task_id)
+
+    asyncio.create_task(_guarded_ingestion())
     return task_id
 
 
