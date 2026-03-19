@@ -23,7 +23,9 @@ class Storage:
         self.table_name = "knowledge"
         
         # Initialize table if not exists
-        if self.table_name not in self.db.table_names():
+        existing = self.db.list_tables()
+        table_list = existing.tables if hasattr(existing, 'tables') else list(existing)
+        if self.table_name not in table_list:
             self.table = self.db.create_table(self.table_name, schema=KnowledgeNode)
         else:
             self.table = self.db.open_table(self.table_name)

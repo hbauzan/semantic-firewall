@@ -1,0 +1,8 @@
+[tool.pytest.ini_options]
+filterwarnings = [
+    # LanceDB / Apache Arrow SWIG internals — out of our control
+    "ignore:builtin type Swig.*:DeprecationWarning",
+    "ignore:builtin type swigvarlink:DeprecationWarning",
+    # slowapi uses deprecated asyncio.iscoroutinefunction — fixed upstream, waiting for release
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning",
+]
