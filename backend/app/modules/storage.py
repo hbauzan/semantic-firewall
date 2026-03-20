@@ -41,17 +41,8 @@ class Storage:
     def get_max_id(self) -> int:
         if self.table.count_rows() == 0:
             return 0
-        
-        # We can just fetch all ids and max, or keep track.
-        # Since LanceDB doesn't have a direct max, we'll order by id desc
-        res = self.table.search().limit(1).select(["id"]).to_list()
-        # Note: search without vector does a vector-less scan but LanceDB doesn't sort by non-vector fields easily in search
-        # Instead, we can read the lance dataset.
-        ds = self.table.to_lance()
-        if ds.count_rows() == 0:
-            return 0
-        import pyarrow.compute as pc
-        return pc.max(ds.to_table()["id"]).as_py()
+        rows = self.table.search().select(["id"]).to_list()
+        return max(row["id"] for row in rows)
         
     def search_nearest(self, query_vector: list[float], k: int = 1):
         if self.table.count_rows() == 0:
@@ -68,8 +59,8 @@ class Storage:
             return []
 
         import json
-        # Use LanceDB native to_list() — no extra dependencies required.
-        rows = self.table.to_list()
+        # Use LanceDB query builder — no extra dependencies required.
+        rows = self.table.search().select(["metadata"]).to_list()
 
         packs = {}
         for row in rows:
