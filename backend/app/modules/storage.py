@@ -66,25 +66,20 @@ class Storage:
     def get_summary(self) -> list[dict]:
         if self.table.count_rows() == 0:
             return []
-        
-        # LanceDB doesn't natively group_by text extracted from metadata.
-        # We will load the dataset and aggregate manually for the HUD.
-        ds = self.table.to_lance()
-        if ds.count_rows() == 0:
-            return []
-            
+
         import json
-        metadata_col = ds.to_table()["metadata"].to_pylist()
-        
+        # Use LanceDB native to_list() — no extra dependencies required.
+        rows = self.table.to_list()
+
         packs = {}
-        for m_str in metadata_col:
+        for row in rows:
             try:
-                m = json.loads(m_str)
+                m = json.loads(row.get("metadata", "{}"))
                 fname = m.get("filename", "unknown")
                 packs[fname] = packs.get(fname, 0) + 1
             except (ValueError, json.JSONDecodeError) as e:
                 logger.warning("Malformed metadata entry: %s", e)
-                
+
         return [{"filename": k, "chunks": v} for k, v in packs.items()]
 
     def delete_pack(self, filename: str):
