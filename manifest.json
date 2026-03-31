@@ -1,6 +1,6 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.14.0",
+    "version": "v2.15.0",
     "active_features": {
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
@@ -56,7 +56,8 @@
         "ollama_response_validation": true,
         "conditional_docs_disabled": true,
         "minimal_health_endpoint": true,
-        "owasp_api_security_2023": true
+        "owasp_api_security_2023": true,
+        "configurable_rag_top_k": true
     },
     "state_schema": {
         "excitation_threshold": {"type": "int", "default": 150, "range": [0, 1024]},
@@ -69,7 +70,8 @@
         "adaptive_factor": {"type": "float", "default": 0.85, "range": [0.01, 1.00]},
         "noise_enabled": {"type": "bool", "default": true},
         "cosine_enabled": {"type": "bool", "default": true},
-        "excitation_enabled": {"type": "bool", "default": true}
+        "excitation_enabled": {"type": "bool", "default": true},
+        "rag_top_k": {"type": "int", "default": 3, "range": [1, 10]}
     },
     "constraints": {
         "vector_dim": 1024

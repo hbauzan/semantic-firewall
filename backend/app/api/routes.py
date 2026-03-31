@@ -118,7 +118,7 @@ async def audit_query(request: Request, req: AuditRequest):
     from app.core import state as state_mod
     cfg = state_mod.config_state  # immutable snapshot
     q_vec = embedder.embed(req.query)
-    results = storage.search_nearest(q_vec, k=1)
+    results = storage.search_nearest(q_vec, k=cfg.rag_top_k)
     if not results:
         return {"activations": 0, "text": "Empty Database."}
 
@@ -195,7 +195,7 @@ async def chat_endpoint(request: Request, req: ChatRequest):
 
     for clause in clauses:
         cl_vec = embedder.embed(clause)
-        results = storage.search_nearest(cl_vec, k=1)
+        results = storage.search_nearest(cl_vec, k=cfg.rag_top_k)
         if not results:
             failed_clause = clause
             block_reason = "no_context"
@@ -205,7 +205,8 @@ async def chat_endpoint(request: Request, req: ChatRequest):
 
         db_vec = results[0]["vector"]
         if not context:
-            context = results[0]["text"]
+            # Concatenate text from all top-K chunks for richer RAG context
+            context = "\n---\n".join(r["text"] for r in results)
         q_arr = np.array(cl_vec, dtype=np.float32)
         c_arr = np.array(db_vec, dtype=np.float32)
         word_count = len(clause.split())

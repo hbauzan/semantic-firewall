@@ -4,7 +4,7 @@ A local-first RAG security layer that validates query-to-corpus geometric alignm
 
 Built for sovereign AI deployments where data never leaves the machine.
 
-> **Version:** v2.14.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
+> **Version:** v2.15.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
 
 ---
 
@@ -144,6 +144,7 @@ cp .env.example .env
 | `CHUNK_SIZE` | `2048` | PDF chunking size in characters (100–10000). |
 | `CHUNK_OVERLAP` | `200` | Overlap between consecutive chunks (0–2000). |
 | `EMBEDDING_BATCH_SIZE` | `10` | Embeddings per batch during ingestion (1–100). |
+| `RAG_TOP_K` | `3` | Number of corpus chunks retrieved for RAG context (1–10). |
 | `RATE_LIMIT_CHAT` | `30/minute` | Rate limit for `/chat` and `/audit` endpoints per client IP. |
 | `RATE_LIMIT_DEFAULT` | `60/minute` | Rate limit for all other endpoints per client IP. |
 | `RATE_LIMIT_UPLOAD` | `10/minute` | Rate limit for `/corpus/upload-pdf` per client IP. |
@@ -256,6 +257,7 @@ All firewall parameters are adjustable in real-time via sliders with `-`/`+` ste
 | **Excitation Threshold** | 150 | 0 – 1024 | 1 | Minimum activated dimensions |
 | **Noise Tolerance** | 0.005 | 0.001 – 0.100 | 0.001 | Per-dimension activation sensitivity |
 | **Adaptive Factor** | 0.85 | 0.01 – 1.00 | 0.01 | Threshold reduction for short queries (< 6 words) |
+| **RAG Context Depth** | 3 | 1 – 10 | 1 | Number of corpus chunks sent to the LLM |
 | **Seq (×3)** | 1, 2, 3 | 1 – 3 | 1 | Pipeline execution order for each filter |
 
 The **Adaptive Factor** section shows real-time calculated thresholds:
@@ -357,7 +359,7 @@ Each option runs the corresponding script. After execution, press Enter to retur
 
 ### Unit Tests
 
-Run the full test suite (25 tests):
+Run the full test suite (28 tests):
 
 ```bash
 ./run_tests.sh
@@ -377,7 +379,7 @@ The suite validates:
 |----------|-------|
 | **Infrastructure** | PDF upload/status, system stats, config sync |
 | **Firewall Logic** | Blocking, piggybacking rejection, noise pre-filter, pipeline ordering |
-| **Configuration** | Immutability, duplicate order rejection, range validation, adaptive factor |
+| **Configuration** | Immutability, duplicate order rejection, range validation, adaptive factor, RAG top-k |
 | **Engine (unit)** | Segmentation, overflow chunking, clause evaluation pass/breach |
 | **Security** | Prompt length limits, API key enforcement |
 | **Health** | Health check endpoint response shape |

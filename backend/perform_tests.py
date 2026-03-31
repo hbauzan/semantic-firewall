@@ -314,3 +314,31 @@ def test_health_endpoint():
     # OWASP API Security: /health must NOT expose internal state
     assert "embedder_loaded" not in data
     assert "corpus_chunks" not in data
+
+# --- RAG Top-K Tests ---
+
+def test_rag_top_k_default():
+    """Default rag_top_k should be 3 on fresh ConfigState."""
+    fresh = ConfigState()
+    assert fresh.rag_top_k == 3
+
+def test_config_sync_includes_rag_top_k():
+    """POST /galaxy/config must accept and persist rag_top_k."""
+    import app.core.state as state_mod
+    res = client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.50,
+        "rag_top_k": 5
+    })
+    assert res.status_code == 200
+    cfg = state_mod.config_state
+    assert cfg.rag_top_k == 5
+
+def test_rag_top_k_validation():
+    """rag_top_k must reject values outside 1–10."""
+    with pytest.raises(Exception):
+        ConfigState(rag_top_k=0)
+    with pytest.raises(Exception):
+        ConfigState(rag_top_k=11)
+

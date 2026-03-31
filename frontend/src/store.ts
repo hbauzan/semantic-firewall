@@ -21,6 +21,7 @@ interface StoreState {
   excitationOrder: number;
   noiseOrder: number;
   adaptiveFactor: number;
+  ragTopK: number;
   noiseEnabled: boolean;
   cosineEnabled: boolean;
   excitationEnabled: boolean;
@@ -32,6 +33,7 @@ interface StoreState {
   setExcitationOrder: (val: number) => void;
   setNoiseOrder: (val: number) => void;
   setAdaptiveFactor: (val: number) => void;
+  setRagTopK: (val: number) => void;
   setNoiseEnabled: (val: boolean) => void;
   setCosineEnabled: (val: boolean) => void;
   setExcitationEnabled: (val: boolean) => void;
@@ -64,6 +66,7 @@ export const useStore = create<StoreState>((set) => ({
   excitationOrder: 3,
   noiseOrder: 1,
   adaptiveFactor: 0.85,
+  ragTopK: 3,
   noiseEnabled: true,
   cosineEnabled: true,
   excitationEnabled: true,
@@ -75,6 +78,7 @@ export const useStore = create<StoreState>((set) => ({
   setExcitationOrder: (val) => set({ excitationOrder: val }),
   setNoiseOrder: (val) => set({ noiseOrder: val }),
   setAdaptiveFactor: (val) => set({ adaptiveFactor: val }),
+  setRagTopK: (val) => set({ ragTopK: val }),
   setNoiseEnabled: (val) => set({ noiseEnabled: val }),
   setCosineEnabled: (val) => set({ cosineEnabled: val }),
   setExcitationEnabled: (val) => set({ excitationEnabled: val }),

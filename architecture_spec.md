@@ -85,6 +85,13 @@ If **any single clause or sub-chunk** fails any stage of the pipeline, the entir
 ### 6.2 System Prompt Hardening (Zero-Tolerance Context Confinement)
 As a secondary defense layer, `stream_ollama` injects a strict system instruction constraining the LLM to respond **exclusively** from the provided RAG context. If a query or sub-instruction cannot be answered from the context (e.g. recipes, jokes, unrelated code), the LLM is instructed to refuse that portion. This provides defense-in-depth even if the segmentation firewall is bypassed.
 
+### 6.3 Configurable RAG Context Depth (Top-K)
+The number of corpus chunks retrieved for RAG context is controlled by `rag_top_k` (default 3, range 1–10). Configurable via:
+- **Environment variable:** `RAG_TOP_K` in `.env` (boot-time default).
+- **Runtime HUD:** "RAG Context Depth" slider in the ControlPanel (synced via `POST /galaxy/config`).
+
+When `rag_top_k > 1`, the `chat_endpoint` retrieves the top-K nearest chunks from LanceDB and concatenates their text separated by `\n---\n` to form a richer context window for the LLM. The firewall evaluation still runs against the **top-1 nearest vector only** — additional chunks affect LLM quality but not security math. The `audit_query` endpoint mirrors this behavior for consistency.
+
 ## 7. API Security Hardening
 
 ### 7.1 CORS Policy

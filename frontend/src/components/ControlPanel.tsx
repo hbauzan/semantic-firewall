@@ -46,10 +46,10 @@ export const ControlPanel: React.FC = () => {
   const {
     excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit,
     cosineOrder, excitationOrder, noiseOrder, adaptiveFactor,
-    noiseEnabled, cosineEnabled, excitationEnabled,
+    noiseEnabled, cosineEnabled, excitationEnabled, ragTopK,
     setExcitationThreshold, setNoiseTolerance, setCosineThreshold, setGlobalNoiseLimit,
     setCosineOrder, setExcitationOrder, setNoiseOrder, setAdaptiveFactor,
-    setNoiseEnabled, setCosineEnabled, setExcitationEnabled,
+    setNoiseEnabled, setCosineEnabled, setExcitationEnabled, setRagTopK,
     ingestionStatus, setIngestionStatus, setSystemAction
   } = useStore();
 
@@ -89,14 +89,15 @@ export const ControlPanel: React.FC = () => {
           adaptive_factor: adaptiveFactor,
           noise_enabled: noiseEnabled,
           cosine_enabled: cosineEnabled,
-          excitation_enabled: excitationEnabled
+          excitation_enabled: excitationEnabled,
+          rag_top_k: ragTopK
         })
       }).then(res => {
         if (!res.ok) console.warn(`Config sync failed: ${res.status}`);
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
-  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled]);
+  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled, ragTopK]);
 
   // Poll for ingestion status if task is active
   useEffect(() => {
@@ -231,6 +232,16 @@ export const ControlPanel: React.FC = () => {
         <div style={{ fontSize: '0.6rem', opacity: 0.5, display: 'flex', justifyContent: 'space-between' }}>
           <span>Short: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
           <span>Full: {excitationThreshold} dims</span>
+        </div>
+      </div>
+
+      {/* --- RAG Top-K --- */}
+      <div style={{ marginBottom: '0.5rem', padding: '0.3rem 0', borderTop: '1px solid #222' }}>
+        <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>RAG Context Depth: <strong>{ragTopK}</strong> chunk{ragTopK > 1 ? 's' : ''}</div>
+        <StepSlider value={ragTopK} min={1} max={10} step={1} onChange={setRagTopK} />
+        <div style={{ fontSize: '0.6rem', opacity: 0.5, display: 'flex', justifyContent: 'space-between' }}>
+          <span>1 (fast)</span>
+          <span>10 (deep)</span>
         </div>
       </div>
 

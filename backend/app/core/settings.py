@@ -48,6 +48,12 @@ class Settings(BaseSettings):
         description="HuggingFace embedding model ID.",
     )
 
+    # --- RAG ---
+    rag_top_k: int = Field(
+        default=3, ge=1, le=10,
+        description="Number of corpus chunks retrieved for RAG context (1–10).",
+    )
+
     # --- PDF Ingestion ---
     max_upload_mb: int = Field(
         default=50, ge=1, le=500,
