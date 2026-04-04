@@ -202,3 +202,97 @@ To ensure zero-friction integration, the firewall exposes a `/v1/chat/completion
 - **Interception Logic:** The proxy extracts the *last* message from the `messages` array. This message is passed through the `SemanticFirewall` segmentation and evaluation pipeline.
 - **Error Handling:** If a `SECURITY BREACH` occurs, the proxy returns a 403 Forbidden response using the OpenAI standard error format: `{"error": {"message": "...", "type": "security_breach", "code": "403"}}`.
 - **Streaming:** Implements Server-Sent Events (SSE) via `httpx`. TTFT (Time To First Token) is optimized for Apple Silicon (MPS) by maintaining the embedding model in unified memory.
+
+## 10. Real-Time Semantic Sniffer (RTSS)
+A zero-latency observability layer for the OpenAI V1 Proxy (`/v1/chat/completions`). Captures every firewall decision and LLM response preview without introducing latency to the primary inference stream.
+
+### 10.1 Producer-Consumer Decoupling
+- **Pattern:** `asyncio.Queue(maxsize=256)` with fire-and-forget `put_nowait()`.
+- **Producer:** `emit_trace()` is called synchronously from the proxy endpoint on both BREACH and PASS paths. The proxy stream never awaits sniffer persistence.
+- **Consumer:** A background `asyncio.Task` (spawned at startup via `asyncio.create_task()` inside the FastAPI lifespan, cancelled at shutdown) reads from the queue, appends to a circular buffer (max 100 entries), and broadcasts to all SSE subscribers.
+- **Task Spawning:** `start_consumer()` uses `asyncio.create_task()` — the modern Python 3.10+ API. This avoids the `DeprecationWarning` emitted by `asyncio.get_event_loop()` when no running loop is present. It is always called from within the async lifespan context where a loop is guaranteed to exist.
+
+### 10.2 SnifferTrace Schema
+```typescript
+interface SnifferTrace {
+  id: string;               // UUID v4
+  timestamp: string;        // ISO 8601 UTC
+  request: {
+    model: string;
+    last_message: string;   // First 200 chars of the intercepted message
+  };
+  firewall: {
+    decision: "PASS" | "BREACH";
+    pipeline_trace: Array<{
+      stage: "noise" | "cosine" | "excitation";
+      passed: boolean;
+      value: number;         // Actual metric (avg_delta, cosine_sim, activations)
+      threshold: number;     // Configured threshold for this stage
+    }>;
+  };
+  response_preview: string;  // First 100 chars of LLM response
+}
+```
+
+### 10.3 SSE Transport
+- **Endpoint:** `GET /v1/sniffer/stream` (protected by API key when configured).
+- **Protocol:** Server-Sent Events — unidirectional, lighter than WebSockets, native reconnection.
+- **Subscriber pattern:** Each connected client receives its own `asyncio.Queue`. A 30-second heartbeat (`: heartbeat\n\n`) prevents proxy/browser timeouts.
+- **Module:** `app/modules/sniffer.py` — contains `SnifferTrace` model, queue, `emit_trace()`, consumer task, subscriber management, and SSE generator.
+- **Thread-Safety Contract:** `_trace_buffer` (circular buffer, max 100 entries) is accessed exclusively from the asyncio event loop. The consumer task, `update_trace()`, and `stream_sniffer_sse()` all execute in the same loop under cooperative scheduling — no lock is required. If a threaded consumer is introduced in the future, an `asyncio.Lock` must protect all buffer access.
+
+### 10.4 Frontend Integration
+- **Component:** `SnifferTab.tsx` — rendered as a new tab in `App.tsx` (Chat | Sniffer).
+- **Constraint:** Does NOT modify `ChatInterface.tsx` or `ControlPanel.tsx`.
+- **State:** Uses the Zustand store for the sniffer log buffer (max 100 entries) and filter state.
+- **Filtering:** Dropdowns for decision (ALL/PASS/BREACH) and stage (ALL/Noise/Cosine/Excitation).
+- **Display:** Color-coded log entries with pipeline stage badges, timestamps, model names, and response previews. New entries animate in with a fade-slide.
+- **Expandable Rows:** Click any trace entry to expand an inline detail panel showing the full request history (formatted JSON) and reconstructed LLM response. Status badges show `PENDING` (pulsing amber), `COMPLETED` (green), or `BREACH` (red).
+
+### 10.5 Full Payload Interception (FPI)
+Evolves the RTSS from a firewall-decision-only observer into a full I/O capture system.
+
+**Input Capture:** The proxy captures the **entire** `config.messages` array (all roles: system, user, assistant) — not just the last message. This is stored as `request_history` in the `SnifferTrace`, giving forensic visibility into multi-turn conversation context.
+
+**Output Reconstruction:** An async `stream_wrapper` generator wraps `provider.stream_chat()`. It intercepts each SSE chunk, extracts `choices[0].delta.content`, and appends it to a local buffer — all without blocking the `yield` to the client. When the stream terminates, the reconstructed response is committed to the trace via `update_trace()`.
+
+**Zero-Latency Guarantee:** The wrapper is a pure pass-through: every chunk is yielded immediately after (not before) buffering. The post-stream `update_trace()` uses fire-and-forget `put_nowait()` — the client connection is already closed by the time the update fires.
+
+### 10.6 Stage Semantics: `no_context`
+`no_context` is a valid `PipelineStageTrace.stage` value alongside `noise`, `cosine`, and `excitation`. It is emitted when the corpus returns zero results for a clause — the firewall cannot evaluate dimensional alignment because there is no reference vector to compare against.
+
+- **`value`:** `0.0` — no metric was computed (corpus miss, not a threshold failure).
+- **`threshold`:** `0.0` — no threshold applies.
+- **`passed`:** `false` — the clause is blocked; an empty corpus is treated as a security breach.
+
+Frontend consumers should render `no_context` as a **corpus miss** indicator rather than a threshold comparison bar. The stage is handled as an explicit branch in `emit_trace()` to prevent it from silently falling through to the generic default case.
+
+### 10.7 Trace Correlation
+Each PASS trace is assigned a UUID `trace_id` at emit time. This ID correlates the initial request capture (emitted before streaming begins) with the final response reconstruction (committed after the stream terminates). BREACH traces are self-contained — they receive `status="BREACH"` immediately since no streaming occurs.
+
+`update_trace()` scans the circular buffer for the matching `trace_id`, rebuilds the frozen Pydantic model with `response_content` and `status="COMPLETED"`, and pushes the updated trace through the sniffer queue so SSE subscribers receive the completed payload.
+
+### 10.8 SnifferTrace Schema v2
+```typescript
+interface SnifferTrace {
+  id: string;               // UUID v4 (trace_id for correlation)
+  timestamp: string;        // ISO 8601 UTC
+  request: {
+    model: string;
+    last_message: string;   // First 200 chars (backward compat)
+    request_history: Array<{role: string; content: string}>;  // Full messages array
+  };
+  firewall: {
+    decision: "PASS" | "BREACH";
+    pipeline_trace: Array<{
+      stage: "noise" | "cosine" | "excitation";
+      passed: boolean;
+      value: number;
+      threshold: number;
+    }>;
+  };
+  response_preview: string;  // First 100 chars of LLM response
+  response_content: string;  // Full reconstructed response (FPI)
+  status: "PENDING" | "COMPLETED" | "BREACH";
+}
+```

@@ -2,7 +2,37 @@ import os
 import sys
 
 
+# --- Files that matter for understanding the latest changes (FPI evolution) ---
+FOCUS_FILES = [
+    # Backend — RTSS/FPI core (sniffer model + update_trace)
+    "backend/app/modules/sniffer.py",
+    # Backend — Proxy route (stream_wrapper, full message capture)
+    "backend/app/api/routes.py",
+    "backend/app/main.py",
+    # Backend — Provider abstraction (stream_chat wrapped by FPI)
+    "backend/app/modules/providers/base.py",
+    "backend/app/modules/providers/ollama.py",
+    # Backend — context (firewall engine, models, state)
+    "backend/app/core/firewall.py",
+    "backend/app/core/models.py",
+    "backend/app/core/state.py",
+    "backend/app/core/settings.py",
+    # Backend — tests (includes FPI reconstruction tests)
+    "backend/perform_tests.py",
+    # Frontend — FPI expandable sniffer UI
+    "frontend/src/components/SnifferTab.tsx",
+    "frontend/src/App.tsx",
+    "frontend/src/store.ts",
+    "frontend/src/index.css",
+    "frontend/src/config.ts",
+    # Documentation
+    "architecture_spec.md",
+    "manifest.json",
+]
+
+
 def bundle():
+    all_mode = "--all" in sys.argv
     output = "context.txt"
     extensions = (".py", ".tsx", ".ts", ".json", ".md", ".sh")
     skip_dirs = {"node_modules", ".venv", ".git", "__pycache__", ".next", "Claude Exports", "Gemini Exports"}
@@ -11,17 +41,25 @@ def bundle():
     if os.path.exists(output):
         os.remove(output)
 
+    # Normalizar focus files a paths absolutos para comparación
+    focus_abs = {os.path.normpath(os.path.join(".", f)) for f in FOCUS_FILES} if not all_mode else None
+
     file_count = 0
     error_count = 0
     total_bytes = 0
     print_count = 0
 
+    mode_label = "ALL FILES" if all_mode else f"FOCUS MODE ({len(FOCUS_FILES)} files)"
+
     print("Vamo' a empaquetar todo paqueteadito carajo!!!\n")
     print(f"🔧 Semantic GuardRails Packager")
+    print(f"   Mode: {mode_label}")
     print(f"   Output: {output}")
     print(f"   Dumpeando extensiones: {', '.join(extensions)}")
     print(f"   Skipeando directorios: {', '.join(skip_dirs)}")
     print(f"   Scanning from: {os.path.abspath('.')}")
+    if not all_mode:
+        print(f"   💡 Use --all para exportar todo el codigo")
     print()
 
     with open(output, "w") as out:
@@ -32,6 +70,12 @@ def bundle():
             for file in files:
                 if file.endswith(extensions) and file != output:
                     filepath = os.path.join(root, file)
+                    norm_path = os.path.normpath(filepath)
+
+                    # En focus mode, solo incluir archivos de la lista
+                    if focus_abs is not None and norm_path not in focus_abs:
+                        continue
+
                     try:
                         with open(filepath, "r") as f:
                             content = f.read()

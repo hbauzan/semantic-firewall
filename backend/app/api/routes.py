@@ -28,6 +28,7 @@ _SAFE_FILENAME_RE = re.compile(r'^[\w\s.\-()]+\.pdf$', re.UNICODE | re.IGNORECAS
 from app.modules.ingestor import process_pdf_async, get_task_status
 from app.modules.embedder import embedder
 from app.modules.storage import storage
+from app.modules.sniffer import emit_trace, update_trace, subscribe, unsubscribe, stream_sniffer_sse
 from app.core.models import ConfigState, ConfigUpdate, AuditRequest, ChatRequest, OpenAIConfig
 from app.core.state import _config_lock
 from app.core.firewall import SemanticFirewall
@@ -334,23 +335,36 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
     """Transparent proxy: OpenAI v1/chat/completions spec with firewall interception."""
     from app.core import state as state_mod
     from fastapi.responses import Response
+    import uuid as _uuid
     cfg = state_mod.config_state
 
-    # 1. Extract last message for Firewall analysis
+    # 1. Capture full message history for FPI
+    request_history = [m.model_dump() for m in config.messages]
     last_msg = config.messages[-1].content
     clauses = SemanticFirewall.segment(last_msg)
 
     # 2. Firewall Evaluation
     fw_on = cfg.noise_enabled or cfg.cosine_enabled or cfg.excitation_enabled
+    all_traces: list[dict] = []
     if fw_on:
         for clause in clauses:
             cl_vec = embedder.embed(clause)
             results = storage.search_nearest(cl_vec, k=cfg.rag_top_k)
             if not results:
+                no_ctx_trace = [{"stage": "no_context", "passed": False, "value": 0, "threshold": 0}]
+                emit_trace(
+                    model=config.model,
+                    last_message=last_msg,
+                    decision="BREACH",
+                    pipeline_trace=no_ctx_trace,
+                    response_preview="",
+                    request_history=request_history,
+                    status="BREACH",
+                )
                 return Response(
                     content=json.dumps({
                         "error": {
-                            "message": f"🛑 [FW] Segment violation: no context match for \"{clause}\"",
+                            "message": f"\ud83d\uded1 [FW] Segment violation: no context match for \"{clause}\"",
                             "type": "security_breach",
                             "code": "403"
                         }
@@ -365,11 +379,21 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
             word_count = len(clause.split())
 
             res = SemanticFirewall.evaluate_clause(q_arr, c_arr, cfg, word_count)
+            all_traces.extend(res["trace"])
             if not res["passed"]:
+                emit_trace(
+                    model=config.model,
+                    last_message=last_msg,
+                    decision="BREACH",
+                    pipeline_trace=all_traces,
+                    response_preview="",
+                    request_history=request_history,
+                    status="BREACH",
+                )
                 return Response(
                     content=json.dumps({
                         "error": {
-                            "message": f"🛑 [FW] Segment violation: {res['breach_reason']}",
+                            "message": f"\ud83d\uded1 [FW] Segment violation: {res['breach_reason']}",
                             "type": "security_breach",
                             "code": "403"
                         }
@@ -378,8 +402,59 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
                     media_type="application/json"
                 )
 
-    # 3. Forward to Provider
+    # 3. Emit PASS trace with trace_id for stream correlation
+    trace_id = str(_uuid.uuid4())
+    if fw_on:
+        emit_trace(
+            trace_id=trace_id,
+            model=config.model,
+            last_message=last_msg,
+            decision="PASS",
+            pipeline_trace=all_traces,
+            response_preview="[streaming]",
+            request_history=request_history,
+            status="PENDING",
+        )
+
+    # 4. Async Stream Wrapper — non-blocking token buffering for FPI
+    async def stream_wrapper(gen, tid):
+        """Pass-through generator that buffers response tokens for sniffer reconstruction."""
+        full_content = []
+        async for chunk in gen:
+            # Extract content from SSE data line for buffering
+            if chunk.startswith("data: ") and chunk.strip() != "data: [DONE]":
+                try:
+                    payload = json.loads(chunk[6:])
+                    delta = payload.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                    if delta:
+                        full_content.append(delta)
+                except (json.JSONDecodeError, IndexError, KeyError):
+                    pass
+            yield chunk
+        # Post-stream: fire-and-forget trace update with reconstructed response
+        reconstructed = "".join(full_content)
+        update_trace(tid, response_content=reconstructed, status="COMPLETED")
+
+    # 5. Forward to Provider (wrapped for FPI)
     return StreamingResponse(
-        provider.stream_chat(config.model, [m.model_dump() for m in config.messages]),
+        stream_wrapper(
+            provider.stream_chat(config.model, [m.model_dump() for m in config.messages]),
+            trace_id,
+        ),
         media_type="text/event-stream"
     )
+
+
+# --- Real-Time Semantic Sniffer SSE Endpoint ---
+
+@router.get("/v1/sniffer/stream", dependencies=[Depends(verify_api_key)])
+async def sniffer_stream():
+    """SSE endpoint for real-time firewall telemetry observation."""
+    sub_q = await subscribe()
+    async def event_generator():
+        try:
+            async for event in stream_sniffer_sse(sub_q):
+                yield event
+        finally:
+            await unsubscribe(sub_q)
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
