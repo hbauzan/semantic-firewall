@@ -7,15 +7,24 @@ invalid type, the app crashes immediately with a clear Pydantic error.
 Defaults match local development — zero .env file needed to run out of the box.
 """
 
+from typing import Literal
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
+import os
+from pathlib import Path
+
+# Calculate the root path of the repository:
+# settings.py -> core -> app -> backend -> project_root
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+ENV_PATH = PROJECT_ROOT / ".env"
 
 class Settings(BaseSettings):
     """Single source of truth for all backend configuration."""
 
     model_config = SettingsConfigDict(
-        env_file="../.env",           # single root-level .env for the whole project
+        env_file=str(ENV_PATH),           # absolute path to the project root `.env`
         env_file_encoding="utf-8",
         extra="ignore",  # ignore unknown VITE_* etc. without crashing
     )
@@ -30,6 +39,22 @@ class Settings(BaseSettings):
     firewall_api_key: SecretStr | None = Field(
         default=None,
         description="If set, /chat, /audit, /galaxy/config require X-API-Key header.",
+    )
+
+    # --- Upstream Provider Selection ---
+    upstream_provider: Literal["ollama", "google"] = Field(
+        default="ollama",
+        description="Select the upstream LLM engine.",
+    )
+
+    # --- Google Gemini ---
+    google_api_key: SecretStr | None = Field(
+        default=None,
+        description="Required if upstream_provider is 'google'.",
+    )
+    gemini_model_id: str = Field(
+        default="gemini-2.5-pro",
+        description="Google Gemini model identifier.",
     )
 
     # --- Ollama ---
@@ -103,6 +128,10 @@ class Settings(BaseSettings):
     def api_key_value(self) -> str | None:
         """Unwrap SecretStr for comparison. Returns None if unset."""
         return self.firewall_api_key.get_secret_value() if self.firewall_api_key else None
+
+    @property
+    def google_key_value(self) -> str | None:
+        return self.google_api_key.get_secret_value() if self.google_api_key else None
 
 
 # --- Singleton: instantiated once at import time (fail-fast) ---

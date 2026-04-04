@@ -19,8 +19,9 @@ FOCUS_FILES = [
     "backend/app/core/settings.py",
     # Backend — tests (includes FPI reconstruction tests)
     "backend/perform_tests.py",
-    # Frontend — FPI expandable sniffer UI
+    # Frontend — FPI expandable sniffer UI + Firewall Mode Controls
     "frontend/src/components/SnifferTab.tsx",
+    "frontend/src/components/ControlPanel.tsx",
     "frontend/src/App.tsx",
     "frontend/src/store.ts",
     "frontend/src/index.css",

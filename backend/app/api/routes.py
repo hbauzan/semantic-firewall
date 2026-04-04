@@ -34,6 +34,7 @@ from app.core.state import _config_lock
 from app.core.firewall import SemanticFirewall
 from app.core.settings import settings
 from app.modules.providers.ollama import OllamaProvider
+from app.modules.providers.google import GoogleGeminiProvider
 
 # --- Rate Limiter (shared instance from app.state, resolved at request time) ---
 limiter = Limiter(key_func=get_remote_address)
@@ -51,7 +52,15 @@ async def verify_api_key(x_api_key: str | None = Header(default=None)):
 router = APIRouter()
 
 # --- Provider Abstraction ---
-provider = OllamaProvider()
+def get_provider():
+    if settings.upstream_provider == "google":
+        if not settings.google_key_value:
+            logger.critical("UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.")
+            raise RuntimeError("Missing Google API Key")
+        return GoogleGeminiProvider()
+    return OllamaProvider()
+
+provider = get_provider()
 
 # --- Corpus Endpoints ---
 

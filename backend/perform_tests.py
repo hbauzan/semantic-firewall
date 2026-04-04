@@ -621,3 +621,22 @@ def test_sniffer_update_trace_reconstruction():
 
     # Clean up buffer
     _trace_buffer[:] = [t for t in _trace_buffer if t.id != tid]
+
+@pytest.mark.asyncio
+async def test_provider_factory_logic():
+    """Verify that the factory correctly switches providers and fails fast."""
+    from app.api.routes import get_provider
+    from app.modules.providers.ollama import OllamaProvider
+    from app.modules.providers.google import GoogleGeminiProvider
+    from app.core.settings import settings
+    
+    # Test Ollama Default
+    settings.upstream_provider = "ollama"
+    assert isinstance(get_provider(), OllamaProvider)
+    
+    # Test Google Fail-Fast
+    settings.upstream_provider = "google"
+    settings.firewall_api_key = None # Ensure no key is set
+    settings.google_api_key = None # Clear Google Key
+    with pytest.raises(RuntimeError, match="Missing Google API Key"):
+        get_provider()

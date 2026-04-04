@@ -1,7 +1,12 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.16.0",
+    "version": "v2.17.0",
     "active_features": {
+        "google_gemini_provider": true,
+        "dynamic_provider_factory": true,
+        "upstream_provider_selection": true,
+        "gemini_sse_normalization": true,
+        "fail_fast_provider_validation": true,
         "dimensional_excitation_firewall": true,
         "realtime_noise_tolerance_ui": true,
         "local_rag_enabled": true,
@@ -69,7 +74,9 @@
         "asyncio_create_task_lifespan": true,
         "trace_buffer_loop_safety_contract": true,
         "no_context_explicit_stage": true,
-        "firewall_mode_positive_negative": true
+        "firewall_mode_positive_negative": true,
+        "robust_provider_error_streaming": true,
+        "gemini_version_deprecation_handling": true
     },
     "state_schema": {
         "excitation_threshold": {
@@ -159,7 +166,10 @@
         "firewall_mode": {
             "type": "str",
             "default": "positive",
-            "values": ["positive", "negative"]
+            "values": [
+                "positive",
+                "negative"
+            ]
         }
     },
     "constraints": {

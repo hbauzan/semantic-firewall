@@ -229,7 +229,17 @@ To ensure zero-friction integration, the firewall exposes a `/v1/chat/completion
 - **Provider Pattern:** Logic is abstracted into `app/modules/providers/`. The `BaseProvider` defines the interface for `stream_chat`. Initial implementation: `OllamaProvider`.
 - **Interception Logic:** The proxy extracts the *last* message from the `messages` array. This message is passed through the `SemanticFirewall` segmentation and evaluation pipeline.
 - **Error Handling:** If a `SECURITY BREACH` occurs, the proxy returns a 403 Forbidden response using the OpenAI standard error format: `{"error": {"message": "...", "type": "security_breach", "code": "403"}}`.
+- **Upstream Errors in Streams:** To prevent silent stream failures or "empty chunk" responses if an upstream provider (e.g., Google or Ollama) fails mid-process or throws an HTTP initialization error (like a 404 for deprecated models like `gemini-1.5`), the `BaseProvider` implementation catches any HTTP non-200 responses and yields a native Server-Sent Events chunk embedding the error. This error (`🔴 [LLM ERROR] ...`) cascades properly through the streaming architecture straight to the frontend sniffer or client UI without breaking the HTTP header phase.
 - **Streaming:** Implements Server-Sent Events (SSE) via `httpx`. TTFT (Time To First Token) is optimized for Apple Silicon (MPS) by maintaining the embedding model in unified memory.
+
+### 9.1 Google Gemini Provider
+Implements the BaseProvider interface for Google's Generative AI API.
+- **Endpoint:** `v1beta/models/{model}:streamGenerateContent?alt=sse`.
+- **Normalization:** Maps Gemini's `candidates[0].content.parts[0].text` structure into the OpenAI-compatible `choices[0].delta.content` SSE format.
+- **Security:** Requires `GOOGLE_API_KEY`. The system performs a fail-fast check at boot/init; if `UPSTREAM_PROVIDER` is set to `google` and the key is missing, the application terminates with a Critical log.
+
+### 9.2 Provider Factory
+The `chat_endpoint` and `openai_proxy` no longer instantiate providers directly. A factory pattern resolves the provider at runtime based on the `UPSTREAM_PROVIDER` environment variable. This ensures the Semantic Firewall remains provider-agnostic.
 
 ## 10. Real-Time Semantic Sniffer (RTSS)
 A zero-latency observability layer for the OpenAI V1 Proxy (`/v1/chat/completions`). Captures every firewall decision and LLM response preview without introducing latency to the primary inference stream.
