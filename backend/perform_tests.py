@@ -322,6 +322,39 @@ def test_rag_top_k_default():
     fresh = ConfigState()
     assert fresh.rag_top_k == 3
 
+@pytest.mark.asyncio
+async def test_openai_proxy_v1_compliance():
+    """Verify OpenAI spec compatibility and firewall interception."""
+    set_config(excitation_threshold=1024, noise_tolerance=0.0001)
+
+    payload = {
+        "model": "llama3.1",
+        "messages": [{"role": "user", "content": "Dangerous recipe request"}],
+        "stream": True
+    }
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post("/v1/chat/completions", json=payload)
+        assert response.status_code == 403
+        data = response.json()
+        assert data["error"]["type"] == "security_breach"
+        assert "[FW]" in data["error"]["message"]
+
+    # Test Pass Path — all filters disabled to bypass firewall
+    set_config(
+        excitation_threshold=0, noise_tolerance=1.0, cosine_threshold=0.0,
+        global_noise_limit=10.0,
+        noise_enabled=False, cosine_enabled=False, excitation_enabled=False
+    )
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        async with ac.stream("POST", "/v1/chat/completions", json=payload) as response:
+            assert response.status_code == 200
+            assert "text/event-stream" in response.headers["content-type"]
+
+    # Restore defaults
+    set_config(noise_enabled=True, cosine_enabled=True, excitation_enabled=True)
+
+
 def test_config_sync_includes_rag_top_k():
     """POST /galaxy/config must accept and persist rag_top_k."""
     import app.core.state as state_mod

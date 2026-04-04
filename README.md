@@ -19,6 +19,7 @@ Built for sovereign AI deployments where data never leaves the machine.
 - [Shell Scripts](#shell-scripts)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
+- [Transparent Proxy (OpenAI V1 Spec)](#transparent-proxy-openai-v1-spec)
 - [API Reference](#api-reference)
 - [Security](#security)
 - [License](#license)
@@ -51,6 +52,13 @@ User Prompt
                        ▼
 ┌─────────────────────────────────────────────────┐
 │  Ollama LLM (llama3.1) + Strict RAG Context     │
+└─────────────────────────────────────────────────┘
+
+         ── OR ──
+
+┌─────────────────────────────────────────────────┐
+│  /v1/chat/completions (OpenAI-compatible proxy)  │
+│  Same firewall pipeline → Provider abstraction   │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -359,7 +367,7 @@ Each option runs the corresponding script. After execution, press Enter to retur
 
 ### Unit Tests
 
-Run the full test suite (28 tests):
+Run the full test suite (29 tests):
 
 ```bash
 ./run_tests.sh
@@ -382,6 +390,7 @@ The suite validates:
 | **Configuration** | Immutability, duplicate order rejection, range validation, adaptive factor, RAG top-k |
 | **Engine (unit)** | Segmentation, overflow chunking, clause evaluation pass/breach |
 | **Security** | Prompt length limits, API key enforcement |
+| **Proxy** | OpenAI v1 spec compliance, firewall interception on proxy, SSE streaming |
 | **Health** | Health check endpoint response shape |
 
 ### Load Testing
@@ -445,7 +454,7 @@ semantic-firewall/
 │
 ├── backend/
 │   ├── requirements.txt          # Python dependencies (pinned)
-│   ├── perform_tests.py          # Pytest test suite (25 tests)
+│   ├── perform_tests.py          # Pytest test suite (29 tests)
 │   ├── tests/
 │   │   ├── load_test_suite.py    # Async load testing (latency, RPS, error rate)
 │   │   └── db_stress_suite.py    # DB saturation test (retrieval scaling)
@@ -461,7 +470,10 @@ semantic-firewall/
 │       └── modules/
 │           ├── embedder.py       # BGE-M3 embedding singleton
 │           ├── storage.py        # LanceDB vector store
-│           └── ingestor.py       # PDF chunking pipeline
+│           ├── ingestor.py       # PDF chunking pipeline
+│           └── providers/
+│               ├── base.py       # BaseProvider ABC (stream_chat interface)
+│               └── ollama.py     # OllamaProvider (Ollama → OpenAI SSE mapping)
 │
 └── frontend/
     ├── package.json
@@ -479,12 +491,63 @@ semantic-firewall/
 
 ---
 
+## Transparent Proxy (OpenAI V1 Spec)
+
+The firewall exposes a `POST /v1/chat/completions` endpoint that implements the OpenAI chat completions spec. Any tool, SDK, or agent framework that speaks the OpenAI protocol can drop in the firewall as its base URL — zero code changes required on the client side.
+
+### How it works
+
+1. The proxy receives a standard OpenAI `messages` array.
+2. The **last message** is extracted and passed through the full segmentation + firewall pipeline (same as `/chat`).
+3. If **any clause fails any filter**, the proxy returns a `403 Forbidden` in the OpenAI standard error format:
+   ```json
+   {
+     "error": {
+       "message": "🛑 [FW] Segment violation: cosine",
+       "type": "security_breach",
+       "code": "403"
+     }
+   }
+   ```
+4. If all clauses pass, the request is forwarded to the configured LLM provider and streamed back as **Server-Sent Events (SSE)** in the OpenAI `data: {...}\n\n` format, terminated by `data: [DONE]\n\n`.
+
+### Provider Abstraction
+
+LLM routing is abstracted behind a `BaseProvider` interface (`app/modules/providers/base.py`). The initial implementation is `OllamaProvider`, which maps the OpenAI message format to the Ollama `/api/generate` endpoint and converts the response stream back to OpenAI SSE chunks. Adding a new provider (vLLM, llama.cpp server, etc.) means implementing a single `stream_chat` async generator.
+
+### Usage example
+
+Point any OpenAI-compatible client at the firewall:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8000/v1",
+    api_key="your-firewall-api-key"   # or "not-needed" if FIREWALL_API_KEY is unset
+)
+
+response = client.chat.completions.create(
+    model="llama3.1",
+    messages=[{"role": "user", "content": "Explain the system architecture"}],
+    stream=True
+)
+
+for chunk in response:
+    print(chunk.choices[0].delta.content, end="")
+```
+
+If the prompt violates the firewall, the client receives a 403 with a structured error instead of a completion.
+
+---
+
 ## API Reference
 
 All endpoints are served at `http://localhost:8000`.
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
+| `POST` | `/v1/chat/completions` | API Key* | OpenAI-compatible proxy. Firewall intercepts the last message; streams SSE response. |
 | `POST` | `/chat` | API Key* | Send a prompt through the firewall pipeline. Streaming NDJSON response. |
 | `POST` | `/audit` | API Key* | Test a query against the corpus. Returns activation count and nearest text match. |
 | `POST` | `/galaxy/config` | API Key* | Update firewall configuration (thresholds, orders, factor). |
@@ -546,6 +609,7 @@ Requests without the header, or with an incorrect key, receive a **403 Forbidden
 
 | Endpoint | Requires API Key |
 |----------|:---:|
+| `POST /v1/chat/completions` | Yes |
 | `POST /chat` | Yes |
 | `POST /audit` | Yes |
 | `POST /galaxy/config` | Yes |

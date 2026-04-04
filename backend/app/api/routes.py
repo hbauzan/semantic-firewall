@@ -28,10 +28,11 @@ _SAFE_FILENAME_RE = re.compile(r'^[\w\s.\-()]+\.pdf$', re.UNICODE | re.IGNORECAS
 from app.modules.ingestor import process_pdf_async, get_task_status
 from app.modules.embedder import embedder
 from app.modules.storage import storage
-from app.core.models import ConfigState, ConfigUpdate, AuditRequest, ChatRequest
+from app.core.models import ConfigState, ConfigUpdate, AuditRequest, ChatRequest, OpenAIConfig
 from app.core.state import _config_lock
 from app.core.firewall import SemanticFirewall
 from app.core.settings import settings
+from app.modules.providers.ollama import OllamaProvider
 
 # --- Rate Limiter (shared instance from app.state, resolved at request time) ---
 limiter = Limiter(key_func=get_remote_address)
@@ -47,6 +48,9 @@ async def verify_api_key(x_api_key: str | None = Header(default=None)):
             raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
 router = APIRouter()
+
+# --- Provider Abstraction ---
+provider = OllamaProvider()
 
 # --- Corpus Endpoints ---
 
@@ -321,3 +325,61 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+# --- OpenAI-Compatible Transparent Proxy ---
+
+@router.post("/v1/chat/completions", dependencies=[Depends(verify_api_key)])
+@limiter.limit(settings.rate_limit_chat)
+async def openai_proxy(request: Request, config: OpenAIConfig):
+    """Transparent proxy: OpenAI v1/chat/completions spec with firewall interception."""
+    from app.core import state as state_mod
+    from fastapi.responses import Response
+    cfg = state_mod.config_state
+
+    # 1. Extract last message for Firewall analysis
+    last_msg = config.messages[-1].content
+    clauses = SemanticFirewall.segment(last_msg)
+
+    # 2. Firewall Evaluation
+    fw_on = cfg.noise_enabled or cfg.cosine_enabled or cfg.excitation_enabled
+    if fw_on:
+        for clause in clauses:
+            cl_vec = embedder.embed(clause)
+            results = storage.search_nearest(cl_vec, k=cfg.rag_top_k)
+            if not results:
+                return Response(
+                    content=json.dumps({
+                        "error": {
+                            "message": f"🛑 [FW] Segment violation: no context match for \"{clause}\"",
+                            "type": "security_breach",
+                            "code": "403"
+                        }
+                    }),
+                    status_code=403,
+                    media_type="application/json"
+                )
+
+            db_vec = results[0]["vector"]
+            q_arr = np.array(cl_vec, dtype=np.float32)
+            c_arr = np.array(db_vec, dtype=np.float32)
+            word_count = len(clause.split())
+
+            res = SemanticFirewall.evaluate_clause(q_arr, c_arr, cfg, word_count)
+            if not res["passed"]:
+                return Response(
+                    content=json.dumps({
+                        "error": {
+                            "message": f"🛑 [FW] Segment violation: {res['breach_reason']}",
+                            "type": "security_breach",
+                            "code": "403"
+                        }
+                    }),
+                    status_code=403,
+                    media_type="application/json"
+                )
+
+    # 3. Forward to Provider
+    return StreamingResponse(
+        provider.stream_chat(config.model, [m.model_dump() for m in config.messages]),
+        media_type="text/event-stream"
+    )

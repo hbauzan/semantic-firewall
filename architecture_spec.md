@@ -195,3 +195,10 @@ Measures how retrieval latency and firewall evaluation time scale as the LanceDB
 - **Injection:** Total time to fill the DB to that milestone (seconds).
 
 **Output:** Formatted console table + `tests/db_scaling_metrics.md` Markdown report with graph-ready tables (DB Size vs Avg Retrieval vs Avg Firewall vs Injection Time).
+
+## 9. Transparent Proxy Architecture (OpenAI V1 Spec)
+To ensure zero-friction integration, the firewall exposes a `/v1/chat/completions` endpoint.
+- **Provider Pattern:** Logic is abstracted into `app/modules/providers/`. The `BaseProvider` defines the interface for `stream_chat`. Initial implementation: `OllamaProvider`.
+- **Interception Logic:** The proxy extracts the *last* message from the `messages` array. This message is passed through the `SemanticFirewall` segmentation and evaluation pipeline.
+- **Error Handling:** If a `SECURITY BREACH` occurs, the proxy returns a 403 Forbidden response using the OpenAI standard error format: `{"error": {"message": "...", "type": "security_breach", "code": "403"}}`.
+- **Streaming:** Implements Server-Sent Events (SSE) via `httpx`. TTFT (Time To First Token) is optimized for Apple Silicon (MPS) by maintaining the embedding model in unified memory.

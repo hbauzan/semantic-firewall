@@ -64,3 +64,15 @@ class AuditRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     prompt: str = Field(max_length=PROMPT_MAX_LENGTH)
+
+
+class OpenAIMessage(BaseModel):
+    role: str
+    content: str
+
+
+class OpenAIConfig(BaseModel):
+    model: str
+    messages: list[OpenAIMessage]
+    stream: bool = False
+    temperature: float = 0.7

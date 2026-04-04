@@ -5,15 +5,22 @@ import sys
 def bundle():
     output = "context.txt"
     extensions = (".py", ".tsx", ".ts", ".json", ".md", ".sh")
-    skip_dirs = {"node_modules", ".venv", ".git", "__pycache__", ".next"}
+    skip_dirs = {"node_modules", ".venv", ".git", "__pycache__", ".next", "Claude Exports", "Gemini Exports"}
+
+    # 1. Si existe, lo borramos para generar uno nuevo limpio
+    if os.path.exists(output):
+        os.remove(output)
 
     file_count = 0
     error_count = 0
     total_bytes = 0
+    print_count = 0
 
+    print("Vamo' a empaquetar todo paqueteadito carajo!!!\n")
     print(f"🔧 Semantic GuardRails Packager")
     print(f"   Output: {output}")
-    print(f"   Extensions: {', '.join(extensions)}")
+    print(f"   Dumpeando extensiones: {', '.join(extensions)}")
+    print(f"   Skipeando directorios: {', '.join(skip_dirs)}")
     print(f"   Scanning from: {os.path.abspath('.')}")
     print()
 
@@ -33,13 +40,26 @@ def bundle():
                         out.write("\n\n")
                         file_count += 1
                         total_bytes += len(content)
-                        print(f"  ✅ {filepath}")
+                        
+                        status = f"✅ {filepath}"
+                        if len(status) > 33:
+                            status = status[:30] + "..."
+                        print(f"{status:<35}", end="\n" if print_count % 3 == 2 else " ")
+                        print_count += 1
                     except Exception as e:
                         out.write(f"=== {filepath} ===\n")
                         out.write(f"Error reading {filepath}: {e}")
                         out.write("\n\n")
                         error_count += 1
-                        print(f"  ❌ {filepath} — {e}", file=sys.stderr)
+                        
+                        status = f"❌ {filepath}"
+                        if len(status) > 33:
+                            status = status[:30] + "..."
+                        print(f"{status:<35}", end="\n" if print_count % 3 == 2 else " ")
+                        print_count += 1
+
+    if print_count % 3 != 0:
+        print()
 
     print()
     print(f"{'=' * 40}")

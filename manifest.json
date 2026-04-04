@@ -57,7 +57,11 @@
         "conditional_docs_disabled": true,
         "minimal_health_endpoint": true,
         "owasp_api_security_2023": true,
-        "configurable_rag_top_k": true
+        "configurable_rag_top_k": true,
+        "openai_v1_proxy_transparent": true,
+        "provider_abstraction_layer": true,
+        "sse_streaming_openai_spec": true,
+        "last_message_interception_logic": true
     },
     "state_schema": {
         "excitation_threshold": {"type": "int", "default": 150, "range": [0, 1024]},
