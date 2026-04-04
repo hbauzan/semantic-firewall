@@ -51,6 +51,34 @@ The firewall executes three distinct validation stages in a **user-defined seque
 
 **Execution semantics:** Stages are sorted by their `_order` integer (ascending). If Stage N returns BREACH, Stages N+1..3 are **never evaluated**. Each clause from the segmentation defense (Section 5) must independently pass the **entire** ordered pipeline. Telemetry trace format: `Pipeline: [cosine:OK → excitation:OK → noise:OK]` or `[cosine:OK → excitation:BREACH]`.
 
+### 3.1 Firewall Mode: Positive / Negative (Allowlist vs Denylist)
+
+The pipeline supports two operating modes controlled by `firewall_mode` (default: `"positive"`), togglable at runtime via the HUD or `POST /galaxy/config`.
+
+**Positive mode (allowlist):** The current default. Queries must be semantically aligned with the corpus to pass. Each filter checks for similarity — the first filter that detects divergence triggers an immediate BREACH.
+
+| Filter says | Effective decision | Action |
+|---|---|---|
+| Similar (raw pass) | **OK** | Continue to next filter |
+| Not similar (raw fail) | **BREACH** | Short-circuit, block prompt |
+| All filters OK | **PASS** | Route to LLM |
+
+**Negative mode (denylist):** The corpus defines restricted content. Queries must NOT be similar. The raw filter result is inverted via `effective_passed = not raw_passed`. The first filter that detects similarity triggers an immediate BREACH.
+
+| Filter says | Effective decision | Action |
+|---|---|---|
+| Similar (raw pass) | **BREACH** | Short-circuit, block prompt |
+| Not similar (raw fail) | **OK** | Continue to next filter |
+| All filters OK (all diverged) | **PASS** | Route to LLM |
+
+**Symmetric short-circuit:** Both modes use the same early-exit logic — only the interpretation of the raw filter result changes. The trace records `effective_passed` (mode-aware), not the raw result, so the pipeline trace always reads `OK`/`BREACH` in context.
+
+**No-context handling:** When the corpus returns zero results for a clause:
+- **Positive:** BREACH — cannot verify alignment.
+- **Negative:** PASS — no restricted content to match against.
+
+**Breach reason prefix:** In negative mode, `breach_reason` is prefixed with `negative:` (e.g. `"negative:cosine"`) to distinguish from positive-mode breaches in telemetry and sniffer traces.
+
 ## 4. Adaptive Clause Logic
 When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, short clauses receive a relaxed excitation threshold to avoid false positives on terse but legitimate queries.
 

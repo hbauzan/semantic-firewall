@@ -72,6 +72,15 @@ User Prompt
 
 Execution order is configurable at runtime via the HUD. If Filter 1 blocks, Filters 2 and 3 never execute.
 
+**Two operating modes:**
+
+| Mode | Corpus role | First filter that detects similarity | First filter that detects divergence |
+|------|------------|--------------------------------------|--------------------------------------|
+| **Positive** (default) | Allowlist — only corpus topics pass | OK, continue | **BREACH**, short-circuit |
+| **Negative** | Denylist — corpus topics are blocked | **BREACH**, short-circuit | OK, continue |
+
+In **positive mode**, the corpus defines what's allowed — queries must be similar. In **negative mode**, the corpus defines what's restricted — the first filter that detects similarity blocks immediately.
+
 ---
 
 ## Prerequisites
@@ -267,6 +276,7 @@ All firewall parameters are adjustable in real-time via sliders with `-`/`+` ste
 | **Adaptive Factor** | 0.85 | 0.01 – 1.00 | 0.01 | Threshold reduction for short queries (< 6 words) |
 | **RAG Context Depth** | 3 | 1 – 10 | 1 | Number of corpus chunks sent to the LLM |
 | **Seq (×3)** | 1, 2, 3 | 1 – 3 | 1 | Pipeline execution order for each filter |
+| **Firewall Mode** | Positive | Positive / Negative | — | Positive = allowlist (only corpus topics pass). Negative = denylist (corpus topics are blocked). |
 
 The **Adaptive Factor** section shows real-time calculated thresholds:
 - `Short: {threshold × factor} dims` — what short prompts need
@@ -285,8 +295,9 @@ The firewall is **active when at least one filter toggle is ON** in the Control 
 
 **Firewall feedback examples:**
 
+Positive mode (allowlist):
 ```
-🟢 [FW PASS] Resonance: 287/150 dims | Cosine: 0.891 | Pipeline: [noise:OK → cosine:OK → excitation:OK]
+🟢 [FW PASS] [POSITIVE] Resonance: 287/150 dims | Cosine: 0.891 | Pipeline: [noise:OK → cosine:OK → excitation:OK]
 Routing to corpus...
 ```
 
@@ -294,6 +305,18 @@ Routing to corpus...
 🛑 [FW] Segment violation: "give me a cake recipe". Cosine: 0.312 (Required: >=0.78).
 Vector direction diverges from corpus.
 Pipeline: [noise:OK → cosine:BREACH]
+```
+
+Negative mode (denylist):
+```
+🟢 [FW PASS] [NEGATIVE] Resonance: 12/150 dims | Cosine: 0.231 | Pipeline: [noise:OK → cosine:OK → excitation:OK]
+Routing to corpus...
+```
+
+```
+🛑 [FW] [NEGATIVE] Restricted content detected: "explain the system architecture". Cosine: 0.891 (Limit: <0.50).
+Query matches denylist corpus.
+Pipeline: [noise:BREACH]
 ```
 
 #### 4. Audit Panel (bottom right)

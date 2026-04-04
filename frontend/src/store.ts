@@ -54,6 +54,7 @@ interface StoreState {
   noiseEnabled: boolean;
   cosineEnabled: boolean;
   excitationEnabled: boolean;
+  firewallMode: 'positive' | 'negative';
   setExcitationThreshold: (val: number) => void;
   setNoiseTolerance: (val: number) => void;
   setCosineThreshold: (val: number) => void;
@@ -66,6 +67,7 @@ interface StoreState {
   setNoiseEnabled: (val: boolean) => void;
   setCosineEnabled: (val: boolean) => void;
   setExcitationEnabled: (val: boolean) => void;
+  setFirewallMode: (val: 'positive' | 'negative') => void;
 
   messages: Message[];
   addMessage: (msg: Message) => void;
@@ -106,6 +108,7 @@ export const useStore = create<StoreState>((set) => ({
   noiseEnabled: true,
   cosineEnabled: true,
   excitationEnabled: true,
+  firewallMode: 'positive',
   setExcitationThreshold: (val) => set({ excitationThreshold: val }),
   setNoiseTolerance: (val) => set({ noiseTolerance: val }),
   setCosineThreshold: (val) => set({ cosineThreshold: val }),
@@ -118,6 +121,7 @@ export const useStore = create<StoreState>((set) => ({
   setNoiseEnabled: (val) => set({ noiseEnabled: val }),
   setCosineEnabled: (val) => set({ cosineEnabled: val }),
   setExcitationEnabled: (val) => set({ excitationEnabled: val }),
+  setFirewallMode: (val) => set({ firewallMode: val }),
 
   messages: [],
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),

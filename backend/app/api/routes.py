@@ -198,15 +198,23 @@ async def chat_endpoint(request: Request, req: ChatRequest):
     last_activations = 0
     last_cosine = 0.0
 
+    negative = cfg.firewall_mode == "negative"
+
     for clause in clauses:
         cl_vec = embedder.embed(clause)
         results = storage.search_nearest(cl_vec, k=cfg.rag_top_k)
         if not results:
-            failed_clause = clause
-            block_reason = "no_context"
-            block_details = {"clause": clause}
-            all_traces.append({"stage": "no_context", "passed": False})
-            break
+            if negative:
+                # Negative mode: no corpus match → nothing to restrict → PASS
+                all_traces.append({"stage": "no_context", "passed": True})
+                continue
+            else:
+                # Positive mode: no corpus match → can't verify alignment → BREACH
+                failed_clause = clause
+                block_reason = "no_context"
+                block_details = {"clause": clause}
+                all_traces.append({"stage": "no_context", "passed": False})
+                break
 
         db_vec = results[0]["vector"]
         if not context:
@@ -238,10 +246,11 @@ async def chat_endpoint(request: Request, req: ChatRequest):
             return StreamingResponse(breach_stream(), media_type="application/x-ndjson")
 
         stage_summary = " → ".join(
-            f'{r["stage"]}:OK' for r in all_traces
+            f'{r["stage"]}:{"OK" if r["passed"] else "MISS"}' for r in all_traces
         )
+        mode_label = "NEGATIVE" if negative else "POSITIVE"
         pass_prefix = (
-            f"🟢 [FW PASS] Resonance: "
+            f"🟢 [FW PASS] [{mode_label}] Resonance: "
             f"{last_activations}/{cfg.excitation_threshold} dims | "
             f"Cosine: {last_cosine:.3f} | "
             f"Pipeline: [{stage_summary}]\n"
@@ -260,31 +269,65 @@ def _format_block_message(
     failed_clause: str, reason: str, details: dict, cfg: ConfigState, traces: list
 ) -> str:
     """Format the telemetry block message based on which filter breached."""
-    if reason == "cosine":
-        msg = (
-            f'🛑 [FW] Segment violation: "{failed_clause}". '
-            f'Cosine: {details.get("cosine_sim", 0):.3f} '
-            f'(Required: >={cfg.cosine_threshold:.2f}). '
-            f'Vector direction diverges from corpus.'
-        )
-    elif reason == "noise":
-        msg = (
-            f'🛑 [FW] Segment violation: "{failed_clause}". '
-            f'Noise pre-filter: avg_delta={details.get("avg_delta", 0):.4f} '
-            f'(Limit: {cfg.global_noise_limit:.3f}).'
-        )
-    elif reason == "no_context":
+    negative = cfg.firewall_mode == "negative"
+    mode_tag = " [NEGATIVE]" if negative else ""
+
+    # Strip mode prefix for matching (e.g. "negative:cosine" → "cosine")
+    bare_reason = reason.split(":", 1)[-1] if reason.startswith("negative:") else reason
+
+    if bare_reason == "cosine":
+        if negative:
+            msg = (
+                f'🛑 [FW]{mode_tag} Restricted content detected: "{failed_clause}". '
+                f'Cosine: {details.get("cosine_sim", 0):.3f} '
+                f'(Limit: <{cfg.cosine_threshold:.2f}). '
+                f'Query matches denylist corpus.'
+            )
+        else:
+            msg = (
+                f'🛑 [FW] Segment violation: "{failed_clause}". '
+                f'Cosine: {details.get("cosine_sim", 0):.3f} '
+                f'(Required: >={cfg.cosine_threshold:.2f}). '
+                f'Vector direction diverges from corpus.'
+            )
+    elif bare_reason == "noise":
+        if negative:
+            msg = (
+                f'🛑 [FW]{mode_tag} Restricted content detected: "{failed_clause}". '
+                f'Noise pre-filter: avg_delta={details.get("avg_delta", 0):.4f} '
+                f'(Limit: {cfg.global_noise_limit:.3f}). '
+                f'Query is too close to denylist corpus.'
+            )
+        else:
+            msg = (
+                f'🛑 [FW] Segment violation: "{failed_clause}". '
+                f'Noise pre-filter: avg_delta={details.get("avg_delta", 0):.4f} '
+                f'(Limit: {cfg.global_noise_limit:.3f}).'
+            )
+    elif bare_reason == "no_context":
         msg = (
             f'🛑 [FW] Segment violation: "{failed_clause}". '
             f'No context match in corpus.'
         )
-    else:
+    elif bare_reason == "excitation":
         adaptive_note = ""
         if details.get("adaptive_applied"):
             adaptive_note = f' [ADAPTIVE] Factor: {details.get("adaptive_factor", 1.0)}x.'
+        if negative:
+            msg = (
+                f'🛑 [FW]{mode_tag} Restricted content detected: "{failed_clause}". '
+                f'Resonance: {details.get("activations", 0)}/{details.get("threshold", 0):.0f}.{adaptive_note} '
+                f'Query matches denylist corpus.'
+            )
+        else:
+            msg = (
+                f'🛑 [FW] Segment violation: "{failed_clause}". '
+                f'Resonance: {details.get("activations", 0)}/{details.get("threshold", 0):.0f}.{adaptive_note}'
+            )
+    else:
         msg = (
-            f'🛑 [FW] Segment violation: "{failed_clause}". '
-            f'Resonance: {details.get("activations", 0)}/{details.get("threshold", 0):.0f}.{adaptive_note}'
+            f'🛑 [FW]{mode_tag} Segment violation: "{failed_clause}". '
+            f'Reason: {reason}.'
         )
 
     stage_summary = " → ".join(
@@ -345,12 +388,17 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
 
     # 2. Firewall Evaluation
     fw_on = cfg.noise_enabled or cfg.cosine_enabled or cfg.excitation_enabled
+    proxy_negative = cfg.firewall_mode == "negative"
     all_traces: list[dict] = []
     if fw_on:
         for clause in clauses:
             cl_vec = embedder.embed(clause)
             results = storage.search_nearest(cl_vec, k=cfg.rag_top_k)
             if not results:
+                if proxy_negative:
+                    # Negative mode: no corpus match → nothing to restrict → skip
+                    all_traces.append({"stage": "no_context", "passed": True, "value": 0, "threshold": 0})
+                    continue
                 no_ctx_trace = [{"stage": "no_context", "passed": False, "value": 0, "threshold": 0}]
                 emit_trace(
                     model=config.model,

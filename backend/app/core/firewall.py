@@ -115,6 +115,17 @@ class SemanticFirewall:
     ) -> dict:
         """Run the full ordered pipeline on a single clause's vectors.
 
+        Mode semantics (symmetric inversion):
+          - **positive** (allowlist): query must be similar to corpus.
+            First filter failure → BREACH.  All pass → PASS.
+          - **negative** (denylist): query must NOT be similar to corpus.
+            First filter pass (similarity detected) → BREACH immediately.
+            All fail (diverges on every metric) → PASS.
+
+        In negative mode, raw_passed is inverted to effective_passed before
+        the short-circuit decision. The trace records effective_passed so it
+        reflects the firewall's decision context, not raw filter output.
+
         Returns:
             {
                 "passed": bool,
@@ -129,22 +140,28 @@ class SemanticFirewall:
         trace: list[dict] = []
         last_activations = 0
         last_cosine = 0.0
+        negative = cfg.firewall_mode == "negative"
 
         for _order, stage_name, stage_fn in pipeline:
-            passed, _name, details = stage_fn(
+            raw_passed, _name, details = stage_fn(
                 q_arr, c_arr, cfg, word_count=word_count
             )
-            trace.append({"stage": stage_name, "passed": passed, **details})
 
-            if passed:
-                if "activations" in details:
-                    last_activations = details["activations"]
-                if "cosine_sim" in details:
-                    last_cosine = details["cosine_sim"]
-            else:
+            # In negative mode, invert the result: similarity = bad, divergence = good
+            effective_passed = (not raw_passed) if negative else raw_passed
+
+            trace.append({"stage": stage_name, "passed": effective_passed, **details})
+
+            if "activations" in details:
+                last_activations = details["activations"]
+            if "cosine_sim" in details:
+                last_cosine = details["cosine_sim"]
+
+            if not effective_passed:
+                breach_reason = f"negative:{stage_name}" if negative else stage_name
                 return {
                     "passed": False,
-                    "breach_reason": stage_name,
+                    "breach_reason": breach_reason,
                     "breach_details": details,
                     "trace": trace,
                     "last_activations": last_activations,
