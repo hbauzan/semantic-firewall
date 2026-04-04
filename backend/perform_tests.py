@@ -322,6 +322,39 @@ def test_rag_top_k_default():
     fresh = ConfigState()
     assert fresh.rag_top_k == 3
 
+@pytest.mark.asyncio
+async def test_openai_proxy_v1_compliance():
+    """Verify OpenAI spec compatibility and firewall interception."""
+    set_config(excitation_threshold=1024, noise_tolerance=0.0001)
+
+    payload = {
+        "model": "llama3.1",
+        "messages": [{"role": "user", "content": "Dangerous recipe request"}],
+        "stream": True
+    }
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post("/v1/chat/completions", json=payload)
+        assert response.status_code == 403
+        data = response.json()
+        assert data["error"]["type"] == "security_breach"
+        assert "[FW]" in data["error"]["message"]
+
+    # Test Pass Path — all filters disabled to bypass firewall
+    set_config(
+        excitation_threshold=0, noise_tolerance=1.0, cosine_threshold=0.0,
+        global_noise_limit=10.0,
+        noise_enabled=False, cosine_enabled=False, excitation_enabled=False
+    )
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        async with ac.stream("POST", "/v1/chat/completions", json=payload) as response:
+            assert response.status_code == 200
+            assert "text/event-stream" in response.headers["content-type"]
+
+    # Restore defaults
+    set_config(noise_enabled=True, cosine_enabled=True, excitation_enabled=True)
+
+
 def test_config_sync_includes_rag_top_k():
     """POST /galaxy/config must accept and persist rag_top_k."""
     import app.core.state as state_mod
@@ -342,3 +375,249 @@ def test_rag_top_k_validation():
     with pytest.raises(Exception):
         ConfigState(rag_top_k=11)
 
+
+# --- Firewall Mode Tests (Positive / Negative) ---
+
+def test_firewall_mode_default_is_positive():
+    """Default firewall_mode must be 'positive' on fresh ConfigState."""
+    fresh = ConfigState()
+    assert fresh.firewall_mode == "positive"
+
+def test_firewall_mode_rejects_invalid_value():
+    """ConfigState must reject firewall_mode values other than 'positive'/'negative'."""
+    with pytest.raises(Exception):
+        ConfigState(firewall_mode="neutral")
+
+def test_engine_negative_mode_identical_vectors_breach():
+    """Negative mode: identical vectors (max similarity) must BREACH on first filter — restricted content."""
+    cfg = ConfigState(
+        cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=10.0,
+        firewall_mode="negative"
+    )
+    vec = np.random.rand(1024).astype(np.float32)
+    result = SemanticFirewall.evaluate_clause(vec, vec, cfg, word_count=10)
+    assert result["passed"] is False
+    # In negative mode, the first filter that sees similarity triggers BREACH immediately
+    assert result["breach_reason"].startswith("negative:")
+    # Trace should show the breaching stage with passed=False (effective, not raw)
+    assert result["trace"][0]["passed"] is False
+
+def test_engine_negative_mode_divergent_vectors_pass():
+    """Negative mode: orthogonal vectors (low similarity) must PASS — not restricted."""
+    cfg = ConfigState(
+        cosine_threshold=0.5, excitation_threshold=500, global_noise_limit=0.01,
+        noise_order=1, cosine_order=2, excitation_order=3,
+        firewall_mode="negative"
+    )
+    q = np.ones(1024, dtype=np.float32)
+    c = np.zeros(1024, dtype=np.float32)
+    result = SemanticFirewall.evaluate_clause(q, c, cfg, word_count=10)
+    assert result["passed"] is True
+    assert result["breach_reason"] is None
+
+def test_engine_positive_mode_identical_vectors_pass():
+    """Positive mode: identical vectors must PASS (baseline — confirms no regression)."""
+    cfg = ConfigState(
+        cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=10.0,
+        firewall_mode="positive"
+    )
+    vec = np.random.rand(1024).astype(np.float32)
+    result = SemanticFirewall.evaluate_clause(vec, vec, cfg, word_count=10)
+    assert result["passed"] is True
+
+def test_config_sync_includes_firewall_mode():
+    """POST /galaxy/config must accept and persist firewall_mode."""
+    import app.core.state as state_mod
+    res = client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.50,
+        "firewall_mode": "negative"
+    })
+    assert res.status_code == 200
+    cfg = state_mod.config_state
+    assert cfg.firewall_mode == "negative"
+
+    # Restore default
+    client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.50,
+        "firewall_mode": "positive"
+    })
+
+@pytest.mark.asyncio
+async def test_negative_mode_chat_endpoint():
+    """Negative mode + strict thresholds: query should BREACH on /chat if corpus matches (empty DB = no match = PASS)."""
+    set_config(
+        excitation_threshold=1024, noise_tolerance=0.0001,
+        firewall_mode="negative"
+    )
+
+    # With empty or poor-match DB, negative mode should PASS (no restricted content detected)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        async with ac.stream("POST", "/chat", json={"prompt": "Random off-topic query"}) as response:
+            assert response.status_code == 200
+            content = ""
+            async for chunk in response.aiter_text():
+                content += chunk
+            # In negative mode with strict thresholds, filters will fail (not similar)
+            # which means PASS in negative mode — no restricted content detected
+            assert "Segment violation" not in content or "[FW PASS]" in content
+
+    # Restore default
+    set_config(firewall_mode="positive")
+
+
+@pytest.mark.asyncio
+async def test_rtss_telemetry_flow():
+    """RTSS: /v1/chat/completions must emit a SnifferTrace into the sniffer queue."""
+    from app.modules.sniffer import sniffer_queue
+
+    # Drain any stale traces from previous tests
+    while not sniffer_queue.empty():
+        try:
+            sniffer_queue.get_nowait()
+        except Exception:
+            break
+
+    # Ultra-strict thresholds → guaranteed BREACH
+    set_config(excitation_threshold=1024, noise_tolerance=0.0001)
+
+    payload = {
+        "model": "llama3.1",
+        "messages": [{"role": "user", "content": "Dangerous off-topic query for sniffer test"}],
+        "stream": True
+    }
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post("/v1/chat/completions", json=payload)
+        assert response.status_code == 403
+        data = response.json()
+        assert data["error"]["type"] == "security_breach"
+
+    # The sniffer queue should now contain exactly one BREACH trace
+    import asyncio
+    try:
+        trace = await asyncio.wait_for(sniffer_queue.get(), timeout=2.0)
+    except asyncio.TimeoutError:
+        pytest.fail("Sniffer queue did not receive a trace within 2 seconds")
+
+    # Validate SnifferTrace schema
+    assert trace.id  # non-empty UUID
+    assert trace.timestamp  # ISO 8601
+    assert trace.request.model == "llama3.1"
+    assert "Dangerous" in trace.request.last_message
+    assert trace.firewall.decision == "BREACH"
+    assert len(trace.firewall.pipeline_trace) >= 1
+    for stage in trace.firewall.pipeline_trace:
+        assert stage.stage in ("noise", "cosine", "excitation", "no_context")
+        assert isinstance(stage.passed, bool)
+        assert isinstance(stage.value, (int, float))
+        assert isinstance(stage.threshold, (int, float))
+
+    # FPI fields
+    assert trace.status == "BREACH"
+    assert isinstance(trace.request.request_history, list)
+    assert len(trace.request.request_history) >= 1
+    assert trace.request.request_history[0]["role"] == "user"
+    assert trace.response_content == ""  # BREACH traces have no response
+
+
+@pytest.mark.asyncio
+async def test_sniffer_fpi_request_history():
+    """FPI: Multi-message payloads must capture the full request_history in the trace."""
+    from app.modules.sniffer import sniffer_queue
+
+    # Drain stale traces
+    while not sniffer_queue.empty():
+        try:
+            sniffer_queue.get_nowait()
+        except Exception:
+            break
+
+    set_config(excitation_threshold=1024, noise_tolerance=0.0001)
+
+    payload = {
+        "model": "llama3.1",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant"},
+            {"role": "user", "content": "Hello, how are you?"},
+            {"role": "assistant", "content": "I'm fine!"},
+            {"role": "user", "content": "Dangerous off-topic recipe request"},
+        ],
+        "stream": True
+    }
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post("/v1/chat/completions", json=payload)
+        assert response.status_code == 403
+
+    import asyncio
+    try:
+        trace = await asyncio.wait_for(sniffer_queue.get(), timeout=2.0)
+    except asyncio.TimeoutError:
+        pytest.fail("Sniffer queue did not receive a trace within 2 seconds")
+
+    # Full request_history must contain ALL 4 messages
+    assert isinstance(trace.request.request_history, list)
+    assert len(trace.request.request_history) == 4
+    assert trace.request.request_history[0]["role"] == "system"
+    assert trace.request.request_history[1]["role"] == "user"
+    assert trace.request.request_history[2]["role"] == "assistant"
+    assert trace.request.request_history[3]["role"] == "user"
+    assert "Dangerous" in trace.request.request_history[3]["content"]
+
+    # last_message should still be the last user message
+    assert "Dangerous" in trace.request.last_message
+    assert trace.status == "BREACH"
+
+
+def test_sniffer_update_trace_reconstruction():
+    """FPI: update_trace must append response_content to an existing trace in the buffer."""
+    from app.modules.sniffer import emit_trace, update_trace, _trace_buffer, sniffer_queue
+
+    # Drain queue
+    while not sniffer_queue.empty():
+        try:
+            sniffer_queue.get_nowait()
+        except Exception:
+            break
+
+    # Emit a PASS trace
+    tid = emit_trace(
+        model="test-model",
+        last_message="test message",
+        decision="PASS",
+        pipeline_trace=[],
+        response_preview="[streaming]",
+        request_history=[{"role": "user", "content": "test message"}],
+        status="PENDING",
+    )
+
+    # Consume the trace and place it in the buffer (simulating consumer behavior)
+    trace = sniffer_queue.get_nowait()
+    _trace_buffer.append(trace)
+
+    # Now update the trace with reconstructed response
+    update_trace(tid, response_content="Hello world! This is the full response.", status="COMPLETED")
+
+    # Verify buffer was updated
+    found = None
+    for t in _trace_buffer:
+        if t.id == tid:
+            found = t
+            break
+
+    assert found is not None
+    assert found.response_content == "Hello world! This is the full response."
+    assert found.status == "COMPLETED"
+
+    # Verify updated trace was pushed back to the queue
+    updated_in_queue = sniffer_queue.get_nowait()
+    assert updated_in_queue.id == tid
+    assert updated_in_queue.response_content == "Hello world! This is the full response."
+    assert updated_in_queue.status == "COMPLETED"
+
+    # Clean up buffer
+    _trace_buffer[:] = [t for t in _trace_buffer if t.id != tid]

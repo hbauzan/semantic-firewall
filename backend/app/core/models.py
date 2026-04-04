@@ -3,6 +3,7 @@
 All schema validation, field constraints, and business rules live here.
 Zero framework dependencies — portable across FastAPI, CLI, or any runtime.
 """
+from typing import Literal
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 
 
@@ -26,6 +27,13 @@ class ConfigState(BaseModel):
     noise_enabled: bool = Field(default=True)
     cosine_enabled: bool = Field(default=True)
     excitation_enabled: bool = Field(default=True)
+    firewall_mode: Literal["positive", "negative"] = Field(
+        default="positive",
+        description=(
+            "positive: only corpus-aligned queries pass (allowlist). "
+            "negative: corpus-aligned queries are blocked (denylist)."
+        ),
+    )
 
     @model_validator(mode='after')
     def validate_unique_orders(self):
@@ -52,6 +60,7 @@ class ConfigUpdate(BaseModel):
     noise_enabled: bool = Field(default=True)
     cosine_enabled: bool = Field(default=True)
     excitation_enabled: bool = Field(default=True)
+    firewall_mode: Literal["positive", "negative"] = Field(default="positive")
 
 
 # Max prompt length to prevent memory exhaustion before vectorization
@@ -64,3 +73,15 @@ class AuditRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     prompt: str = Field(max_length=PROMPT_MAX_LENGTH)
+
+
+class OpenAIMessage(BaseModel):
+    role: str
+    content: str
+
+
+class OpenAIConfig(BaseModel):
+    model: str
+    messages: list[OpenAIMessage]
+    stream: bool = False
+    temperature: float = 0.7

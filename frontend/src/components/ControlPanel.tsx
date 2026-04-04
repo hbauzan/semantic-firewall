@@ -46,10 +46,10 @@ export const ControlPanel: React.FC = () => {
   const {
     excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit,
     cosineOrder, excitationOrder, noiseOrder, adaptiveFactor,
-    noiseEnabled, cosineEnabled, excitationEnabled, ragTopK,
+    noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode,
     setExcitationThreshold, setNoiseTolerance, setCosineThreshold, setGlobalNoiseLimit,
     setCosineOrder, setExcitationOrder, setNoiseOrder, setAdaptiveFactor,
-    setNoiseEnabled, setCosineEnabled, setExcitationEnabled, setRagTopK,
+    setNoiseEnabled, setCosineEnabled, setExcitationEnabled, setRagTopK, setFirewallMode,
     ingestionStatus, setIngestionStatus, setSystemAction
   } = useStore();
 
@@ -90,14 +90,15 @@ export const ControlPanel: React.FC = () => {
           noise_enabled: noiseEnabled,
           cosine_enabled: cosineEnabled,
           excitation_enabled: excitationEnabled,
-          rag_top_k: ragTopK
+          rag_top_k: ragTopK,
+          firewall_mode: firewallMode
         })
       }).then(res => {
         if (!res.ok) console.warn(`Config sync failed: ${res.status}`);
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
-  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled, ragTopK]);
+  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode]);
 
   // Poll for ingestion status if task is active
   useEffect(() => {
@@ -169,6 +170,36 @@ export const ControlPanel: React.FC = () => {
   return (
     <div className="panel" style={{ width: 'auto', flex: 1, overflow: 'auto' }}>
       <h2 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', paddingBottom: '0.3rem' }}>Control Panel</h2>
+
+      {/* --- Firewall Mode Toggle --- */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: '0.6rem', padding: '0.35rem 0.5rem',
+        background: firewallMode === 'negative' ? 'rgba(255, 60, 60, 0.12)' : 'rgba(0, 255, 136, 0.08)',
+        border: `1px solid ${firewallMode === 'negative' ? '#ff3c3c' : 'var(--accent)'}`,
+        borderRadius: '4px', transition: 'all 0.2s',
+      }}>
+        <div style={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
+          <div style={{ fontWeight: 'bold', color: firewallMode === 'negative' ? '#ff3c3c' : 'var(--accent)' }}>
+            {firewallMode === 'positive' ? 'POSITIVE — Allowlist' : 'NEGATIVE — Denylist'}
+          </div>
+          <div style={{ opacity: 0.6, fontSize: '0.6rem' }}>
+            {firewallMode === 'positive' ? 'Only corpus topics pass' : 'Corpus topics are blocked'}
+          </div>
+        </div>
+        <button
+          onClick={() => setFirewallMode(firewallMode === 'positive' ? 'negative' : 'positive')}
+          style={{
+            width: '3.2rem', height: '1.5rem', fontSize: '0.6rem', fontWeight: 'bold',
+            border: '1px solid', cursor: 'pointer', borderRadius: '3px', padding: 0,
+            borderColor: firewallMode === 'negative' ? '#ff3c3c' : 'var(--accent)',
+            background: firewallMode === 'negative' ? '#ff3c3c' : 'var(--accent)',
+            color: '#000', transition: 'all 0.2s',
+          }}
+        >
+          {firewallMode === 'positive' ? 'POS' : 'NEG'}
+        </button>
+      </div>
 
       {/* --- Noise Pre-Filter --- */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', opacity: noiseEnabled ? 1 : 0.4, transition: 'opacity 0.2s' }}>

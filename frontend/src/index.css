@@ -187,3 +187,353 @@ button:hover {
 .file-input {
   display: none;
 }
+
+/* --- Tab Navigation --- */
+
+.tab-navigation {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--panel-bg);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 0;
+}
+
+.tab-btn:hover {
+  color: var(--text-main);
+  background-color: rgba(0, 255, 204, 0.05);
+}
+
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background-color: rgba(0, 255, 204, 0.08);
+}
+
+/* --- Sniffer Tab --- */
+
+.sniffer-tab {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.sniffer-header h2 {
+  margin-bottom: 0.5rem;
+}
+
+.sniffer-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.sniffer-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.sniffer-filter-group label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.sniffer-filter-group select {
+  background-color: #000;
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.sniffer-filter-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.sniffer-clear-btn {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.sniffer-clear-btn:hover {
+  background-color: var(--danger);
+  color: #000;
+}
+
+.sniffer-stats {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.7rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.4rem;
+  color: var(--text-muted);
+}
+
+.sniffer-stat-pass {
+  color: var(--accent);
+}
+
+.sniffer-stat-breach {
+  color: var(--danger);
+}
+
+.sniffer-log-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-right: 0.25rem;
+}
+
+.sniffer-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.sniffer-empty-hint {
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.sniffer-entry {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  background-color: rgba(255, 255, 255, 0.02);
+  animation: sniffer-fadein 0.3s ease-out;
+}
+
+.sniffer-entry-pass {
+  border-left: 3px solid var(--accent);
+}
+
+.sniffer-entry-breach {
+  border-left: 3px solid var(--danger);
+}
+
+@keyframes sniffer-fadein {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sniffer-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.sniffer-time {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sniffer-badge {
+  font-size: 0.65rem;
+  font-weight: bold;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+}
+
+.sniffer-badge-pass {
+  background-color: rgba(0, 255, 204, 0.15);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.sniffer-badge-breach {
+  background-color: rgba(255, 51, 102, 0.15);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.sniffer-model {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.sniffer-entry-message {
+  font-size: 0.75rem;
+  color: var(--text-main);
+  opacity: 0.85;
+  margin-bottom: 0.3rem;
+  word-break: break-word;
+}
+
+.sniffer-pipeline {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.sniffer-stage {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sniffer-stage-pass {
+  background-color: rgba(0, 255, 204, 0.08);
+  color: var(--accent);
+}
+
+.sniffer-stage-breach {
+  background-color: rgba(255, 51, 102, 0.08);
+  color: var(--danger);
+}
+
+.sniffer-preview {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+  font-style: italic;
+}
+
+/* --- FPI Expandable Rows --- */
+
+.sniffer-entry-clickable {
+  cursor: pointer;
+  transition: background-color 0.15s;
+  border-radius: 4px;
+  padding: 0.15rem 0.3rem;
+  margin: -0.15rem -0.3rem 0.25rem;
+}
+
+.sniffer-entry-clickable:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.sniffer-expand-icon {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  margin-left: 0.3rem;
+  transition: transform 0.2s;
+}
+
+.sniffer-status-badge {
+  font-size: 0.6rem;
+  font-weight: bold;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+}
+
+.sniffer-status-pending {
+  background-color: rgba(255, 170, 0, 0.15);
+  color: #ffaa00;
+  border: 1px solid #ffaa0055;
+  animation: sniffer-pulse 1.5s ease-in-out infinite;
+}
+
+.sniffer-status-completed {
+  background-color: rgba(0, 255, 204, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+}
+
+.sniffer-status-breach {
+  background-color: rgba(255, 51, 102, 0.12);
+  color: var(--danger);
+  border: 1px solid rgba(255, 51, 102, 0.3);
+}
+
+@keyframes sniffer-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.sniffer-expanded-panel {
+  margin-top: 0.5rem;
+  padding: 0.6rem;
+  background-color: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  animation: sniffer-fadein 0.2s ease-out;
+}
+
+.sniffer-expanded-section {
+  margin-bottom: 0.5rem;
+}
+
+.sniffer-expanded-section:last-child {
+  margin-bottom: 0;
+}
+
+.sniffer-expanded-label {
+  font-size: 0.7rem;
+  font-weight: bold;
+  color: #66bbff;
+  margin-bottom: 0.3rem;
+}
+
+.sniffer-expanded-label-response {
+  color: var(--accent);
+}
+
+.sniffer-expanded-json,
+.sniffer-expanded-response {
+  font-family: 'Courier New', monospace;
+  font-size: 0.65rem;
+  line-height: 1.4;
+  padding: 0.5rem;
+  background-color: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow-x: auto;
+  max-height: 250px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.sniffer-expanded-response {
+  color: var(--text-main);
+  opacity: 0.9;
+}
