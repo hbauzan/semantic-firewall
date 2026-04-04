@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -8,6 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from app.api.routes import router
 from app.core.settings import settings
+from app.modules.sniffer import start_consumer, stop_consumer
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +28,21 @@ if settings.api_key_value is None:
 # --- Rate Limiter ---
 limiter = Limiter(key_func=get_remote_address, default_limits=[settings.rate_limit_default])
 
+
+# --- Lifespan (startup / shutdown) ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    start_consumer()
+    yield
+    stop_consumer()
+
+
 app = FastAPI(
     title="Three-Headed Semantic Firewall",
-    version="2.14.0",
+    version="2.15.0",
     docs_url=None if settings.api_key_value else "/docs",
     redoc_url=None if settings.api_key_value else "/redoc",
+    lifespan=lifespan,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

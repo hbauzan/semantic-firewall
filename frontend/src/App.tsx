@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { TelemetryHUD } from './components/TelemetryHUD';
 import { ControlPanel } from './components/ControlPanel';
 import { ChatInterface } from './components/ChatInterface';
 import { AuditPanel } from './components/AuditPanel';
+import { SnifferTab } from './components/SnifferTab';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function App() {
+  const [activeTab, setActiveTab] = useState<'chat' | 'sniffer'>('chat');
+
   return (
     <div className="app-container">
       <div className="side-panel">
@@ -16,12 +20,36 @@ function App() {
         </ErrorBoundary>
       </div>
       <div className="main-content-area">
-        <ErrorBoundary label="ChatInterface">
-          <ChatInterface />
-        </ErrorBoundary>
-        <ErrorBoundary label="AuditPanel">
-          <AuditPanel />
-        </ErrorBoundary>
+        <div className="tab-navigation">
+          <button
+            id="tab-chat"
+            className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
+            onClick={() => setActiveTab('chat')}
+          >
+            💬 Chat
+          </button>
+          <button
+            id="tab-sniffer"
+            className={`tab-btn ${activeTab === 'sniffer' ? 'active' : ''}`}
+            onClick={() => setActiveTab('sniffer')}
+          >
+            🔍 Sniffer
+          </button>
+        </div>
+        {activeTab === 'chat' ? (
+          <>
+            <ErrorBoundary label="ChatInterface">
+              <ChatInterface />
+            </ErrorBoundary>
+            <ErrorBoundary label="AuditPanel">
+              <AuditPanel />
+            </ErrorBoundary>
+          </>
+        ) : (
+          <ErrorBoundary label="SnifferTab">
+            <SnifferTab />
+          </ErrorBoundary>
+        )}
       </div>
     </div>
   );

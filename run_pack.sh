@@ -4,7 +4,7 @@ set -e
 echo "🚀 Starting packager..."
 echo ""
 
-python3 semantic_guardtrails_packager.py
+python3 semantic_guardtrails_packager.py "$@"
 exit_code=$?
 
 echo ""
