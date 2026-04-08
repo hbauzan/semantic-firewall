@@ -4,11 +4,30 @@
 - Writes are serialized via asyncio.Lock.
 - set_config() atomically replaces the global reference (merge + validate + swap).
 - Readers take a snapshot reference: cfg = config_state (safe under GIL).
+- At module load, the _last_used profile is restored from disk if present.
 """
 import asyncio
+import logging
 from app.core.models import ConfigState
+from app.modules.profiles import ProfileManager
 
-config_state: ConfigState = ConfigState()
+logger = logging.getLogger(__name__)
+
+
+def _load_initial_state() -> ConfigState:
+    """Restore _last_used profile from disk, fall back to defaults."""
+    data = ProfileManager.load_profile("_last_used")
+    if data:
+        try:
+            state = ConfigState(**data)
+            logger.info("Restored config from _last_used profile.")
+            return state
+        except Exception as e:
+            logger.warning("Failed to restore _last_used profile: %s — using defaults.", e)
+    return ConfigState()
+
+
+config_state: ConfigState = _load_initial_state()
 _config_lock = asyncio.Lock()
 
 

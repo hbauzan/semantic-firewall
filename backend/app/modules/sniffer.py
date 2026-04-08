@@ -3,17 +3,33 @@
 Producer-Consumer pattern using asyncio.Queue:
   - emit_trace()   → fire-and-forget into sniffer_queue (never blocks proxy)
   - sniffer_consumer() → background task that broadcasts to SSE subscribers
+
+Persistence:
+  - _trace_buffer is flushed to HISTORY_FILE (backend/data/sniffer_history.json)
+    on every new trace so history survives restarts.
+  - At consumer startup, up to _BUFFER_MAX entries are loaded from disk.
+  - Disk writes are offloaded via asyncio.to_thread() to keep the event loop free.
 """
 import asyncio
 import json
 import logging
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import AsyncGenerator, Optional
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Persistence path — same sibling to profiles: backend/data/
+# ---------------------------------------------------------------------------
+
+# sniffer.py → modules → app → backend → project_root/data
+_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+_DATA_DIR.mkdir(exist_ok=True)
+HISTORY_FILE = _DATA_DIR / "sniffer_history.json"
 
 # ---------------------------------------------------------------------------
 # SnifferTrace Schema
@@ -66,7 +82,34 @@ _subscribers_lock = asyncio.Lock()
 # awaits within a single task). Do NOT access from threads — if a threaded
 # consumer is ever introduced, replace with threading.Lock or asyncio.Lock.
 _trace_buffer: list[SnifferTrace] = []
-_BUFFER_MAX = 100
+_BUFFER_MAX = 1000
+
+
+# ---------------------------------------------------------------------------
+# Persistence helpers
+# ---------------------------------------------------------------------------
+
+def _load_history_sync() -> list[SnifferTrace]:
+    """Load sniffer history from disk (synchronous — called once at startup)."""
+    if not HISTORY_FILE.exists():
+        return []
+    try:
+        raw = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+        traces = [SnifferTrace(**entry) for entry in raw[-_BUFFER_MAX:]]
+        logger.info("Loaded %d sniffer traces from history.", len(traces))
+        return traces
+    except Exception as e:
+        logger.warning("Failed to load sniffer history: %s", e)
+        return []
+
+
+def _save_history_sync(buffer: list[SnifferTrace]) -> None:
+    """Flush the current buffer to disk (synchronous — run via to_thread)."""
+    try:
+        payload = json.dumps([t.model_dump() for t in buffer], indent=2)
+        HISTORY_FILE.write_text(payload, encoding="utf-8")
+    except Exception as e:
+        logger.error("Failed to save sniffer history: %s", e)
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +229,12 @@ _consumer_task: asyncio.Task | None = None
 
 
 async def sniffer_consumer() -> None:
-    """Read traces from the queue, buffer them, and broadcast to SSE subscribers."""
+    """Read traces from the queue, buffer them, persist, and broadcast to SSE subscribers."""
+    global _trace_buffer
+
+    # Restore history from disk at startup
+    _trace_buffer = _load_history_sync()
+
     logger.info("RTSS consumer started")
     while True:
         try:
@@ -195,10 +243,18 @@ async def sniffer_consumer() -> None:
             logger.info("RTSS consumer shutting down")
             return
 
-        # Append to circular buffer
-        _trace_buffer.append(trace)
-        if len(_trace_buffer) > _BUFFER_MAX:
-            _trace_buffer.pop(0)
+        # Find existing entry in buffer (update_trace path) or append new one
+        existing_idx = next((i for i, t in enumerate(_trace_buffer) if t.id == trace.id), None)
+        if existing_idx is not None:
+            _trace_buffer[existing_idx] = trace
+        else:
+            _trace_buffer.append(trace)
+            if len(_trace_buffer) > _BUFFER_MAX:
+                _trace_buffer.pop(0)
+
+        # Persist to disk without blocking the event loop
+        snapshot = list(_trace_buffer)
+        asyncio.create_task(asyncio.to_thread(_save_history_sync, snapshot))
 
         # Broadcast to all subscribers
         async with _subscribers_lock:

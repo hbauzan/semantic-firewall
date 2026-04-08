@@ -29,6 +29,7 @@ from app.modules.ingestor import process_pdf_async, get_task_status
 from app.modules.embedder import embedder
 from app.modules.storage import storage
 from app.modules.sniffer import emit_trace, update_trace, subscribe, unsubscribe, stream_sniffer_sse
+from app.modules.profiles import ProfileManager
 from app.core.models import ConfigState, ConfigUpdate, AuditRequest, ChatRequest, OpenAIConfig
 from app.core.state import _config_lock
 from app.core.firewall import SemanticFirewall
@@ -119,10 +120,57 @@ async def update_config(config: ConfigUpdate):
     from app.core import state as state_mod
     try:
         async with _config_lock:
-            state_mod.config_state = ConfigState(**config.model_dump())
+            new_state = ConfigState(**config.model_dump())
+            state_mod.config_state = new_state
+        # Auto-persist every config change to _last_used for session continuity
+        ProfileManager.save_profile("_last_used", new_state)
         return {"status": "updated", "config": config.model_dump()}
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid configuration values")
+
+
+# --- Profile Endpoints ---
+
+@router.get("/galaxy/profiles", dependencies=[Depends(verify_api_key)])
+async def list_profiles():
+    """Return sorted list of user-visible named profiles."""
+    return {"profiles": ProfileManager.list_profiles()}
+
+
+@router.post("/galaxy/profiles/save/{name}", dependencies=[Depends(verify_api_key)])
+async def save_profile(name: str):
+    """Save current config state under the given profile name."""
+    if name.startswith("_"):
+        raise HTTPException(status_code=400, detail="Profile names cannot start with underscore (reserved for internal use).")
+    from app.core import state as state_mod
+    ProfileManager.save_profile(name, state_mod.config_state)
+    return {"status": "saved", "profile": name}
+
+
+@router.post("/galaxy/profiles/load/{name}", dependencies=[Depends(verify_api_key)])
+async def load_profile(name: str):
+    """Load a named profile and apply it as the active config."""
+    data = ProfileManager.load_profile(name)
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"Profile '{name}' not found.")
+    from app.core import state as state_mod
+    try:
+        async with _config_lock:
+            new_state = ConfigState(**data)
+            state_mod.config_state = new_state
+        ProfileManager.save_profile("_last_used", new_state)
+        return {"status": "loaded", "profile": name, "config": new_state.model_dump()}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Invalid profile data: {e}")
+
+
+@router.delete("/galaxy/profiles/{name}", dependencies=[Depends(verify_api_key)])
+async def delete_profile(name: str):
+    """Delete a named profile. Protected (underscore-prefixed) profiles cannot be deleted."""
+    deleted = ProfileManager.delete_profile(name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Profile '{name}' not found or protected.")
+    return {"status": "deleted", "profile": name}
 
 # --- Audit Endpoint ---
 

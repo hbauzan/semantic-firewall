@@ -34,6 +34,10 @@ class ConfigState(BaseModel):
             "negative: corpus-aligned queries are blocked (denylist)."
         ),
     )
+    active_tab: str = Field(
+        default="chat",
+        description="Last active UI tab. Persisted to _last_used profile for session continuity.",
+    )
 
     @model_validator(mode='after')
     def validate_unique_orders(self):
@@ -61,6 +65,7 @@ class ConfigUpdate(BaseModel):
     cosine_enabled: bool = Field(default=True)
     excitation_enabled: bool = Field(default=True)
     firewall_mode: Literal["positive", "negative"] = Field(default="positive")
+    active_tab: str = Field(default="chat")
 
 
 # Max prompt length to prevent memory exhaustion before vectorization

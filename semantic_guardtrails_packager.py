@@ -12,6 +12,9 @@ FOCUS_FILES = [
     # Backend — Provider abstraction (stream_chat wrapped by FPI)
     "backend/app/modules/providers/base.py",
     "backend/app/modules/providers/ollama.py",
+    "backend/app/modules/providers/google.py",
+    # Backend — Profiles (named config persistence)
+    "backend/app/modules/profiles.py",
     # Backend — context (firewall engine, models, state)
     "backend/app/core/firewall.py",
     "backend/app/core/models.py",

@@ -334,3 +334,104 @@ interface SnifferTrace {
   status: "PENDING" | "COMPLETED" | "BREACH";
 }
 ```
+
+---
+
+## 11. Configuration Profiles & Persistence
+
+### 11.1 Overview
+
+The SSA (Session State Architecture) protocol provides persistent configuration across restarts through two orthogonal mechanisms:
+
+1. **Config Profiles** — named JSON snapshots of `ConfigState` stored in `backend/data/`
+2. **Sniffer History** — circular trace buffer flushed to `backend/data/sniffer_history.json`
+3. **Active Tab Persistence** — last UI tab stored as `active_tab` inside `ConfigState` and carried forward via `_last_used`
+
+### 11.2 ProfileManager (`backend/app/modules/profiles.py`)
+
+```
+DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+```
+
+The `DATA_DIR` is resolved as an absolute path relative to the module file — guaranteeing the same location regardless of process working directory (pytest, uvicorn, or CLI).
+
+| Method | Behaviour |
+|---|---|
+| `save_profile(name, state)` | Serializes `ConfigState` → `{name}.json` via `model_dump_json()` |
+| `load_profile(name)` | Returns a `dict` or `None` if not found. Catches all parse errors. |
+| `list_profiles()` | Returns sorted list of stems; underscore-prefixed profiles excluded. |
+| `delete_profile(name)` | Rejects underscore-prefixed names. Returns `True` if deleted. |
+
+**Naming convention:** underscore prefix (`_`) = internal/protected (e.g., `_last_used`, `_default`). These never appear in the public listing and cannot be deleted via `delete_profile()`.
+
+### 11.3 Auto-Persistence on Config Change
+
+Every call to `POST /galaxy/config` atomically:
+1. Updates `config_state` under `asyncio.Lock` (existing behaviour).
+2. Calls `ProfileManager.save_profile("_last_used", new_state)` — fire-and-forget, synchronous (no lock contention; writes are fast JSON).
+
+### 11.4 Auto-Load at Startup (`core/state.py`)
+
+At module load time (before the first request), `state.py` calls `_load_initial_state()`:
+
+```python
+data = ProfileManager.load_profile("_last_used")
+if data:
+    return ConfigState(**data)
+return ConfigState()   # factory defaults
+```
+
+If `_last_used.json` is absent, malformed, or fails Pydantic validation, the module falls back to `ConfigState()` defaults with a warning log. **No crash, no data loss.**
+
+### 11.5 Profile API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/galaxy/profiles` | List user-visible profiles |
+| `POST` | `/galaxy/profiles/save/{name}` | Save current config as `{name}` |
+| `POST` | `/galaxy/profiles/load/{name}` | Load `{name}` and apply as active config |
+| `DELETE` | `/galaxy/profiles/{name}` | Delete `{name}` (protected names: 404/error) |
+
+All endpoints require `X-API-Key` if `FIREWALL_API_KEY` is set.
+
+Loading a profile auto-saves it as `_last_used` so the next restart restores the loaded profile.
+
+### 11.6 active_tab Field
+
+`ConfigState` (and `ConfigUpdate`) now carry an `active_tab: str` field (default `"chat"`).
+
+The frontend writes `active_tab` into every config sync debounce payload. On next session load, `_load_initial_state()` restores the last active tab, and the frontend can use it to restore tab position without additional API calls.
+
+### 11.7 Sniffer Persistence Layer
+
+The RTSS circular buffer is flushed to `backend/data/sniffer_history.json` on every trace processed by `sniffer_consumer()`.
+
+**At consumer startup (`sniffer_consumer()`):**
+```python
+_trace_buffer = _load_history_sync()  # up to _BUFFER_MAX=1000 entries
+```
+
+**On every trace (new or updated):**
+```python
+snapshot = list(_trace_buffer)
+asyncio.create_task(asyncio.to_thread(_save_history_sync, snapshot))
+```
+
+`asyncio.to_thread()` offloads the blocking file write to a thread pool without blocking the event loop. The `snapshot` is a shallow copy taken before the async hand-off to prevent race conditions.
+
+**_BUFFER_MAX = 1000** (increased from 100) — the in-memory circular buffer and the JSON history file are capped at 1000 entries. Oldest entries are evicted FIFO when the cap is reached.
+
+**Resilience:** `_load_history_sync()` catches all `json.JSONDecodeError` and generic exceptions, returning `[]` on failure. The consumer continues normally even if history is corrupted.
+
+### 11.8 Data Directory Layout
+
+```
+backend/
+└── data/
+    ├── _last_used.json          # Auto-saved on every config change
+    ├── sniffer_history.json     # RTSS buffer — last 1000 traces
+    ├── production.json          # Example user profile
+    └── dev_strict.json          # Example user profile
+```
+
+All `*.json` files in `data/` are excluded from version control (`.gitignore`). The directory itself is created at import time by `DATA_DIR.mkdir(exist_ok=True)` in both `profiles.py` and `sniffer.py`.
