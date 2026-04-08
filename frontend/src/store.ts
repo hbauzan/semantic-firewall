@@ -55,6 +55,7 @@ interface StoreState {
   cosineEnabled: boolean;
   excitationEnabled: boolean;
   firewallMode: 'positive' | 'negative';
+  activeTab: 'chat' | 'sniffer';
   setExcitationThreshold: (val: number) => void;
   setNoiseTolerance: (val: number) => void;
   setCosineThreshold: (val: number) => void;
@@ -68,6 +69,7 @@ interface StoreState {
   setCosineEnabled: (val: boolean) => void;
   setExcitationEnabled: (val: boolean) => void;
   setFirewallMode: (val: 'positive' | 'negative') => void;
+  setActiveTab: (val: 'chat' | 'sniffer') => void;
 
   messages: Message[];
   addMessage: (msg: Message) => void;
@@ -109,6 +111,7 @@ export const useStore = create<StoreState>((set) => ({
   cosineEnabled: true,
   excitationEnabled: true,
   firewallMode: 'positive',
+  activeTab: 'chat',
   setExcitationThreshold: (val) => set({ excitationThreshold: val }),
   setNoiseTolerance: (val) => set({ noiseTolerance: val }),
   setCosineThreshold: (val) => set({ cosineThreshold: val }),
@@ -122,6 +125,7 @@ export const useStore = create<StoreState>((set) => ({
   setCosineEnabled: (val) => set({ cosineEnabled: val }),
   setExcitationEnabled: (val) => set({ excitationEnabled: val }),
   setFirewallMode: (val) => set({ firewallMode: val }),
+  setActiveTab: (val) => set({ activeTab: val }),
 
   messages: [],
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),

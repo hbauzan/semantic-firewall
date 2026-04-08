@@ -1,6 +1,6 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.17.0",
+    "version": "v2.18.0",
     "active_features": {
         "google_gemini_provider": true,
         "dynamic_provider_factory": true,
@@ -76,7 +76,12 @@
         "no_context_explicit_stage": true,
         "firewall_mode_positive_negative": true,
         "robust_provider_error_streaming": true,
-        "gemini_version_deprecation_handling": true
+        "gemini_version_deprecation_handling": true,
+        "config_profiles_persistence": true,
+        "unified_sniffer_logging": true,
+        "sniffer_persistence_layer": true,
+        "auto_load_last_config": true,
+        "active_tab_persistence": true
     },
     "state_schema": {
         "excitation_threshold": {
@@ -170,6 +175,11 @@
                 "positive",
                 "negative"
             ]
+        },
+        "active_tab": {
+            "type": "str",
+            "default": "chat",
+            "description": "Last active UI tab. Persisted via _last_used profile."
         }
     },
     "constraints": {

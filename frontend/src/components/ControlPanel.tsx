@@ -46,7 +46,7 @@ export const ControlPanel: React.FC = () => {
   const {
     excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit,
     cosineOrder, excitationOrder, noiseOrder, adaptiveFactor,
-    noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode,
+    noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode, activeTab,
     setExcitationThreshold, setNoiseTolerance, setCosineThreshold, setGlobalNoiseLimit,
     setCosineOrder, setExcitationOrder, setNoiseOrder, setAdaptiveFactor,
     setNoiseEnabled, setCosineEnabled, setExcitationEnabled, setRagTopK, setFirewallMode,
@@ -55,6 +55,11 @@ export const ControlPanel: React.FC = () => {
 
   const [packs, setPacks] = useState<{ filename: string, chunks: number }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Profile state ---
+  const [profiles, setProfiles] = useState<string[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState<string>('');
+  const [newProfileName, setNewProfileName] = useState<string>('');
 
   const fetchPacks = useCallback(async () => {
     try {
@@ -70,7 +75,55 @@ export const ControlPanel: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { fetchPacks(); }, [fetchPacks]);
+  const fetchProfiles = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/galaxy/profiles`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setProfiles(data.profiles || []);
+    } catch (err) {
+      console.error("Failed to fetch profiles:", err);
+    }
+  }, []);
+
+  useEffect(() => { fetchPacks(); fetchProfiles(); }, [fetchPacks, fetchProfiles]);
+
+  const handleSaveProfile = async () => {
+    const name = newProfileName.trim();
+    if (!name) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/galaxy/profiles/save/${encodeURIComponent(name)}`, { method: 'POST' });
+      if (!res.ok) { console.warn(`Save profile failed: ${res.status}`); return; }
+      setNewProfileName('');
+      await fetchProfiles();
+    } catch (err) {
+      console.error("Failed to save profile:", err);
+    }
+  };
+
+  const handleLoadProfile = async () => {
+    if (!selectedProfile) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/galaxy/profiles/load/${encodeURIComponent(selectedProfile)}`, { method: 'POST' });
+      if (!res.ok) { console.warn(`Load profile failed: ${res.status}`); return; }
+      // Reload the page so Zustand store re-syncs from backend
+      window.location.reload();
+    } catch (err) {
+      console.error("Failed to load profile:", err);
+    }
+  };
+
+  const handleDeleteProfile = async () => {
+    if (!selectedProfile) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/galaxy/profiles/${encodeURIComponent(selectedProfile)}`, { method: 'DELETE' });
+      if (!res.ok) { console.warn(`Delete profile failed: ${res.status}`); return; }
+      setSelectedProfile('');
+      await fetchProfiles();
+    } catch (err) {
+      console.error("Failed to delete profile:", err);
+    }
+  };
 
   // Debounce API calls for config
   useEffect(() => {
@@ -91,14 +144,15 @@ export const ControlPanel: React.FC = () => {
           cosine_enabled: cosineEnabled,
           excitation_enabled: excitationEnabled,
           rag_top_k: ragTopK,
-          firewall_mode: firewallMode
+          firewall_mode: firewallMode,
+          active_tab: activeTab,
         })
       }).then(res => {
         if (!res.ok) console.warn(`Config sync failed: ${res.status}`);
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
-  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode]);
+  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode, activeTab]);
 
   // Poll for ingestion status if task is active
   useEffect(() => {
@@ -273,6 +327,57 @@ export const ControlPanel: React.FC = () => {
         <div style={{ fontSize: '0.6rem', opacity: 0.5, display: 'flex', justifyContent: 'space-between' }}>
           <span>1 (fast)</span>
           <span>10 (deep)</span>
+        </div>
+      </div>
+
+      {/* --- Config Profiles --- */}
+      <div style={{ borderTop: '1px solid #222', paddingTop: '0.4rem', marginBottom: '0.4rem' }}>
+        <div style={{ fontSize: '0.7rem', opacity: 0.6, marginBottom: '0.3rem' }}>Config Profiles</div>
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '0.3rem' }}>
+          <select
+            value={selectedProfile}
+            onChange={(e) => setSelectedProfile(e.target.value)}
+            style={{
+              flex: 1, background: '#111', color: 'var(--accent)', border: '1px solid #444',
+              fontSize: '0.7rem', padding: '2px 4px', borderRadius: '2px',
+            }}
+          >
+            <option value="">— select profile —</option>
+            {profiles.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleLoadProfile}
+            disabled={!selectedProfile}
+            style={{ fontSize: '0.65rem', padding: '2px 6px', opacity: selectedProfile ? 1 : 0.4 }}
+            title="Load selected profile"
+          >LOAD</button>
+          <button
+            onClick={handleDeleteProfile}
+            disabled={!selectedProfile}
+            style={{ fontSize: '0.65rem', padding: '2px 6px', color: 'var(--danger)', borderColor: 'var(--danger)', opacity: selectedProfile ? 1 : 0.4 }}
+            title="Delete selected profile"
+          >DEL</button>
+        </div>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <input
+            type="text"
+            placeholder="profile name..."
+            value={newProfileName}
+            onChange={(e) => setNewProfileName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveProfile(); }}
+            style={{
+              flex: 1, background: '#111', color: 'var(--accent)', border: '1px solid #444',
+              fontSize: '0.7rem', padding: '2px 4px', borderRadius: '2px',
+            }}
+          />
+          <button
+            onClick={handleSaveProfile}
+            disabled={!newProfileName.trim()}
+            style={{ fontSize: '0.65rem', padding: '2px 6px', opacity: newProfileName.trim() ? 1 : 0.4 }}
+            title="Save current config as new profile"
+          >SAVE</button>
         </div>
       </div>
 

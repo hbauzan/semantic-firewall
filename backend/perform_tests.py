@@ -640,3 +640,135 @@ async def test_provider_factory_logic():
     settings.google_api_key = None # Clear Google Key
     with pytest.raises(RuntimeError, match="Missing Google API Key"):
         get_provider()
+
+
+# ---------------------------------------------------------------------------
+# SSA Protocol — Config Profiles & Persistence
+# ---------------------------------------------------------------------------
+
+def test_config_profiles_persistence():
+    """ProfileManager: save → list → load → delete round-trip must be 100% consistent."""
+    import tempfile
+    import json
+    from pathlib import Path
+    from app.modules.profiles import ProfileManager
+    from app.core.models import ConfigState
+    import app.modules.profiles as profiles_mod
+
+    # --- Isolate tests to a temp DATA_DIR ---
+    with tempfile.TemporaryDirectory() as tmpdir:
+        original_data_dir = profiles_mod.DATA_DIR
+        profiles_mod.DATA_DIR = Path(tmpdir)
+        try:
+            test_name = "test_profile_roundtrip"
+            state = ConfigState(
+                excitation_threshold=200,
+                cosine_threshold=0.75,
+                firewall_mode="negative",
+                active_tab="sniffer",
+            )
+
+            # 1. Save
+            ProfileManager.save_profile(test_name, state)
+            saved_path = Path(tmpdir) / f"{test_name}.json"
+            assert saved_path.exists(), "Profile file must exist after save"
+
+            # 2. List — should appear
+            names = ProfileManager.list_profiles()
+            assert test_name in names, f"Profile '{test_name}' must appear in list_profiles()"
+
+            # 3. Load — must round-trip cleanly
+            data = ProfileManager.load_profile(test_name)
+            assert data is not None, "load_profile must return a dict"
+            restored = ConfigState(**data)
+            assert restored.excitation_threshold == 200
+            assert restored.cosine_threshold == 0.75
+            assert restored.firewall_mode == "negative"
+            assert restored.active_tab == "sniffer"
+
+            # 4. Protected names must NOT appear in list
+            ProfileManager.save_profile("_internal", state)
+            names_after = ProfileManager.list_profiles()
+            assert "_internal" not in names_after, "Underscore-prefixed profiles must be hidden"
+
+            # 5. Protected names must NOT be deleteable
+            assert ProfileManager.delete_profile("_internal") is False
+
+            # 6. Delete user profile
+            deleted = ProfileManager.delete_profile(test_name)
+            assert deleted is True
+            assert not saved_path.exists(), "Profile file must be gone after delete"
+            assert test_name not in ProfileManager.list_profiles()
+
+            # 7. Load of non-existent profile returns None
+            assert ProfileManager.load_profile("ghost_profile") is None
+
+            # 8. Verify _last_used auto-persistence via API
+            res = client.post("/galaxy/config", json={
+                "excitation_threshold": 333,
+                "noise_tolerance": 0.005,
+                "cosine_threshold": 0.60,
+                "firewall_mode": "positive",
+                "active_tab": "chat",
+            })
+            assert res.status_code == 200
+            # _last_used should have been written to the REAL DATA_DIR (not tmp),
+            # so we just verify the HTTP response is correct
+            assert res.json()["status"] == "updated"
+
+        finally:
+            profiles_mod.DATA_DIR = original_data_dir
+
+
+def test_sniffer_persistence():
+    """Sniffer persistence: HISTORY_FILE path resolves correctly and _load_history_sync is resilient."""
+    from pathlib import Path
+    from app.modules.sniffer import HISTORY_FILE, _load_history_sync, _BUFFER_MAX
+
+    # 1. HISTORY_FILE must be an absolute path ending in backend/data/sniffer_history.json
+    assert HISTORY_FILE.is_absolute(), "HISTORY_FILE must be an absolute path"
+    assert HISTORY_FILE.name == "sniffer_history.json"
+    assert HISTORY_FILE.parent.name == "data"
+
+    # 2. _BUFFER_MAX must be 1000
+    assert _BUFFER_MAX == 1000, f"_BUFFER_MAX must be 1000, got {_BUFFER_MAX}"
+
+    # 3. _load_history_sync with no file returns []
+    import tempfile, json
+    import app.modules.sniffer as sniffer_mod
+    original_history_file = sniffer_mod.HISTORY_FILE
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fake_path = Path(tmpdir) / "sniffer_history.json"
+        sniffer_mod.HISTORY_FILE = fake_path
+
+        try:
+            # No file → empty list
+            result = _load_history_sync()
+            assert result == [], "Missing history file must return empty list"
+
+            # 4. Corrupt JSON → empty list (resilient fallback)
+            fake_path.write_text("not valid json {{{{", encoding="utf-8")
+            result = _load_history_sync()
+            assert result == [], "Corrupt history file must return empty list"
+
+            # 5. Valid JSON round-trip
+            from app.modules.sniffer import emit_trace, sniffer_queue, _save_history_sync, SnifferTrace
+            tid = emit_trace(
+                model="test-model",
+                last_message="persistence test message",
+                decision="PASS",
+                pipeline_trace=[{"stage": "cosine", "passed": True, "cosine_sim": 0.8, "cosine_threshold": 0.5}],
+                status="COMPLETED",
+            )
+            trace = sniffer_queue.get_nowait()
+            _save_history_sync([trace])
+            assert fake_path.exists(), "History file must exist after _save_history_sync"
+
+            loaded = _load_history_sync()
+            assert len(loaded) == 1
+            assert loaded[0].id == trace.id
+            assert loaded[0].firewall.decision == "PASS"
+            assert loaded[0].request.last_message == "persistence test message"
+
+        finally:
+            sniffer_mod.HISTORY_FILE = original_history_file
