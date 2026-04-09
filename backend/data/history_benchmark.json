@@ -1,0 +1,16 @@
+{
+    "excitation_threshold": 150,
+    "noise_tolerance": 0.005,
+    "cosine_threshold": 0.5,
+    "global_noise_limit": 0.5,
+    "cosine_order": 2,
+    "excitation_order": 3,
+    "noise_order": 1,
+    "adaptive_factor": 0.85,
+    "rag_top_k": 3,
+    "noise_enabled": true,
+    "cosine_enabled": true,
+    "excitation_enabled": true,
+    "firewall_mode": "positive",
+    "active_tab": "chat"
+}
