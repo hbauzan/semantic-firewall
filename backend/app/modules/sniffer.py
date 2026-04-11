@@ -140,7 +140,8 @@ def emit_trace(
         threshold = 0.0
         stage_name = t.get("stage", "unknown")
         if stage_name == "noise":
-            value = t.get("avg_delta", 0.0)
+            # Phase 2.1: Transitioned from variance to Shannon Entropy
+            value = t.get("entropy", 0.0)
             threshold = t.get("limit", t.get("global_noise_limit", 0.0))
         elif stage_name == "cosine":
             value = t.get("cosine_sim", 0.0)

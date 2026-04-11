@@ -31,7 +31,7 @@ app/
 - **Routes (`api/routes.py`):** Thin HTTP layer — request parsing, embedding calls, storage queries, telemetry formatting, streaming responses. Delegates all firewall math to `SemanticFirewall`.
 - **Embedder Singleton (`modules/embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU. The model name is read from the `settings` singleton.
 - **Storage Layer (`modules/storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation. Filename validation prevents SQL injection on delete operations.
-- **Ingestor Protocol (`modules/ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines. Chunk size, overlap, and batch size are read from the `settings` singleton (defaults: 2048, 200, 10). Completed/failed tasks are automatically pruned after 1 hour (`TaskStore` with TTL).
+- **Ingestor Protocol (`modules/ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines. Chunk size, overlap, and batch size are read from the `settings` singleton (defaults: 512, 50, 10). Completed/failed tasks are automatically pruned after 1 hour (`TaskStore` with TTL). Updated default chunking parameters for higher granularity: chunk_size=512, chunk_overlap=50. This ensures that specific adversarial instructions are not "diluted" within large text blocks, increasing the signal-to-noise ratio for the Variance filter.
 - **Settings (`core/settings.py`):** Uses `pydantic-settings` (`BaseSettings`) for typed, validated configuration following 12-Factor App principles. All env vars are declared in a single `Settings` class with type annotations, default values, and range constraints. The `.env` file is loaded automatically at boot — no `source` or manual export required. If a variable has an invalid type or fails validation, the app crashes immediately with a clear Pydantic error (fail-fast). Secrets (`FIREWALL_API_KEY`) use `SecretStr` to prevent accidental logging. A singleton `settings` instance is created at import time and imported by all modules. The backend and frontend share a single root-level `.env` file — see `.env.example` for the full list. Vite reads the same file via `envDir: '..'` in `vite.config.ts`.
 
 ## 3. Execution Pipeline (Sequential Reorderable Firewall)
@@ -43,7 +43,7 @@ The firewall executes three distinct validation stages in a **user-defined seque
 | B | **Cosine Filter** | `cosine_order` | 2 |
 | C | **Excitation Filter** | `excitation_order` | 3 |
 
-**Stage A — Noise Pre-Filter (Global Delta Sanity):** Computes the average absolute delta across all 1024 dimensions: `avg_delta = np.mean(np.abs(Q - C))`. If `avg_delta > global_noise_limit`, the query is blocked immediately. This catches gross semantic drift before finer-grained filters run.
+**Stage A — Noise Pre-Filter (Entropy Analysis):** Replaces Variance analysis. Computes the Shannon Entropy of the Query Vector ($Q$) to detect GCG (Greedy Coordinate Gradient) artifacts. Math: $H(Q) = -\sum p_i \log_2(p_i)$, where $p_i$ is the normalized distribution of the 1024D embedding (L1-normalized absolute values). Natural language embeddings exhibit high entropy (distributed information). Adversarial "bursts" (e.g., "! ! ! !") collapse the embedding into low-entropy clusters. If $H(Q) < global\_noise\_limit$ (Default: 4.5), the query is blocked as a `Burst Detection Breach`. This is corpus-independent — the filter does not require a context vector.
 
 **Stage B — Cosine Filter:** Traditional cosine similarity gate. Computes `cos(Q, C) = dot(Q, C) / (‖Q‖ × ‖C‖)` using **raw vectors** (no normalization). Includes zero-norm guard and `np.clip(raw, -1.0, 1.0)` for floating-point safety. Blocks if `cos(Q, C) < cosine_threshold`.
 
@@ -79,12 +79,13 @@ The pipeline supports two operating modes controlled by `firewall_mode` (default
 
 **Breach reason prefix:** In negative mode, `breach_reason` is prefixed with `negative:` (e.g. `"negative:cosine"`) to distinguish from positive-mode breaches in telemetry and sniffer traces.
 
-## 4. Adaptive Clause Logic
-When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, short clauses receive a relaxed excitation threshold to avoid false positives on terse but legitimate queries.
+## 4. Adaptive Clause Logic (Polarity Inversion)
+When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, short clauses receive a logic-inverted threshold multiplier based on mode.
 
 - **Config:** `adaptive_factor` (float, default 0.85, range 0.01–1.00). User-adjustable via HUD slider.
-- **Rule:** If a clause contains **fewer than 6 words**, the excitation threshold is reduced by the adaptive factor: `current_threshold = excitation_threshold × adaptive_factor`.
-- **Rationale:** Short phrases produce sparser embedding activations by nature. Without this multiplier, 2–5 word queries that are semantically valid would be rejected solely due to insufficient dimensional overlap.
+- **Rule:** If a clause contains **fewer than 6 words**, logic inversion applies:
+  - **Positive Mode:** `threshold = excitation_threshold * adaptive_factor` (Default 0.85x). Provides forgiveness for short, terse queries.
+  - **Negative Mode:** `threshold = excitation_threshold * (1.15)`. Increases the similarity requirement for short queries to prevent "diluted" danger signals from triggering false negatives on brief malicious prompts.
 - **Scope:** This adaptive reduction applies **only** within the Excitation Filter stage of the pipeline. Cosine and Noise filters use their full thresholds regardless of clause length.
 - **HUD Feedback:** The ControlPanel displays real-time dimension requirements: `Short Query Req: {threshold × factor} dims` and `Full Query Req: {threshold} dims`.
 - **Telemetry:** When a short clause triggers the adaptive path, the BREACH message includes: `[ADAPTIVE] Short Clause Detected. Applying {factor}x factor.`
@@ -296,8 +297,9 @@ Evolves the RTSS from a firewall-decision-only observer into a full I/O capture 
 
 **Zero-Latency Guarantee:** The wrapper is a pure pass-through: every chunk is yielded immediately after (not before) buffering. The post-stream `update_trace()` uses fire-and-forget `put_nowait()` — the client connection is already closed by the time the update fires.
 
-### 10.6 Stage Semantics: `no_context`
+### 10.6 Stage Semantics: `no_context` & `noise`
 `no_context` is a valid `PipelineStageTrace.stage` value alongside `noise`, `cosine`, and `excitation`. It is emitted when the corpus returns zero results for a clause — the firewall cannot evaluate dimensional alignment because there is no reference vector to compare against.
+The noise stage now explicitly reports Shannon Entropy as its primary metric in the SnifferTrace.
 
 - **`value`:** `0.0` — no metric was computed (corpus miss, not a threshold failure).
 - **`threshold`:** `0.0` — no threshold applies.
@@ -435,3 +437,18 @@ backend/
 ```
 
 All `*.json` files in `data/` are excluded from version control (`.gitignore`). The directory itself is created at import time by `DATA_DIR.mkdir(exist_ok=True)` in both `profiles.py` and `sniffer.py`.
+
+### 11.9 Mode-Aware Auto-Calibration (Non-Intrusive)
+
+The `update_config` logic enforces Phase 2.1 optimized constants when `firewall_mode` is toggled, but **respects user intent** on a per-field basis:
+
+| Mode | `cosine_threshold` | `excitation_threshold` | `global_noise_limit` |
+|---|---|---|---|
+| **Positive** | 0.5315 | 150 | 4.5 |
+| **Negative** | 0.6197 | 170 | 4.5 |
+
+**Non-Intrusive Logic:** For each threshold field (`cosine_threshold`, `excitation_threshold`), the system checks whether the request value differs from the current state. If the user explicitly changed a value (slider moved), that value is preserved. Smart defaults are applied **only** to fields the user did not touch during the mode toggle.
+
+**Profile Sovereignty:** `POST /galaxy/profiles/load/{name}` bypasses auto-calibration entirely — profiles are loaded exactly as saved, with no constant overrides.
+
+Calibration is **atomic** — it occurs inside the `asyncio.Lock` during `POST /galaxy/config`. Constants are only applied when the mode actually **changes** (same-mode config updates preserve all user values). The response returns `new_state.model_dump()` so the frontend HUD reflects the adjusted values immediately.

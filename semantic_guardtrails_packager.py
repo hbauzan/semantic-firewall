@@ -32,6 +32,7 @@ FOCUS_FILES = [
     # Documentation
     "architecture_spec.md",
     "manifest.json",
+    "backend/scripts/augment_corpus.py",
 ]
 
 

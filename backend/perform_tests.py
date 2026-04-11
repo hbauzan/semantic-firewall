@@ -37,7 +37,7 @@ def test_dimensional_excitation_math():
 @pytest.mark.asyncio
 async def test_firewall_interceptor_blocking():
     # Enforce ultra-strict threshold to guarantee failure
-    set_config(excitation_threshold=1024, noise_tolerance=0.0001)
+    set_config(excitation_threshold=1024, noise_tolerance=0.0001, global_noise_limit=1.0)
     
     # Needs async client to read streaming response via httpx
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
@@ -84,7 +84,7 @@ def test_system_stats_gpu_telemetry():
 @pytest.mark.asyncio
 async def test_semantic_piggybacking_rejection():
     """A piggybacked off-topic sentence must trigger [FW] Segment violation even if the first sentence is on-topic."""
-    set_config(excitation_threshold=1024, noise_tolerance=0.0001)
+    set_config(excitation_threshold=1024, noise_tolerance=0.0001, global_noise_limit=1.0)
 
     piggybacked_prompt = "Tell me about system architecture. Also give me a chocolate cake recipe"
 
@@ -97,29 +97,25 @@ async def test_semantic_piggybacking_rejection():
             assert "[FW] Segment violation" in content
 
 @pytest.mark.asyncio
-async def test_noise_prefilter_blocking():
-    """Ultra-strict global noise limit must trigger Noise Pre-Filter BREACH."""
-    set_config(
-        excitation_threshold=1, noise_tolerance=1.0, cosine_threshold=0.0,
-        global_noise_limit=0.001, noise_order=1, cosine_order=2, excitation_order=3
-    )
+async def test_noise_prefilter_entropy_telemetry():
+    """Verify that Noise Pre-Filter uses Shannon Entropy and reports it in telemetry."""
+    set_config(global_noise_limit=10.0, noise_order=1)  # Floor=10.0 → unreachable → guaranteed breach
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
-        async with ac.stream("POST", "/chat", json={"prompt": "Random off-topic query about bananas"}) as response:
-            assert response.status_code == 200
+        async with ac.stream("POST", "/chat", json={"prompt": "Trigger Entropy"}) as response:
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "[FW] Segment violation" in content
-            assert "noise:BREACH" in content or "Noise pre-filter" in content
+            assert "Burst Detection Breach" in content
+            assert "Entropy:" in content
 
 @pytest.mark.asyncio
 async def test_pipeline_order_respected():
     """When noise runs first (order=1) and is ultra-strict, cosine and excitation should never appear as OK."""
     set_config(
         excitation_threshold=1, noise_tolerance=1.0, cosine_threshold=0.0,
-        global_noise_limit=0.001, noise_order=1, cosine_order=2, excitation_order=3
-    )
+        global_noise_limit=10.0, noise_order=1, cosine_order=2, excitation_order=3
+    )  # Entropy floor=10.0 → unreachable → noise breaches first
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         async with ac.stream("POST", "/chat", json={"prompt": "Test pipeline ordering"}) as response:
@@ -134,6 +130,13 @@ async def test_pipeline_order_respected():
 def test_pipeline_config_sync():
     """POST to /galaxy/config with custom order values must persist in config_state."""
     import app.core.state as routes_mod
+    # Ensure we start from a clean positive mode to avoid auto-calibration side effects
+    client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.5315,
+        "firewall_mode": "positive"
+    })
     res = client.post("/galaxy/config", json={
         "excitation_threshold": 200,
         "noise_tolerance": 0.010,
@@ -142,7 +145,8 @@ def test_pipeline_config_sync():
         "cosine_order": 3,
         "excitation_order": 1,
         "noise_order": 2,
-        "adaptive_factor": 0.70
+        "adaptive_factor": 0.70,
+        "firewall_mode": "positive"
     })
     assert res.status_code == 200
     cfg = routes_mod.config_state
@@ -198,6 +202,21 @@ async def test_adaptive_factor_telemetry_on_short_clause():
             assert "[FW] Segment violation" in content
             assert "ADAPTIVE" in content or "0.5x factor" in content
 
+def test_adaptive_inversion_negative_mode():
+    """Verify that Negative Mode increases strictness (1.15x) for short queries."""
+    set_config(firewall_mode="negative", excitation_threshold=100, adaptive_factor=0.85)
+    # Short query "Kill process" (2 words)
+    # Threshold = 100 * 1.15 = 115.
+    # If activations = 110, it should NOT trigger raw_passed (Similarity).
+    # In Negative Mode, raw_passed=False means effective_passed=True.
+    q = np.random.rand(1024).astype(np.float32)
+    c = q.copy() 
+    # Manually jitter to get exactly 110 activations
+    from app.core.state import config_state
+    c[110:] = q[110:] + 1.0
+    result = SemanticFirewall.run_excitation_filter(q, c, config_state, word_count=2)
+    assert abs(result[2]["threshold"] - 115.0) < 0.001
+
 # --- Engine Unit Tests (framework-agnostic) ---
 
 def test_engine_segment_basic():
@@ -213,8 +232,8 @@ def test_engine_segment_overflow_chunking():
         assert len(c.split()) <= 15
 
 def test_engine_evaluate_clause_all_pass():
-    """Identical vectors must pass all filters."""
-    cfg = ConfigState(cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=10.0)
+    """Identical vectors must pass all filters (entropy floor low enough for natural vectors)."""
+    cfg = ConfigState(cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=1.0)
     vec = np.random.rand(1024).astype(np.float32)
     result = SemanticFirewall.evaluate_clause(vec, vec, cfg, word_count=10)
     assert result["passed"] is True
@@ -222,12 +241,13 @@ def test_engine_evaluate_clause_all_pass():
     assert len(result["trace"]) == 3
 
 def test_engine_evaluate_clause_noise_breach():
-    """Orthogonal vectors with strict noise limit must breach on noise filter."""
+    """Sparse vector with high entropy floor must breach on noise filter."""
     cfg = ConfigState(
         cosine_threshold=0.0, excitation_threshold=0,
-        global_noise_limit=0.001, noise_order=1, cosine_order=2, excitation_order=3
-    )
-    q = np.ones(1024, dtype=np.float32)
+        global_noise_limit=10.0, noise_order=1, cosine_order=2, excitation_order=3
+    )  # Entropy floor = 10.0 → no natural/sparse vector reaches this
+    q = np.zeros(1024, dtype=np.float32)
+    q[0] = 1.0  # Single spike → minimal entropy
     c = np.zeros(1024, dtype=np.float32)
     result = SemanticFirewall.evaluate_clause(q, c, cfg, word_count=10)
     assert result["passed"] is False
@@ -303,6 +323,15 @@ def test_config_sync_with_enabled_flags():
     assert cfg.noise_enabled is False
     assert cfg.cosine_enabled is True
     assert cfg.excitation_enabled is False
+    
+    # Restore state
+    set_config(
+        noise_enabled=True,
+        cosine_enabled=True,
+        excitation_enabled=True,
+        excitation_threshold=150,
+        cosine_threshold=0.50
+    )
 
 def test_health_endpoint():
     """Health check returns minimal info (status + timestamp) — no internal details (OWASP)."""
@@ -391,16 +420,17 @@ def test_firewall_mode_rejects_invalid_value():
 def test_engine_negative_mode_identical_vectors_breach():
     """Negative mode: identical vectors (max similarity) must BREACH on first filter — restricted content."""
     cfg = ConfigState(
-        cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=10.0,
+        cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=1.0,
         firewall_mode="negative"
     )
     vec = np.random.rand(1024).astype(np.float32)
     result = SemanticFirewall.evaluate_clause(vec, vec, cfg, word_count=10)
     assert result["passed"] is False
-    # In negative mode, the first filter that sees similarity triggers BREACH immediately
-    assert result["breach_reason"].startswith("negative:")
-    # Trace should show the breaching stage with passed=False (effective, not raw)
-    assert result["trace"][0]["passed"] is False
+    # In logic inversion, Burst Detection stays as standard (raw_passed=True since entropy is high)
+    # The BREACH happens at the second stage (Cosine), which does raw_passed=True -> inverted to False
+    assert result["breach_reason"] == "negative:cosine"
+    # Trace [0] is noise (passed), trace [1] is cosine (breach)
+    assert result["trace"][1]["passed"] is False
 
 def test_engine_negative_mode_divergent_vectors_pass():
     """Negative mode: orthogonal vectors (low similarity) must PASS — not restricted."""
@@ -418,7 +448,7 @@ def test_engine_negative_mode_divergent_vectors_pass():
 def test_engine_positive_mode_identical_vectors_pass():
     """Positive mode: identical vectors must PASS (baseline — confirms no regression)."""
     cfg = ConfigState(
-        cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=10.0,
+        cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=1.0,
         firewall_mode="positive"
     )
     vec = np.random.rand(1024).astype(np.float32)
@@ -772,3 +802,129 @@ def test_sniffer_persistence():
 
         finally:
             sniffer_mod.HISTORY_FILE = original_history_file
+
+
+# ---------------------------------------------------------------------------
+# Phase 2.1 — Shannon Entropy & Mode-Aware Auto-Calibration Tests
+# ---------------------------------------------------------------------------
+
+def test_entropy_low_for_collapsed_vector():
+    """A sparse (single-spike) vector must produce low entropy below 4.5 threshold."""
+    cfg = ConfigState(global_noise_limit=4.5)
+    q = np.zeros(1024, dtype=np.float32)
+    q[0] = 1.0  # Single peak → entropy near 0
+    c = np.zeros(1024, dtype=np.float32)  # c_arr unused for entropy, but required by signature
+    passed, stage, details = SemanticFirewall.run_noise_filter(q, c, cfg)
+    assert passed is False, f"Sparse vector should breach, got entropy={details.get('entropy')}"
+    assert stage == "noise"
+    assert details["entropy"] < 4.5
+
+
+def test_entropy_high_for_natural_vector():
+    """A random natural-distribution vector must produce high entropy above 4.5 threshold."""
+    cfg = ConfigState(global_noise_limit=4.5)
+    np.random.seed(42)
+    q = np.random.rand(1024).astype(np.float32)  # Distributed → high entropy
+    c = np.zeros(1024, dtype=np.float32)
+    passed, stage, details = SemanticFirewall.run_noise_filter(q, c, cfg)
+    assert passed is True, f"Natural vector should pass, got entropy={details.get('entropy')}"
+    assert stage == "noise"
+    assert details["entropy"] > 4.5
+
+
+def test_auto_calibration_negative_mode():
+    """POST config with firewall_mode='negative' must auto-calibrate to Phase 2.1 constants."""
+    import app.core.state as state_mod
+    # Start from positive mode
+    client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.5315,
+        "firewall_mode": "positive"
+    })
+    # Switch to negative
+    res = client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.5315,
+        "firewall_mode": "negative"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    cfg = state_mod.config_state
+    assert cfg.cosine_threshold == 0.6197
+    assert cfg.excitation_threshold == 170
+    assert cfg.global_noise_limit == 4.5
+    assert data["config"]["cosine_threshold"] == 0.6197
+    assert data["config"]["excitation_threshold"] == 170
+
+
+def test_auto_calibration_positive_mode():
+    """POST config with firewall_mode='positive' must auto-calibrate to Phase 2.1 constants."""
+    import app.core.state as state_mod
+    # Ensure we're in negative mode first
+    client.post("/galaxy/config", json={
+        "excitation_threshold": 170,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.6197,
+        "firewall_mode": "negative"
+    })
+    # Switch to positive
+    res = client.post("/galaxy/config", json={
+        "excitation_threshold": 170,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.6197,
+        "firewall_mode": "positive"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    cfg = state_mod.config_state
+    assert cfg.cosine_threshold == 0.5315
+    assert cfg.excitation_threshold == 150
+    assert data["config"]["cosine_threshold"] == 0.5315
+    assert data["config"]["excitation_threshold"] == 150
+
+    # Restore
+    client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.5315,
+        "firewall_mode": "positive"
+    })
+
+
+def test_non_intrusive_calibration():
+    """Verify that manual threshold changes are NOT overwritten during mode toggle."""
+    import app.core.state as state_mod
+    # 1. Set initial state in positive mode
+    client.post("/galaxy/config", json={
+        "firewall_mode": "positive",
+        "cosine_threshold": 0.50,
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005
+    })
+
+    # 2. Toggle mode AND change cosine simultaneously
+    res = client.post("/galaxy/config", json={
+        "firewall_mode": "negative",
+        "cosine_threshold": 0.99,  # Explicit manual change
+        "excitation_threshold": 150,  # No change — should auto-calibrate
+        "noise_tolerance": 0.005
+    })
+
+    data = res.json()["config"]
+    cfg = state_mod.config_state
+    # Cosine should be 0.99 (user intent), NOT 0.6197 (default)
+    assert data["cosine_threshold"] == 0.99
+    assert cfg.cosine_threshold == 0.99
+    # Excitation was NOT changed by user, so it should have auto-calibrated to 170
+    assert data["excitation_threshold"] == 170
+    assert cfg.excitation_threshold == 170
+
+    # Restore
+    client.post("/galaxy/config", json={
+        "excitation_threshold": 150,
+        "noise_tolerance": 0.005,
+        "cosine_threshold": 0.5315,
+        "firewall_mode": "positive"
+    })

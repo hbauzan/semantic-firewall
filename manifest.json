@@ -1,7 +1,12 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.18.0",
+    "version": "v2.21.0",
     "active_features": {
+        "corpus_densification_1k": true,
+        "optimized_chunking_512": true,
+        "sniffer_variance_telemetry": true,
+        "advbench_augmentation_pipeline": true,
+        "gauntlet_benchmark_ready": true,
         "google_gemini_provider": true,
         "dynamic_provider_factory": true,
         "upstream_provider_selection": true,
@@ -81,7 +86,18 @@
         "unified_sniffer_logging": true,
         "sniffer_persistence_layer": true,
         "auto_load_last_config": true,
-        "active_tab_persistence": true
+        "active_tab_persistence": true,
+        "adaptive_factor_logic_inversion": true,
+        "shannon_entropy_noise_filter": true,
+        "mode_aware_auto_calibration": true,
+        "non_intrusive_auto_calibration": true,
+        "user_intent_preservation": true,
+        "profile_load_sovereignty": true,
+        "excitation_threshold_recalibration_170": true,
+        "corpus_independent_burst_detection": true,
+        "synthetic_corpus_augmentation_script": true,
+        "youden_threshold_calibration": true,
+        "mps_accelerated_augmentation": true
     },
     "state_schema": {
         "excitation_threshold": {
@@ -102,7 +118,7 @@
         },
         "cosine_threshold": {
             "type": "float",
-            "default": 0.50,
+            "default": 0.5315,
             "range": [
                 0.0,
                 1.0
@@ -110,7 +126,7 @@
         },
         "global_noise_limit": {
             "type": "float",
-            "default": 0.50,
+            "default": 4.5,
             "range": [
                 0.0,
                 10.0

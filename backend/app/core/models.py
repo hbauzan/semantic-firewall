@@ -17,8 +17,10 @@ class ConfigState(BaseModel):
 
     excitation_threshold: int = Field(default=150, ge=0, le=1024)
     noise_tolerance: float = Field(default=0.005, ge=0.0, le=1.0)
-    cosine_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
-    global_noise_limit: float = Field(default=0.50, ge=0.0, le=10.0)
+    # Optimized Youden Threshold (0.5315) for Negative Mode default
+    cosine_threshold: float = Field(default=0.5315, ge=0.0, le=1.0)
+    # Global Noise Limit — Shannon Entropy Floor (corpus-independent)
+    global_noise_limit: float = Field(default=4.5, ge=0.0, le=10.0)
     cosine_order: int = Field(default=2, ge=1, le=3)
     excitation_order: int = Field(default=3, ge=1, le=3)
     noise_order: int = Field(default=1, ge=1, le=3)
@@ -55,7 +57,7 @@ class ConfigUpdate(BaseModel):
     excitation_threshold: int = Field(ge=0, le=1024)
     noise_tolerance: float = Field(ge=0.0, le=1.0)
     cosine_threshold: float = Field(ge=0.0, le=1.0)
-    global_noise_limit: float = Field(default=0.50, ge=0.0, le=10.0)
+    global_noise_limit: float = Field(default=4.5, ge=0.0, le=10.0)
     cosine_order: int = Field(default=2, ge=1, le=3)
     excitation_order: int = Field(default=3, ge=1, le=3)
     noise_order: int = Field(default=1, ge=1, le=3)

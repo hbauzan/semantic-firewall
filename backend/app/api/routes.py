@@ -120,11 +120,36 @@ async def update_config(config: ConfigUpdate):
     from app.core import state as state_mod
     try:
         async with _config_lock:
-            new_state = ConfigState(**config.model_dump())
+            current = state_mod.config_state
+            req_data = config.model_dump()
+
+            # --- Phase 2.1-B: Non-Intrusive Smart Calibration ---
+            mode_toggled = req_data["firewall_mode"] != current.firewall_mode
+
+            # Detect per-field user intent: if req value != current value, user moved a slider
+            cos_manual = req_data["cosine_threshold"] != current.cosine_threshold
+            exc_manual = req_data["excitation_threshold"] != current.excitation_threshold
+
+            # Apply defaults ONLY if mode is toggled AND user didn't touch the slider
+            if mode_toggled:
+                if req_data["firewall_mode"] == "negative":
+                    if not cos_manual:
+                        req_data["cosine_threshold"] = 0.6197
+                    if not exc_manual:
+                        req_data["excitation_threshold"] = 170
+                    req_data["global_noise_limit"] = 4.5  # Entropy Floor
+                else:
+                    if not cos_manual:
+                        req_data["cosine_threshold"] = 0.5315
+                    if not exc_manual:
+                        req_data["excitation_threshold"] = 150
+                    req_data["global_noise_limit"] = 4.5
+
+            new_state = ConfigState(**req_data)
             state_mod.config_state = new_state
-        # Auto-persist every config change to _last_used for session continuity
+
         ProfileManager.save_profile("_last_used", new_state)
-        return {"status": "updated", "config": config.model_dump()}
+        return {"status": "updated", "config": new_state.model_dump()}
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid configuration values")
 
@@ -348,19 +373,11 @@ def _format_block_message(
                 f'Vector direction diverges from corpus.'
             )
     elif bare_reason == "noise":
-        if negative:
-            msg = (
-                f'🛑 [FW]{mode_tag} Restricted content detected: "{failed_clause}". '
-                f'Noise pre-filter: avg_delta={details.get("avg_delta", 0):.4f} '
-                f'(Limit: {cfg.global_noise_limit:.3f}). '
-                f'Query is too close to denylist corpus.'
-            )
-        else:
-            msg = (
-                f'🛑 [FW] Segment violation: "{failed_clause}". '
-                f'Noise pre-filter: avg_delta={details.get("avg_delta", 0):.4f} '
-                f'(Limit: {cfg.global_noise_limit:.3f}).'
-            )
+        msg = (
+            f'🛑 [FW]{mode_tag} Burst Detection Breach: "{failed_clause}". '
+            f'Entropy: {details.get("entropy", 0):.4f} '
+            f'(Limit: {cfg.global_noise_limit:.3f}).'
+        )
     elif bare_reason == "no_context":
         msg = (
             f'🛑 [FW] Segment violation: "{failed_clause}". '
