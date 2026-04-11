@@ -84,8 +84,8 @@ class Settings(BaseSettings):
         default=50, ge=1, le=500,
         description="Maximum PDF upload size in megabytes.",
     )
-    chunk_size: int = Field(default=2048, ge=100, le=10000)
-    chunk_overlap: int = Field(default=200, ge=0, le=2000)
+    chunk_size: int = Field(default=512, ge=100, le=10000)  # Reduced for density
+    chunk_overlap: int = Field(default=50, ge=0, le=2000)   # Reduced for precision
     embedding_batch_size: int = Field(default=10, ge=1, le=100)
 
     @property

@@ -51,11 +51,17 @@ class SemanticFirewall:
     def run_noise_filter(
         q_arr: np.ndarray, c_arr: np.ndarray, cfg: ConfigState, **_kw: Any
     ) -> tuple[bool, str, dict]:
-        """Global delta sanity check across all dimensions."""
-        avg_delta = float(np.mean(np.abs(q_arr - c_arr)))
-        if avg_delta > cfg.global_noise_limit:
-            return False, "noise", {"avg_delta": avg_delta, "limit": cfg.global_noise_limit}
-        return True, "noise", {"avg_delta": avg_delta}
+        """Burst Detection: Shannon Entropy of the Query Vector (Corpus-Independent)."""
+        # Normalize Q to a probability distribution for entropy calculation
+        abs_q = np.abs(q_arr)
+        p = abs_q / (np.sum(abs_q) + 1e-9)
+        entropy = float(-np.sum(p * np.log2(p + 1e-9)))
+
+        # Low entropy = collapsed/repetitive embedding (GCG signature)
+        # Note: global_noise_limit now acts as an Entropy Floor
+        if entropy < cfg.global_noise_limit:
+            return False, "noise", {"entropy": entropy, "limit": cfg.global_noise_limit}
+        return True, "noise", {"entropy": entropy}
 
     @staticmethod
     def run_cosine_filter(
@@ -77,11 +83,21 @@ class SemanticFirewall:
     def run_excitation_filter(
         q_arr: np.ndarray, c_arr: np.ndarray, cfg: ConfigState, word_count: int = 0, **_kw: Any
     ) -> tuple[bool, str, dict]:
-        """Dimensional resonance count with adaptive threshold for short clauses."""
+        """Dimensional resonance with Mode-Aware Adaptive Polarity."""
         delta = np.abs(q_arr - c_arr)
         activations = int(np.sum(delta <= cfg.noise_tolerance))
         is_short = word_count < 6
-        factor = cfg.adaptive_factor if is_short else 1.0
+        
+        # Logic Inversion: Positive (Forgiveness) vs Negative (Strictness)
+        if is_short:
+            if cfg.firewall_mode == "positive":
+                factor = cfg.adaptive_factor  # e.g., 0.85x (Lower threshold = easier to pass)
+            else:
+                # Negative mode: Increase threshold to ensure only high-confidence matches breach
+                factor = 1.15  # Explicit 1.15x as per Phase 2 mandate
+        else:
+            factor = 1.0
+
         threshold = float(cfg.excitation_threshold) * factor
         passed = activations >= threshold
         return passed, "excitation", {
@@ -148,7 +164,11 @@ class SemanticFirewall:
             )
 
             # In negative mode, invert the result: similarity = bad, divergence = good
-            effective_passed = (not raw_passed) if negative else raw_passed
+            # Burst Detection ('noise') checks for adversarial signatures regardless of mode, so do not invert it.
+            if negative and stage_name != "noise":
+                effective_passed = not raw_passed
+            else:
+                effective_passed = raw_passed
 
             trace.append({"stage": stage_name, "passed": effective_passed, **details})
 
