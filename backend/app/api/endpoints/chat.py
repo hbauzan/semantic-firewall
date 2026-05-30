@@ -132,16 +132,17 @@ async def chat_endpoint(request: Request, req: ChatRequest):
         stage_summary = " → ".join(
             f'{r["stage"]}:{"OK" if r["passed"] else "MISS"}' for r in all_traces
         )
-        mode_label = "NEGATIVE" if negative else "POSITIVE"
-        pass_prefix = (
-            f"🟢 [FW PASS] [{mode_label}] Resonance: "
-            f"{last_activations}/{cfg.excitation_threshold} dims | "
-            f"Cosine: {last_cosine:.3f} | "
-            f"Pipeline: [{stage_summary}]\n"
-            f"Routing to corpus...\n\n"
-        )
+        
+        entropy = 0.0
+        for t in all_traces:
+            if t.get("stage") == "noise":
+                entropy = t.get("value", 0.0)
+                break
+                
+        telemetry_prefix = f"🟢 [FW PASS] [Resonance: {last_activations} | Cosine: {last_cosine:.3f} | Entropy: {entropy:.2f}]\n\n"
+        
         async def prefixed_stream():
-            yield json.dumps({"response": pass_prefix}).encode("utf-8") + b"\n"
+            yield json.dumps({"response": telemetry_prefix}).encode("utf-8") + b"\n"
             async for chunk in _stream_via_provider(clean_prompt, context, cfg, strict=True):
                 yield chunk
         return StreamingResponse(prefixed_stream(), media_type="application/x-ndjson")

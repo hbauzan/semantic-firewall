@@ -112,6 +112,11 @@ def _save_history_sync(buffer: list[SnifferTrace]) -> None:
         logger.error("Failed to save sniffer history: %s", e)
 
 
+def get_sniffer_history() -> list[SnifferTrace]:
+    """Return a snapshot of the in-memory trace buffer."""
+    return list(_trace_buffer)
+
+
 # ---------------------------------------------------------------------------
 # Producer API  (called from routes — never awaited by the proxy stream)
 # ---------------------------------------------------------------------------
