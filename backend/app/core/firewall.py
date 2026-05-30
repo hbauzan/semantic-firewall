@@ -6,12 +6,23 @@ Portable across CLI tools, test harnesses, or alternative API wrappers.
 """
 import logging
 import re
-from typing import Any, Callable
+from typing import Any, Callable, TypedDict
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
 from app.core.models import ConfigState
+
+
+class ClauseResult(TypedDict):
+    """Typed return value for SemanticFirewall.evaluate_clause().
+    Ensures type-safety for all consumers (routes, tests, CLI tools)."""
+    passed: bool
+    breach_reason: str | None
+    breach_details: dict | None
+    trace: list[dict]
+    last_activations: int
+    last_cosine: float
 
 
 class SemanticFirewall:
@@ -128,7 +139,7 @@ class SemanticFirewall:
         c_arr: np.ndarray,
         cfg: ConfigState,
         word_count: int = 0,
-    ) -> dict:
+    ) -> ClauseResult:
         """Run the full ordered pipeline on a single clause's vectors.
 
         Mode semantics (symmetric inversion):

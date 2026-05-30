@@ -15,10 +15,11 @@ class GoogleGeminiProvider(BaseProvider):
             role = "user" if m["role"] == "user" else "model"
             contents.append({"role": role, "parts": [{"text": m["content"]}]})
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:streamGenerateContent?alt=sse&key={api_key}"
-        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:streamGenerateContent?alt=sse"
+        headers = {"x-goog-api-key": api_key}
+
         async with httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=300.0)) as client:
-            async with client.stream("POST", url, json={"contents": contents}) as response:
+            async with client.stream("POST", url, json={"contents": contents}, headers=headers) as response:
                 if response.status_code != 200:
                     await response.aread()
                     error_text = f"🔴 [LLM ERROR] Google Gemini API Error ({response.status_code}): {response.text}"

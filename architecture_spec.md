@@ -15,20 +15,32 @@ app/
 ├── core/                    # Framework-agnostic logic
 │   ├── models.py            # Pydantic models (ConfigState, ConfigUpdate, etc.)
 │   ├── state.py             # Global config singleton + asyncio.Lock + set_config()
-│   ├── firewall.py          # SemanticFirewall engine (pure vector math)
+│   ├── firewall.py          # SemanticFirewall engine (pure vector math) + ClauseResult TypedDict
 │   └── settings.py          # Environment-driven settings (Ollama, embedder, chunks)
 ├── api/
-│   └── routes.py            # Thin FastAPI layer (HTTP, streaming, telemetry)
+│   ├── router_main.py       # Entry point — includes all sub-routers
+│   └── endpoints/
+│       ├── _shared.py       # verify_api_key + limiter (shared across endpoints)
+│       ├── corpus.py        # PDF upload, task status, packs, deletion
+│       ├── config.py        # /galaxy/config (GET+POST), profiles, /audit
+│       ├── chat.py          # /chat and /v1/chat/completions (unified provider)
+│       └── system.py        # /health, /system/stats, /v1/sniffer/stream
 └── modules/
     ├── embedder.py          # BGE-M3 embedding singleton
     ├── storage.py           # LanceDB vector store
-    └── ingestor.py          # PDF chunking pipeline + TaskStore with TTL
+    ├── ingestor.py          # PDF chunking pipeline + TaskStore with TTL
+    ├── sniffer.py           # RTSS producer-consumer + SSE + persistence
+    ├── profiles.py          # JSON profiles with path traversal protection
+    └── providers/           # Strategy pattern for LLM backends
+        ├── base.py
+        ├── ollama.py
+        └── google.py
 ```
 
-- **Firewall Engine (`core/firewall.py`):** `SemanticFirewall` class with static methods — completely agnostic of web framework, embedders, and storage. Receives numpy arrays and a frozen `ConfigState`, returns structured results. Portable for CLI tools, batch audits, or alternative API wrappers. Contains: `segment()`, `run_noise_filter()`, `run_cosine_filter()`, `run_excitation_filter()`, `build_pipeline()`, `evaluate_clause()`.
+- **Firewall Engine (`core/firewall.py`):** `SemanticFirewall` class with static methods — completely agnostic of web framework, embedders, and storage. Receives numpy arrays and a frozen `ConfigState`, returns structured `ClauseResult` (TypedDict). Portable for CLI tools, batch audits, or alternative API wrappers. Contains: `segment()`, `run_noise_filter()`, `run_cosine_filter()`, `run_excitation_filter()`, `build_pipeline()`, `evaluate_clause()`.
 - **Models (`core/models.py`):** All Pydantic schemas. `ConfigState` is a **frozen BaseModel** — immutable after construction. `Field` constraints enforce value ranges. `@model_validator` ensures pipeline order uniqueness.
 - **State (`core/state.py`):** Configuration singleton + `asyncio.Lock` for serialized writes. `set_config()` is an **async** function that acquires the lock before performing merge-validate-swap, guaranteeing no concurrent config corruption. A separate `set_config_sync()` exists for single-threaded test harnesses only. Each request handler snapshots the reference at entry (`cfg = config_state`) for mid-request consistency.
-- **Routes (`api/routes.py`):** Thin HTTP layer — request parsing, embedding calls, storage queries, telemetry formatting, streaming responses. Delegates all firewall math to `SemanticFirewall`.
+- **Routes (`api/router_main.py` + `api/endpoints/`):** Decomposed into thematic sub-routers (corpus, config, chat, system) aggregated by `router_main.py`. Each endpoint module imports shared dependencies (`verify_api_key`, `limiter`) from `_shared.py`. The `/chat` endpoint uses `BaseProvider.stream_chat()` (no standalone `stream_ollama` function). Providers are instantiated lazily inside request handlers to prevent boot-time crashes if API keys are missing.
 - **Embedder Singleton (`modules/embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU. The model name is read from the `settings` singleton.
 - **Storage Layer (`modules/storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation. Filename validation prevents SQL injection on delete operations.
 - **Ingestor Protocol (`modules/ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines. Chunk size, overlap, and batch size are read from the `settings` singleton (defaults: 512, 50, 10). Completed/failed tasks are automatically pruned after 1 hour (`TaskStore` with TTL). Updated default chunking parameters for higher granularity: chunk_size=512, chunk_overlap=50. This ensures that specific adversarial instructions are not "diluted" within large text blocks, increasing the signal-to-noise ratio for the Variance filter.
@@ -91,9 +103,9 @@ When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, 
 - **Telemetry:** When a short clause triggers the adaptive path, the BREACH message includes: `[ADAPTIVE] Short Clause Detected. Applying {factor}x factor.`
 
 ## 5. Frontend Control Logic
-- **State Management:** Overarched by **Zustand** React 19 Store maintaining configuration payloads (including `cosineOrder`, `excitationOrder`, `noiseOrder`, `globalNoiseLimit`, `adaptiveFactor`), an overarching `systemAction` global state, asynchronous ingestion states, chat histories, and per-second telemetry data points.
-- **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings. Displays **Three Monkey Heads** (one per filter: Noise, Cosine, Excitation) — each head animates when its filter is enabled and goes dark when disabled, providing visual pipeline status. Also shows the current `systemAction` state and a compact telemetry line (CPU/RAM/GPU). On Apple Silicon (MPS), GPU% is calculated as `torch.mps.current_allocated_memory() / psutil.virtual_memory().total * 100` — reflecting actual allocation against total unified memory. On CUDA, it uses `torch.cuda.memory_allocated() / torch.cuda.get_device_properties(0).total_mem * 100`.
-- **Pipeline Ordering UI (`ControlPanel.tsx`):** Slider groups are visually ordered to match the default pipeline execution sequence: **Noise Pre-Filter (Seq 1)** → **Cosine Gate (Seq 2)** → **Excitation Threshold + Noise Tolerance (Seq 3)** → **Adaptive Factor**. Each filter includes a **Seq** numerical input (1–3) that controls pipeline execution order and an **ON/OFF toggle button** that enables or disables that individual filter. When a filter is toggled OFF, its slider group dims to 40% opacity and the filter is excluded from the pipeline entirely (via `build_pipeline()` in the engine). The firewall is considered active when at least one filter is enabled (`fw_on = noise_enabled || cosine_enabled || excitation_enabled`). There is no user-prompt bypass — the firewall can only be disabled via the authenticated HUD toggles. All values including enabled states are synced to the backend via debounced `POST /galaxy/config`.
+- **State Management:** Overarched by **Zustand** React 19 Store using a **4-slice architecture**: `FirewallSlice` (config, modes, pipeline orders), `ChatSlice` (messages, input state), `SystemSlice` (telemetry, ingestion, global status), `SnifferSlice` (logs, filters). Telemetry is isolated in the System slice to prevent 1Hz poll updates from re-rendering the chat message list. The exported `useStore` hook composes all slices — no consumer-facing API change.
+- **HUD Telemetry (`TelemetryHUD.tsx`):** Periodically polls `/system/stats` for PSUtil & CPU / Torch RAM mappings. Uses CSS classes from `styles/ControlPanel.css` (extracted from inline styles). Displays **Three Monkey Heads** (one per filter: Noise, Cosine, Excitation) — each head animates when its filter is enabled and goes dark when disabled, providing visual pipeline status. Also shows the current `systemAction` state and a compact telemetry line (CPU/RAM/GPU). On Apple Silicon (MPS), GPU% is calculated as `torch.mps.current_allocated_memory() / psutil.virtual_memory().total * 100` — reflecting actual allocation against total unified memory. On CUDA, it uses `torch.cuda.memory_allocated() / torch.cuda.get_device_properties(0).total_mem * 100`.
+- **Pipeline Ordering UI (`ControlPanel.tsx`):** Uses CSS classes from `styles/ControlPanel.css` (inline styles extracted). Slider groups are visually ordered to match the default pipeline execution sequence: **Noise Pre-Filter (Seq 1)** → **Cosine Gate (Seq 2)** → **Excitation Threshold + Noise Tolerance (Seq 3)** → **Adaptive Factor**. On mount, `ControlPanel` fetches `GET /galaxy/config` to hydrate the Zustand store with actual backend state — eliminating default value desync (e.g. `globalNoiseLimit: 0.50` vs `4.5`). Each filter includes a **Seq** numerical input (1–3) that controls pipeline execution order and an **ON/OFF toggle button** that enables or disables that individual filter. When a filter is toggled OFF, its slider group dims via `.filter-group--disabled` class and the filter is excluded from the pipeline entirely (via `build_pipeline()` in the engine). The firewall is considered active when at least one filter is enabled (`fw_on = noise_enabled || cosine_enabled || excitation_enabled`). There is no user-prompt bypass — the firewall can only be disabled via the authenticated HUD toggles. All values including enabled states are synced to the backend via debounced `POST /galaxy/config`.
 - **Interface Guardrails (`ChatInterface.tsx`):** Uses `crypto.randomUUID()` for collision-free message IDs. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically. Each component is wrapped in an `ErrorBoundary` to prevent cascading UI crashes — a single panel failure renders a retry button instead of killing the entire app.
 - **Centralized API Config (`config.ts`):** All API calls reference `API_BASE_URL` from `import.meta.env.VITE_API_BASE_URL` (default: `http://localhost:8000`). Zero hardcoded URLs in components.
 
@@ -237,10 +249,10 @@ To ensure zero-friction integration, the firewall exposes a `/v1/chat/completion
 Implements the BaseProvider interface for Google's Generative AI API.
 - **Endpoint:** `v1beta/models/{model}:streamGenerateContent?alt=sse`.
 - **Normalization:** Maps Gemini's `candidates[0].content.parts[0].text` structure into the OpenAI-compatible `choices[0].delta.content` SSE format.
-- **Security:** Requires `GOOGLE_API_KEY`. The system performs a fail-fast check at boot/init; if `UPSTREAM_PROVIDER` is set to `google` and the key is missing, the application terminates with a Critical log.
+- **Security:** Requires `GOOGLE_API_KEY`. The key is sent via the `x-goog-api-key` HTTP header (not as a URL query parameter) to prevent leakage in access logs, proxies, and CDN caches. The system performs a fail-fast check at request time; if `UPSTREAM_PROVIDER` is set to `google` and the key is missing, the provider factory raises a `RuntimeError`.
 
 ### 9.2 Provider Factory
-The `chat_endpoint` and `openai_proxy` no longer instantiate providers directly. A factory pattern resolves the provider at runtime based on the `UPSTREAM_PROVIDER` environment variable. This ensures the Semantic Firewall remains provider-agnostic.
+The `chat_endpoint` and `openai_proxy` resolve the provider lazily at request time via `get_provider()` (defined in `endpoints/chat.py`). The factory returns the correct provider based on the `UPSTREAM_PROVIDER` environment variable. Lazy instantiation means a missing Google API key does not crash the app at import time — it only fails when the `/chat` or proxy endpoint is actually called. This ensures the Semantic Firewall remains provider-agnostic and the system prompt for context-confined operation is injected at the endpoint level (prepended to the messages array) before calling `provider.stream_chat()`.
 
 ## 10. Real-Time Semantic Sniffer (RTSS)
 A zero-latency observability layer for the OpenAI V1 Proxy (`/v1/chat/completions`). Captures every firewall decision and LLM response preview without introducing latency to the primary inference stream.
@@ -359,10 +371,12 @@ The `DATA_DIR` is resolved as an absolute path relative to the module file — g
 
 | Method | Behaviour |
 |---|---|
-| `save_profile(name, state)` | Serializes `ConfigState` → `{name}.json` via `model_dump_json()` |
-| `load_profile(name)` | Returns a `dict` or `None` if not found. Catches all parse errors. |
+| `save_profile(name, state)` | Validates name against `_SAFE_PROFILE_RE`, then serializes `ConfigState` → `{name}.json` via `model_dump_json()` |
+| `load_profile(name)` | Validates name, returns a `dict` or `None` if not found. Catches all parse errors. |
 | `list_profiles()` | Returns sorted list of stems; underscore-prefixed profiles excluded. |
-| `delete_profile(name)` | Rejects underscore-prefixed names. Returns `True` if deleted. |
+| `delete_profile(name)` | Validates name. Rejects underscore-prefixed names. Returns `True` if deleted. |
+
+**Path Traversal Protection (Audit Finding S3):** A `_SAFE_PROFILE_RE` regex (`^[a-zA-Z0-9_\-]{1,64}$`) is enforced on all public methods via `_validate_name()`. This prevents names like `../../etc/passwd` from escaping `DATA_DIR`. All profile names are restricted to alphanumeric characters, underscores, and hyphens (max 64 chars).
 
 **Naming convention:** underscore prefix (`_`) = internal/protected (e.g., `_last_used`, `_default`). These never appear in the public listing and cannot be deleted via `delete_profile()`.
 
@@ -389,6 +403,8 @@ If `_last_used.json` is absent, malformed, or fails Pydantic validation, the mod
 
 | Method | Path | Description |
 |---|---|---|
+| `GET` | `/galaxy/config` | Return current config state (frontend hydration) |
+| `POST` | `/galaxy/config` | Update firewall config (with auto-calibration) |
 | `GET` | `/galaxy/profiles` | List user-visible profiles |
 | `POST` | `/galaxy/profiles/save/{name}` | Save current config as `{name}` |
 | `POST` | `/galaxy/profiles/load/{name}` | Load `{name}` and apply as active config |
