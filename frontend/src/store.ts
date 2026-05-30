@@ -1,4 +1,8 @@
-import { create } from 'zustand';
+import { create, StateCreator } from 'zustand';
+
+// ============================================================
+// Slice Interfaces
+// ============================================================
 
 interface Message {
   id: string;
@@ -41,7 +45,8 @@ interface SnifferFilter {
   filterType: 'ALL' | 'noise' | 'cosine' | 'excitation';
 }
 
-interface StoreState {
+// --- Firewall Slice ---
+export interface FirewallSlice {
   excitationThreshold: number;
   noiseTolerance: number;
   cosineThreshold: number;
@@ -70,25 +75,32 @@ interface StoreState {
   setExcitationEnabled: (val: boolean) => void;
   setFirewallMode: (val: 'positive' | 'negative') => void;
   setActiveTab: (val: 'chat' | 'sniffer') => void;
+}
 
+// --- Chat Slice ---
+export interface ChatSlice {
   messages: Message[];
   addMessage: (msg: Message) => void;
   clearMessages: () => void;
+}
 
+// --- System Slice (telemetry, ingestion, global status) ---
+export interface SystemSlice {
   telemetry: TelemetryData;
   setTelemetry: (data: TelemetryData) => void;
-
   systemAction: string;
   setSystemAction: (action: string) => void;
-
   ingestionStatus: {
     taskId: string | null;
     status: string;
     progress: number;
     message: string;
   };
-  setIngestionStatus: (status: Partial<StoreState['ingestionStatus']>) => void;
+  setIngestionStatus: (status: Partial<SystemSlice['ingestionStatus']>) => void;
+}
 
+// --- Sniffer Slice ---
+export interface SnifferSlice {
   snifferLogs: SnifferTrace[];
   snifferFilter: SnifferFilter;
   addSnifferLog: (trace: SnifferTrace) => void;
@@ -97,7 +109,17 @@ interface StoreState {
   clearSnifferLogs: () => void;
 }
 
-export const useStore = create<StoreState>((set) => ({
+// ============================================================
+// Combined Store Type
+// ============================================================
+
+export type StoreState = FirewallSlice & ChatSlice & SystemSlice & SnifferSlice;
+
+// ============================================================
+// Slice Creators
+// ============================================================
+
+const createFirewallSlice: StateCreator<StoreState, [], [], FirewallSlice> = (set) => ({
   excitationThreshold: 150,
   noiseTolerance: 0.005,
   cosineThreshold: 0.50,
@@ -126,26 +148,29 @@ export const useStore = create<StoreState>((set) => ({
   setExcitationEnabled: (val) => set({ excitationEnabled: val }),
   setFirewallMode: (val) => set({ firewallMode: val }),
   setActiveTab: (val) => set({ activeTab: val }),
+});
 
+const createChatSlice: StateCreator<StoreState, [], [], ChatSlice> = (set) => ({
   messages: [],
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
   clearMessages: () => set({ messages: [] }),
+});
 
+const createSystemSlice: StateCreator<StoreState, [], [], SystemSlice> = (set) => ({
   telemetry: { cpu: 0, ram: 0, gpu: 0 },
   setTelemetry: (data) => set({ telemetry: data }),
-
   systemAction: 'SYSTEM IDLE',
   setSystemAction: (action) => set({ systemAction: action }),
-
   ingestionStatus: { taskId: null, status: 'idle', progress: 0, message: '' },
   setIngestionStatus: (status) => set((state) => ({
     ingestionStatus: { ...state.ingestionStatus, ...status }
   })),
+});
 
+const createSnifferSlice: StateCreator<StoreState, [], [], SnifferSlice> = (set) => ({
   snifferLogs: [],
   snifferFilter: { status: 'ALL', filterType: 'ALL' },
   addSnifferLog: (trace) => set((state) => {
-    // If a trace with this ID already exists, update it (FPI stream completion)
     const existingIdx = state.snifferLogs.findIndex(t => t.id === trace.id);
     if (existingIdx !== -1) {
       const updated = [...state.snifferLogs];
@@ -163,4 +188,15 @@ export const useStore = create<StoreState>((set) => ({
     snifferFilter: { ...state.snifferFilter, ...filter }
   })),
   clearSnifferLogs: () => set({ snifferLogs: [] }),
+});
+
+// ============================================================
+// Unified Store (API-compatible — no consumer changes required)
+// ============================================================
+
+export const useStore = create<StoreState>()((...a) => ({
+  ...createFirewallSlice(...a),
+  ...createChatSlice(...a),
+  ...createSystemSlice(...a),
+  ...createSnifferSlice(...a),
 }));
