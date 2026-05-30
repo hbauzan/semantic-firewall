@@ -26,9 +26,11 @@ export const ControlPanel: React.FC = () => {
     excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit,
     cosineOrder, excitationOrder, noiseOrder, adaptiveFactor,
     noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode, activeTab,
+    upstreamProvider,
     setExcitationThreshold, setNoiseTolerance, setCosineThreshold, setGlobalNoiseLimit,
     setCosineOrder, setExcitationOrder, setNoiseOrder, setAdaptiveFactor,
     setNoiseEnabled, setCosineEnabled, setExcitationEnabled, setRagTopK, setFirewallMode,
+    setUpstreamProvider,
     ingestionStatus, setIngestionStatus, setSystemAction
   } = useStore();
 
@@ -63,6 +65,7 @@ export const ControlPanel: React.FC = () => {
         setCosineEnabled(c.cosine_enabled);
         setExcitationEnabled(c.excitation_enabled);
         setFirewallMode(c.firewall_mode);
+        if (c.upstream_provider) setUpstreamProvider(c.upstream_provider);
         setConfigHydrated(true);
       })
       .catch(err => {
@@ -132,6 +135,7 @@ export const ControlPanel: React.FC = () => {
       setCosineEnabled(c.cosine_enabled);
       setExcitationEnabled(c.excitation_enabled);
       setFirewallMode(c.firewall_mode);
+      if (c.upstream_provider) setUpstreamProvider(c.upstream_provider);
     } catch (err) {
       console.error("Failed to load profile:", err);
     }
@@ -171,13 +175,14 @@ export const ControlPanel: React.FC = () => {
           rag_top_k: ragTopK,
           firewall_mode: firewallMode,
           active_tab: activeTab,
+          upstream_provider: upstreamProvider,
         })
       }).then(res => {
         if (!res.ok) console.warn(`Config sync failed: ${res.status}`);
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
-  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode, activeTab, configHydrated]);
+  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode, activeTab, upstreamProvider, configHydrated]);
 
   // Poll for ingestion status if task is active
   useEffect(() => {
@@ -251,6 +256,22 @@ export const ControlPanel: React.FC = () => {
   return (
     <div className="panel" style={{ width: 'auto', flex: 1, overflow: 'auto' }}>
       <h2 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', paddingBottom: '0.3rem' }}>Control Panel</h2>
+
+      {/* --- Upstream Provider Selection --- */}
+      <div className="config-section" style={{ marginBottom: '1rem' }}>
+        <div className="slider-label">Upstream LLM Engine</div>
+        <select
+          value={upstreamProvider}
+          onChange={(e) => setUpstreamProvider(e.target.value as any)}
+          style={{ width: '100%', padding: '0.4rem', marginTop: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+        >
+          <option value="ollama">Ollama (Local)</option>
+          <option value="google">Google Gemini</option>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="groq">Groq</option>
+        </select>
+      </div>
 
       {/* --- Firewall Mode Toggle --- */}
       <div className={`firewall-mode-banner ${isNeg ? 'firewall-mode-banner--negative' : ''}`}>

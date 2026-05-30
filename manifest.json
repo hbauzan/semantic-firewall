@@ -1,6 +1,6 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.22.0",
+    "version": "v2.23.0",
     "active_features": {
         "corpus_densification_1k": true,
         "optimized_chunking_512": true,
@@ -108,7 +108,13 @@
         "test_suite_partitioning": true,
         "config_hydration_get_endpoint": true,
         "typed_clause_result": true,
-        "lazy_provider_initialization": true
+        "lazy_provider_initialization": true,
+        "universal_provider_strategy": true,
+        "openai_provider_integration": true,
+        "anthropic_sse_normalization": true,
+        "groq_fast_inference_support": true,
+        "multi_cloud_llm_support": true,
+        "lazy_key_validation": true
     },
     "state_schema": {
         "excitation_threshold": {

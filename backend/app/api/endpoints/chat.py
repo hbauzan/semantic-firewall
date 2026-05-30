@@ -20,6 +20,9 @@ from app.core.firewall import SemanticFirewall
 from app.core.settings import settings
 from app.modules.providers.ollama import OllamaProvider
 from app.modules.providers.google import GoogleGeminiProvider
+from app.modules.providers.openai import OpenAIProvider
+from app.modules.providers.anthropic import AnthropicProvider
+from app.modules.providers.groq import GroqProvider
 from app.api.endpoints._shared import verify_api_key, limiter
 
 logger = logging.getLogger(__name__)
@@ -28,14 +31,30 @@ router = APIRouter()
 
 # --- Provider Abstraction (Lazy Init — Finding A2) ---
 
-def get_provider():
+def get_provider(cfg):
     """Resolve provider at call time to prevent boot-time crashes if keys are missing."""
-    if settings.upstream_provider == "google":
+    provider_name = cfg.upstream_provider
+    if provider_name == "google":
         if not settings.google_key_value:
             logger.critical("UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.")
             raise RuntimeError("Missing Google API Key")
-        return GoogleGeminiProvider()
-    return OllamaProvider()
+        return GoogleGeminiProvider(), settings.gemini_model_id
+    elif provider_name == "openai":
+        if not settings.openai_key_value:
+            logger.critical("UPSTREAM_PROVIDER set to 'openai' but OPENAI_API_KEY is missing.")
+            raise RuntimeError("Missing OpenAI API Key")
+        return OpenAIProvider(), settings.openai_model
+    elif provider_name == "anthropic":
+        if not settings.anthropic_key_value:
+            logger.critical("UPSTREAM_PROVIDER set to 'anthropic' but ANTHROPIC_API_KEY is missing.")
+            raise RuntimeError("Missing Anthropic API Key")
+        return AnthropicProvider(), settings.anthropic_model
+    elif provider_name == "groq":
+        if not settings.groq_key_value:
+            logger.critical("UPSTREAM_PROVIDER set to 'groq' but GROQ_API_KEY is missing.")
+            raise RuntimeError("Missing Groq API Key")
+        return GroqProvider(), settings.groq_model
+    return OllamaProvider(), settings.ollama_model
 
 
 # --- Chat Endpoint (Firewall Gateway) ---
@@ -123,16 +142,16 @@ async def chat_endpoint(request: Request, req: ChatRequest):
         )
         async def prefixed_stream():
             yield json.dumps({"response": pass_prefix}).encode("utf-8") + b"\n"
-            async for chunk in _stream_via_provider(clean_prompt, context, strict=True):
+            async for chunk in _stream_via_provider(clean_prompt, context, cfg, strict=True):
                 yield chunk
         return StreamingResponse(prefixed_stream(), media_type="application/x-ndjson")
 
     return StreamingResponse(
-        _stream_via_provider(clean_prompt, context), media_type="application/x-ndjson"
+        _stream_via_provider(clean_prompt, context, cfg), media_type="application/x-ndjson"
     )
 
 
-async def _stream_via_provider(prompt: str, context: str, strict: bool = False):
+async def _stream_via_provider(prompt: str, context: str, cfg: ConfigState, strict: bool = False):
     """Unified streaming via BaseProvider (replaces stream_ollama — Finding Q3).
 
     Constructs a messages array with optional strict system prompt, calls
@@ -158,9 +177,9 @@ async def _stream_via_provider(prompt: str, context: str, strict: bool = False):
     else:
         messages.append({"role": "user", "content": prompt})
 
-    provider = get_provider()
+    provider, model_id = get_provider(cfg)
     try:
-        async for sse_line in provider.stream_chat(settings.ollama_model, messages):
+        async for sse_line in provider.stream_chat(model_id, messages):
             # SSE format: "data: {...}\n\n" — extract content for NDJSON conversion
             if sse_line.startswith("data: ") and sse_line.strip() != "data: [DONE]":
                 try:
@@ -334,7 +353,7 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
         )
 
     # 4. Async Stream Wrapper — non-blocking token buffering for FPI
-    provider = get_provider()
+    provider, _ = get_provider(cfg)
 
     async def stream_wrapper(gen, tid):
         """Pass-through generator that buffers response tokens for sniffer reconstruction."""

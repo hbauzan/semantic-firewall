@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     )
 
     # --- Upstream Provider Selection ---
-    upstream_provider: Literal["ollama", "google"] = Field(
+    upstream_provider: Literal["ollama", "google", "openai", "anthropic", "groq"] = Field(
         default="ollama",
         description="Select the upstream LLM engine.",
     )
@@ -65,6 +65,36 @@ class Settings(BaseSettings):
     ollama_model: str = Field(
         default="llama3.1",
         description="LLM model name for inference.",
+    )
+
+    # --- OpenAI ---
+    openai_api_key: SecretStr | None = Field(
+        default=None,
+        description="Required if upstream_provider is 'openai'.",
+    )
+    openai_model: str = Field(
+        default="gpt-4o-mini",
+        description="OpenAI model identifier.",
+    )
+
+    # --- Anthropic ---
+    anthropic_api_key: SecretStr | None = Field(
+        default=None,
+        description="Required if upstream_provider is 'anthropic'.",
+    )
+    anthropic_model: str = Field(
+        default="claude-3-5-sonnet-latest",
+        description="Anthropic model identifier.",
+    )
+
+    # --- Groq ---
+    groq_api_key: SecretStr | None = Field(
+        default=None,
+        description="Required if upstream_provider is 'groq'.",
+    )
+    groq_model: str = Field(
+        default="llama-3.3-70b-versatile",
+        description="Groq model identifier.",
     )
 
     # --- Embedding ---
@@ -132,6 +162,18 @@ class Settings(BaseSettings):
     @property
     def google_key_value(self) -> str | None:
         return self.google_api_key.get_secret_value() if self.google_api_key else None
+
+    @property
+    def openai_key_value(self) -> str | None:
+        return self.openai_api_key.get_secret_value() if self.openai_api_key else None
+
+    @property
+    def anthropic_key_value(self) -> str | None:
+        return self.anthropic_api_key.get_secret_value() if self.anthropic_api_key else None
+
+    @property
+    def groq_key_value(self) -> str | None:
+        return self.groq_api_key.get_secret_value() if self.groq_api_key else None
 
 
 # --- Singleton: instantiated once at import time (fail-fast) ---
