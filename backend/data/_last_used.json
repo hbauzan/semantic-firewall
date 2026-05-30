@@ -12,5 +12,6 @@
     "cosine_enabled": true,
     "excitation_enabled": true,
     "firewall_mode": "positive",
-    "active_tab": "chat"
+    "active_tab": "chat",
+    "upstream_provider": "ollama"
 }

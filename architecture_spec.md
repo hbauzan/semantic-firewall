@@ -34,7 +34,10 @@ app/
     └── providers/           # Strategy pattern for LLM backends
         ├── base.py
         ├── ollama.py
-        └── google.py
+        ├── google.py
+        ├── openai.py
+        ├── anthropic.py
+        └── groq.py
 ```
 
 - **Firewall Engine (`core/firewall.py`):** `SemanticFirewall` class with static methods — completely agnostic of web framework, embedders, and storage. Receives numpy arrays and a frozen `ConfigState`, returns structured `ClauseResult` (TypedDict). Portable for CLI tools, batch audits, or alternative API wrappers. Contains: `segment()`, `run_noise_filter()`, `run_cosine_filter()`, `run_excitation_filter()`, `build_pipeline()`, `evaluate_clause()`.
@@ -251,7 +254,23 @@ Implements the BaseProvider interface for Google's Generative AI API.
 - **Normalization:** Maps Gemini's `candidates[0].content.parts[0].text` structure into the OpenAI-compatible `choices[0].delta.content` SSE format.
 - **Security:** Requires `GOOGLE_API_KEY`. The key is sent via the `x-goog-api-key` HTTP header (not as a URL query parameter) to prevent leakage in access logs, proxies, and CDN caches. The system performs a fail-fast check at request time; if `UPSTREAM_PROVIDER` is set to `google` and the key is missing, the provider factory raises a `RuntimeError`.
 
-### 9.2 Provider Factory
+### 9.2 OpenAI Provider
+Implements the BaseProvider interface for the official OpenAI API.
+- **Endpoint:** `https://api.openai.com/v1/chat/completions`.
+- **Security:** Requires `OPENAI_API_KEY`. The key is sent via the `Authorization: Bearer` header. The system performs a fail-fast check at request time.
+
+### 9.3 Anthropic Provider
+Implements the BaseProvider interface for the Anthropic API.
+- **Endpoint:** `https://api.anthropic.com/v1/messages`.
+- **Normalization:** Maps Anthropic's `content_block_delta` structure into the OpenAI-compatible `choices[0].delta.content` SSE format. Extracts the top-level `system` message from the array.
+- **Security:** Requires `ANTHROPIC_API_KEY`. The key is sent via the `x-api-key` header. The system performs a fail-fast check at request time.
+
+### 9.4 Groq Provider
+Implements the BaseProvider interface for the Groq API (OpenAI-compatible).
+- **Endpoint:** `https://api.groq.com/openai/v1/chat/completions`.
+- **Security:** Requires `GROQ_API_KEY`. The key is sent via the `Authorization: Bearer` header. The system performs a fail-fast check at request time.
+
+### 9.5 Provider Factory
 The `chat_endpoint` and `openai_proxy` resolve the provider lazily at request time via `get_provider()` (defined in `endpoints/chat.py`). The factory returns the correct provider based on the `UPSTREAM_PROVIDER` environment variable. Lazy instantiation means a missing Google API key does not crash the app at import time — it only fails when the `/chat` or proxy endpoint is actually called. This ensures the Semantic Firewall remains provider-agnostic and the system prompt for context-confined operation is injected at the endpoint level (prepended to the messages array) before calling `provider.stream_chat()`.
 
 ## 10. Real-Time Semantic Sniffer (RTSS)

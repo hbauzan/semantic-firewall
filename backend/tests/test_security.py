@@ -44,20 +44,21 @@ def test_provider_factory_logic():
     from app.modules.providers.google import GoogleGeminiProvider
     from app.core.settings import settings
 
+    from app.core.models import ConfigState
+
     # Test Ollama Default
-    original_provider = settings.upstream_provider
-    settings.upstream_provider = "ollama"
-    assert isinstance(get_provider(), OllamaProvider)
+    cfg = ConfigState(upstream_provider="ollama")
+    provider, _ = get_provider(cfg)
+    assert isinstance(provider, OllamaProvider)
 
     # Test Google Fail-Fast
-    settings.upstream_provider = "google"
+    cfg_google = ConfigState(upstream_provider="google")
     original_google_key = settings.google_api_key
     settings.google_api_key = None
     with pytest.raises(RuntimeError, match="Missing Google API Key"):
-        get_provider()
+        get_provider(cfg_google)
 
     # Restore
-    settings.upstream_provider = original_provider
     settings.google_api_key = original_google_key
 
 

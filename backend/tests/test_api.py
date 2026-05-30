@@ -232,7 +232,7 @@ async def test_adaptive_factor_telemetry_on_short_clause():
             assert "ADAPTIVE" in content or "0.5x factor" in content
 
 @pytest.mark.asyncio
-async def test_openai_proxy_v1_compliance():
+async def test_openai_proxy_v1_compliance(monkeypatch):
     """Verify OpenAI spec compatibility and firewall interception."""
     set_config(excitation_threshold=1024, noise_tolerance=0.0001)
     payload = {
@@ -252,6 +252,14 @@ async def test_openai_proxy_v1_compliance():
         global_noise_limit=10.0,
         noise_enabled=False, cosine_enabled=False, excitation_enabled=False
     )
+    
+    # Mock provider stream to avoid ConnectError
+    from app.modules.providers.ollama import OllamaProvider
+    async def mock_stream(*args, **kwargs):
+        yield "data: {\"choices\": [{\"delta\": {\"content\": \"Mocked\"}}]}\n\n"
+        yield "data: [DONE]\n\n"
+    monkeypatch.setattr(OllamaProvider, "stream_chat", mock_stream)
+
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         async with ac.stream("POST", "/v1/chat/completions", json=payload) as response:
             assert response.status_code == 200

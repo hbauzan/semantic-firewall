@@ -61,6 +61,7 @@ export interface FirewallSlice {
   excitationEnabled: boolean;
   firewallMode: 'positive' | 'negative';
   activeTab: 'chat' | 'sniffer';
+  upstreamProvider: 'ollama' | 'google' | 'openai' | 'anthropic' | 'groq';
   setExcitationThreshold: (val: number) => void;
   setNoiseTolerance: (val: number) => void;
   setCosineThreshold: (val: number) => void;
@@ -75,6 +76,7 @@ export interface FirewallSlice {
   setExcitationEnabled: (val: boolean) => void;
   setFirewallMode: (val: 'positive' | 'negative') => void;
   setActiveTab: (val: 'chat' | 'sniffer') => void;
+  setUpstreamProvider: (val: 'ollama' | 'google' | 'openai' | 'anthropic' | 'groq') => void;
 }
 
 // --- Chat Slice ---
@@ -134,6 +136,7 @@ const createFirewallSlice: StateCreator<StoreState, [], [], FirewallSlice> = (se
   excitationEnabled: true,
   firewallMode: 'positive',
   activeTab: 'chat',
+  upstreamProvider: 'ollama',
   setExcitationThreshold: (val) => set({ excitationThreshold: val }),
   setNoiseTolerance: (val) => set({ noiseTolerance: val }),
   setCosineThreshold: (val) => set({ cosineThreshold: val }),
@@ -148,6 +151,7 @@ const createFirewallSlice: StateCreator<StoreState, [], [], FirewallSlice> = (se
   setExcitationEnabled: (val) => set({ excitationEnabled: val }),
   setFirewallMode: (val) => set({ firewallMode: val }),
   setActiveTab: (val) => set({ activeTab: val }),
+  setUpstreamProvider: (val) => set({ upstreamProvider: val }),
 });
 
 const createChatSlice: StateCreator<StoreState, [], [], ChatSlice> = (set) => ({
