@@ -487,3 +487,20 @@ The `update_config` logic enforces Phase 2.1 optimized constants when `firewall_
 **Profile Sovereignty:** `POST /galaxy/profiles/load/{name}` bypasses auto-calibration entirely — profiles are loaded exactly as saved, with no constant overrides.
 
 Calibration is **atomic** — it occurs inside the `asyncio.Lock` during `POST /galaxy/config`. Constants are only applied when the mode actually **changes** (same-mode config updates preserve all user values). The response returns `new_state.model_dump()` so the frontend HUD reflects the adjusted values immediately.
+
+### 11.10 Visibility Mapping
+The `_last_used` profile is now exposed to the frontend via `list_profiles()` but aliased as "🕒 Last Session (Auto-save)" to provide user feedback on persistence.
+
+### 11.11 One-Click Calibration
+A "Reset to Recommended" function applies mode-aware Youden constants (Positive: 0.5315/150; Negative: 0.6197/170) to ensure optimal F1-score performance without manual slider hunting.
+
+## 12. Industrial Logging & Forensics
+
+### 12.1 Rotating File Handler
+Implements `logging.handlers.TimedRotatingFileHandler`. Logs are rotated daily at midnight.
+
+### 12.2 Retention Policy
+30-day retention window. Total log volume capped by filesystem limits (recommended 100GB).
+
+### 12.3 Forensic Export
+`GET /system/logs/export` aggregates in-memory sniffer traces and chat history into a portable JSON forensic package for audit purposes.

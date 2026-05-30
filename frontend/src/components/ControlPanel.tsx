@@ -253,6 +253,18 @@ export const ControlPanel: React.FC = () => {
 
   const isNeg = firewallMode === 'negative';
 
+  const handleResetToRecommended = () => {
+    if (firewallMode === 'positive') {
+      setCosineThreshold(0.5315);
+      setExcitationThreshold(150);
+      setGlobalNoiseLimit(4.5);
+    } else {
+      setCosineThreshold(0.6197);
+      setExcitationThreshold(170);
+      setGlobalNoiseLimit(4.5);
+    }
+  };
+
   return (
     <div className="panel" style={{ width: 'auto', flex: 1, overflow: 'auto' }}>
       <h2 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', paddingBottom: '0.3rem' }}>Control Panel</h2>
@@ -291,6 +303,10 @@ export const ControlPanel: React.FC = () => {
         </button>
       </div>
 
+      <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
+        <button onClick={handleResetToRecommended} className="reset-btn" style={{ padding: '0.4rem 1rem', cursor: 'pointer', borderRadius: '4px', backgroundColor: 'var(--bg-light)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>Reset to Recommended</button>
+      </div>
+
       {/* --- Noise Pre-Filter --- */}
       <div className={`filter-group ${noiseEnabled ? '' : 'filter-group--disabled'}`}>
         <button onClick={() => setNoiseEnabled(!noiseEnabled)}
@@ -298,7 +314,10 @@ export const ControlPanel: React.FC = () => {
           {noiseEnabled ? 'ON' : 'OFF'}
         </button>
         <div style={{ flex: 1 }}>
-          <div className="slider-label">Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong></div>
+          <div className="slider-label">
+            Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong>
+            <span className="info-icon" title="Detects repetitive patterns or GCG attacks. Higher = Stricter." style={{ cursor: 'help', marginLeft: '5px' }}>ⓘ</span>
+          </div>
           <StepSlider value={globalNoiseLimit} min={0.10} max={2.00} step={0.01} onChange={setGlobalNoiseLimit} />
         </div>
         <div className="seq-column">
@@ -380,7 +399,7 @@ export const ControlPanel: React.FC = () => {
           >
             <option value="">&mdash; select profile &mdash;</option>
             {profiles.map(p => (
-              <option key={p} value={p}>{p}</option>
+              <option key={p} value={p}>{p === '_last_used' ? '🕒 Last Session (Auto-save)' : p}</option>
             ))}
           </select>
           <button

@@ -18,6 +18,9 @@ logging.basicConfig(
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
 )
 
+from app.core.logging_config import setup_industrial_logging
+setup_industrial_logging()
+
 # --- Startup warning if API Key is not configured ---
 if settings.api_key_value is None:
     logger.warning(

@@ -57,11 +57,14 @@ class ProfileManager:
 
     @staticmethod
     def list_profiles() -> list[str]:
-        """Return names of all user-visible profiles (underscore-prefixed excluded)."""
-        return sorted(
-            f.stem for f in DATA_DIR.glob("*.json")
-            if not f.name.startswith("_")
-        )
+        """Return names of all profiles. _last_used is included for UI visibility."""
+        profiles = []
+        for f in DATA_DIR.glob("*.json"):
+            if f.name == "_last_used.json":
+                profiles.append("_last_used")
+            elif not f.name.startswith("_"):
+                profiles.append(f.stem)
+        return sorted(profiles)
 
     @staticmethod
     def delete_profile(name: str) -> bool:

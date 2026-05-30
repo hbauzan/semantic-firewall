@@ -1,7 +1,15 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.23.0",
+    "version": "v2.24.0",
     "active_features": {
+        "last_session_visibility": true,
+        "reset_to_recommended_config": true,
+        "industrial_rotating_logger": true,
+        "forensic_log_export": true,
+        "chat_input_history_navigation": true,
+        "semantic_ui_tooltips": true,
+        "telemetry_aesthetic_refactor": true,
+        "mode_aware_youden_reset": true,
         "corpus_densification_1k": true,
         "optimized_chunking_512": true,
         "sniffer_variance_telemetry": true,

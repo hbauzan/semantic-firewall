@@ -7,7 +7,7 @@ import psutil
 import torch
 from fastapi import APIRouter, Depends
 
-from app.modules.sniffer import subscribe, unsubscribe, stream_sniffer_sse
+from app.modules.sniffer import subscribe, unsubscribe, stream_sniffer_sse, get_sniffer_history
 from app.api.endpoints._shared import verify_api_key
 from fastapi.responses import StreamingResponse
 
@@ -62,3 +62,10 @@ async def sniffer_stream():
         finally:
             await unsubscribe(sub_q)
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@router.get("/system/logs/export", dependencies=[Depends(verify_api_key)])
+async def export_logs():
+    """Forensic Export: aggregates in-memory sniffer traces and chat history into a portable JSON forensic package."""
+    history = get_sniffer_history()
+    return {"traces": [t.model_dump() for t in history]}
+
