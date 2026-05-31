@@ -72,7 +72,7 @@ class SemanticFirewall:
         # Note: global_noise_limit now acts as an Entropy Floor
         if entropy < cfg.global_noise_limit:
             return False, "noise", {"entropy": entropy, "limit": cfg.global_noise_limit}
-        return True, "noise", {"entropy": entropy}
+        return True, "noise", {"entropy": entropy, "limit": cfg.global_noise_limit}
 
     @staticmethod
     def run_cosine_filter(

@@ -26446,5 +26446,325 @@
     "response_preview": "[streaming]",
     "response_content": "\ud83d\udd34 [LLM ERROR] Google Gemini API Error (429): {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\\nPlease retry in 10.871723706s.\",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Learn more about Gemini API quotas\",\n            \"url\": \"https://ai.google.dev/gemini-api/docs/rate-limits\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.QuotaFailure\",\n        \"violations\": [\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"model\": \"gemini-2.5-flash\",\n              \"location\": \"global\"\n            },\n            \"quotaValue\": \"20\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.RetryInfo\",\n        \"retryDelay\": \"10s\"\n      }\n    ]\n  }\n}\n",
     "status": "COMPLETED"
+  },
+  {
+    "id": "95e9841e-9b3c-46b0-a9f8-fb9e9c2040a8",
+    "timestamp": "2026-05-31T14:42:23.315284+00:00",
+    "request": {
+      "model": "llama3.1",
+      "last_message": "Cual es el limite de retiro?",
+      "request_history": [
+        {
+          "role": "user",
+          "content": "Cual es el limite de retiro?"
+        }
+      ]
+    },
+    "firewall": {
+      "decision": "PASS",
+      "pipeline_trace": [
+        {
+          "stage": "noise",
+          "passed": true,
+          "value": 9.552918434143066,
+          "threshold": 0.0
+        },
+        {
+          "stage": "cosine",
+          "passed": true,
+          "value": 0.8312484622001648,
+          "threshold": 0.0
+        },
+        {
+          "stage": "excitation",
+          "passed": true,
+          "value": 215.0,
+          "threshold": 150.0
+        }
+      ]
+    },
+    "response_preview": "",
+    "response_content": "El l\u00edmite de retiro es 5000.",
+    "status": "COMPLETED"
+  },
+  {
+    "id": "54832b11-dcac-4ab9-8419-88601fc64f20",
+    "timestamp": "2026-05-31T14:45:39.792721+00:00",
+    "request": {
+      "model": "llama3.1",
+      "last_message": "Cuanta plata puedo sacar?",
+      "request_history": [
+        {
+          "role": "user",
+          "content": "Cuanta plata puedo sacar?"
+        }
+      ]
+    },
+    "firewall": {
+      "decision": "PASS",
+      "pipeline_trace": [
+        {
+          "stage": "noise",
+          "passed": true,
+          "value": 9.556928634643555,
+          "threshold": 0.0
+        },
+        {
+          "stage": "cosine",
+          "passed": true,
+          "value": 0.6118229627609253,
+          "threshold": 0.0
+        },
+        {
+          "stage": "excitation",
+          "passed": true,
+          "value": 145.0,
+          "threshold": 127.5
+        }
+      ]
+    },
+    "response_preview": "",
+    "response_content": "Si el l\u00edmite de retiro es de 5000, puedes retirar hasta esa cantidad.",
+    "status": "COMPLETED"
+  },
+  {
+    "id": "26b78239-1b1d-4cbf-9cf4-f512612b2847",
+    "timestamp": "2026-05-31T14:48:16.686434+00:00",
+    "request": {
+      "model": "llama3.1",
+      "last_message": "cuanta plata puedo sacar?",
+      "request_history": [
+        {
+          "role": "user",
+          "content": "cuanta plata puedo sacar?"
+        }
+      ]
+    },
+    "firewall": {
+      "decision": "PASS",
+      "pipeline_trace": [
+        {
+          "stage": "noise",
+          "passed": true,
+          "value": 9.54850959777832,
+          "threshold": 0.0
+        },
+        {
+          "stage": "cosine",
+          "passed": true,
+          "value": 0.6123672723770142,
+          "threshold": 0.0
+        },
+        {
+          "stage": "excitation",
+          "passed": true,
+          "value": 162.0,
+          "threshold": 127.5
+        }
+      ]
+    },
+    "response_preview": "",
+    "response_content": "Si el l\u00edmite de retiro es $5,000, eso significa que puedes retirar hasta un m\u00e1ximo de $5,000.",
+    "status": "COMPLETED"
+  },
+  {
+    "id": "5fb1400e-5073-4e62-9972-0f4aa3ab55ac",
+    "timestamp": "2026-05-31T14:48:49.831800+00:00",
+    "request": {
+      "model": "llama3.1",
+      "last_message": "Cuanta plata puedo sacar?",
+      "request_history": [
+        {
+          "role": "user",
+          "content": "Cuanta plata puedo sacar?"
+        }
+      ]
+    },
+    "firewall": {
+      "decision": "PASS",
+      "pipeline_trace": [
+        {
+          "stage": "noise",
+          "passed": true,
+          "value": 9.556928634643555,
+          "threshold": 0.0
+        },
+        {
+          "stage": "cosine",
+          "passed": true,
+          "value": 0.6118229627609253,
+          "threshold": 0.0
+        },
+        {
+          "stage": "excitation",
+          "passed": true,
+          "value": 145.0,
+          "threshold": 127.5
+        }
+      ]
+    },
+    "response_preview": "",
+    "response_content": "Lo siento, pero no tengo suficiente informaci\u00f3n para responder con precisi\u00f3n a tu pregunta. \u00bfPodr\u00edas proporcionar m\u00e1s contexto sobre la cuenta o el tipo de retiro que se refiere al l\u00edmite de retiro de $5000? Esto ayudar\u00eda a dar una respuesta m\u00e1s precisa y \u00fatil.",
+    "status": "COMPLETED"
+  },
+  {
+    "id": "991a903f-a249-43a8-824c-794701ac23cc",
+    "timestamp": "2026-05-31T14:49:10.307170+00:00",
+    "request": {
+      "model": "llama3.1",
+      "last_message": "hasta cuanta plata puedo sacar?",
+      "request_history": [
+        {
+          "role": "user",
+          "content": "hasta cuanta plata puedo sacar?"
+        }
+      ]
+    },
+    "firewall": {
+      "decision": "PASS",
+      "pipeline_trace": [
+        {
+          "stage": "noise",
+          "passed": true,
+          "value": 9.540473937988281,
+          "threshold": 0.0
+        },
+        {
+          "stage": "cosine",
+          "passed": true,
+          "value": 0.6408665180206299,
+          "threshold": 0.0
+        },
+        {
+          "stage": "excitation",
+          "passed": true,
+          "value": 172.0,
+          "threshold": 127.5
+        }
+      ]
+    },
+    "response_preview": "",
+    "response_content": "Puedes sacar hasta 5,000 d\u00f3lares.",
+    "status": "COMPLETED"
+  },
+  {
+    "id": "92fcf538-1f01-4ec1-bd0d-e8131e3d83f0",
+    "timestamp": "2026-05-31T14:53:35.746533+00:00",
+    "request": {
+      "model": "llama3.1",
+      "last_message": "Cuanta plata puedo sacar?",
+      "request_history": [
+        {
+          "role": "user",
+          "content": "Cuanta plata puedo sacar?"
+        }
+      ]
+    },
+    "firewall": {
+      "decision": "PASS",
+      "pipeline_trace": [
+        {
+          "stage": "noise",
+          "passed": true,
+          "value": 9.556928634643555,
+          "threshold": 0.0
+        },
+        {
+          "stage": "cosine",
+          "passed": true,
+          "value": 0.6118229627609253,
+          "threshold": 0.0
+        },
+        {
+          "stage": "excitation",
+          "passed": true,
+          "value": 145.0,
+          "threshold": 127.5
+        }
+      ]
+    },
+    "response_preview": "",
+    "response_content": "Con un l\u00edmite de retiro de 5000 d\u00f3lares, puedes retirar hasta 5000 d\u00f3lares.",
+    "status": "COMPLETED"
+  },
+  {
+    "id": "7060050b-2e58-4356-a0ce-1c97b7d7dad7",
+    "timestamp": "2026-05-31T15:13:29.525289+00:00",
+    "request": {
+      "model": "llama3.1",
+      "last_message": "Cuanta plata se puede sacar?",
+      "request_history": [
+        {
+          "role": "user",
+          "content": "Cuanta plata se puede sacar?"
+        }
+      ]
+    },
+    "firewall": {
+      "decision": "PASS",
+      "pipeline_trace": [
+        {
+          "stage": "noise",
+          "passed": true,
+          "value": 9.566256523132324,
+          "threshold": 0.5
+        },
+        {
+          "stage": "cosine",
+          "passed": true,
+          "value": 0.591525673866272,
+          "threshold": 0.0
+        },
+        {
+          "stage": "excitation",
+          "passed": true,
+          "value": 147.0,
+          "threshold": 127.5
+        }
+      ]
+    },
+    "response_preview": "",
+    "response_content": "Parece que ya sabes la respuesta. Se pueden sacar $5,000.",
+    "status": "COMPLETED"
+  },
+  {
+    "id": "3a8a6831-ce76-4bb1-8662-6648c05ec1a4",
+    "timestamp": "2026-05-31T15:14:20.087220+00:00",
+    "request": {
+      "model": "llama3.1",
+      "last_message": "Cuanta plata puedo sacar?",
+      "request_history": [
+        {
+          "role": "user",
+          "content": "Cuanta plata puedo sacar?"
+        }
+      ]
+    },
+    "firewall": {
+      "decision": "PASS",
+      "pipeline_trace": [
+        {
+          "stage": "noise",
+          "passed": true,
+          "value": 9.556928634643555,
+          "threshold": 0.5
+        },
+        {
+          "stage": "cosine",
+          "passed": true,
+          "value": 0.6118229627609253,
+          "threshold": 0.0
+        },
+        {
+          "stage": "excitation",
+          "passed": true,
+          "value": 145.0,
+          "threshold": 127.5
+        }
+      ]
+    },
+    "response_preview": "",
+    "response_content": "Puedes retirar hasta los $5000 establecidos como el l\u00edmite de retiro.",
+    "status": "COMPLETED"
   }
 ]

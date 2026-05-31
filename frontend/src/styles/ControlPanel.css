@@ -381,3 +381,47 @@
   padding-top: 0.3rem;
   margin-top: 0.2rem;
 }
+
+/* --- Tooltips --- */
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  cursor: help;
+  margin-left: 6px;
+  position: relative;
+  font-size: 9px;
+  font-style: normal;
+  color: inherit;
+}
+
+.tooltip-box {
+  visibility: hidden;
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-dark, #111);
+  border: 1px solid var(--border-color, #444);
+  padding: 12px;
+  border-radius: 8px;
+  width: 250px;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.2s, visibility 0.2s;
+  color: #ccc;
+  font-size: 0.7rem;
+  font-weight: normal;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+
+.info-icon:hover .tooltip-box {
+  visibility: visible;
+  opacity: 1;
+}

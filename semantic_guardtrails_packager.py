@@ -32,7 +32,12 @@ FOCUS_FILES = [
     # Documentation
     "architecture_spec.md",
     "manifest.json",
+    "backend/app/api/endpoints/chat.py",
     "backend/scripts/augment_corpus.py",
+    "backend/app/api/router_main.py",
+    "backend/app/api/endpoints/config.py",
+    "backend/app/api/endpoints/corpus.py",
+    "backend/app/api/endpoints/system.py",
 ]
 
 

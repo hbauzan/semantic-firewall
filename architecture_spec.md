@@ -5,7 +5,12 @@ The firewall operates by evaluating the raw 1024D embedding layers produced by `
 - **Delta Calculation:** For each dimension `i`, we compute the absolute delta `Delta_i = abs(Q_i - C_i)`.
 - **Activation Logic:** An activation register is tripped if `Delta_i` is less than or equal to the `Noise Tolerance` configuration (default 0.005). Thus, `Activation_i = 1`.
 - **Gate:** The final dimension sum `sum(Activation_i)` must be mathematically greater than or equal to the `Excitation Threshold` (default 150) to be deemed geometrically 'SAFE'. Otherwise, the request triggers a `SECURITY BREACH` and the streaming block breaks connection.
-- **Explicit Chat Feedback:** When any firewall filter is enabled, the chat endpoint injects human-readable telemetry into the response. A blocked query returns `🛑 [FW] Segment violation` with the exact metric that triggered the breach. A passed query prepends `🟢 [FW PASS]` with resonance/threshold and cosine values before routing to the LLM stream. All telemetry uses language-neutral technical terms.
+- **Explicit Chat Feedback:** When any firewall filter is enabled, the chat endpoint injects human-readable telemetry into the response. A blocked query returns `[FW_BLOCK] Segment violation` with the exact metric that triggered the breach. A passed query prepends `[FIREWALL_AUDIT]` followed by `[FW_PASS]` with resonance/threshold and cosine values before routing to the LLM stream. All telemetry uses language-neutral technical terms.
+
+### 1.4 Telemetry Standards
+All telemetry and logs must use structured ASCII headers (e.g., [FIREWALL_AUDIT], [FW_BLOCK], [FW_PASS]) and the multi-line `Metric | Limit` format.
+Emojis are strictly prohibited in backend-generated strings.
+The AuditPanel is deprecated in favor of the Sniffer's Full Payload Interception (FPI). Sniffer history is now volatile via API.
 
 ## 2. Backend Architecture
 Utilizes **FastAPI** for route management yielding high execution throughput. The backend follows a **layered separation of concerns**:
@@ -111,6 +116,9 @@ When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, 
 - **Pipeline Ordering UI (`ControlPanel.tsx`):** Uses CSS classes from `styles/ControlPanel.css` (inline styles extracted). Slider groups are visually ordered to match the default pipeline execution sequence: **Noise Pre-Filter (Seq 1)** → **Cosine Gate (Seq 2)** → **Excitation Threshold + Noise Tolerance (Seq 3)** → **Adaptive Factor**. On mount, `ControlPanel` fetches `GET /galaxy/config` to hydrate the Zustand store with actual backend state — eliminating default value desync (e.g. `globalNoiseLimit: 0.50` vs `4.5`). Each filter includes a **Seq** numerical input (1–3) that controls pipeline execution order and an **ON/OFF toggle button** that enables or disables that individual filter. When a filter is toggled OFF, its slider group dims via `.filter-group--disabled` class and the filter is excluded from the pipeline entirely (via `build_pipeline()` in the engine). The firewall is considered active when at least one filter is enabled (`fw_on = noise_enabled || cosine_enabled || excitation_enabled`). There is no user-prompt bypass — the firewall can only be disabled via the authenticated HUD toggles. All values including enabled states are synced to the backend via debounced `POST /galaxy/config`.
 - **Interface Guardrails (`ChatInterface.tsx`):** Uses `crypto.randomUUID()` for collision-free message IDs. Decodes raw NDJSON via `aiter_lines()` from the backend to guarantee seamless UTF-8 character stability for multi-byte accents organically. Each component is wrapped in an `ErrorBoundary` to prevent cascading UI crashes — a single panel failure renders a retry button instead of killing the entire app.
 - **Centralized API Config (`config.ts`):** All API calls reference `API_BASE_URL` from `import.meta.env.VITE_API_BASE_URL` (default: `http://localhost:8000`). Zero hardcoded URLs in components.
+- **I18n Tooltip Architecture:** Implements a decoupled string registry for UI telemetry and guidance.
+  - **Structure:** Tooltips are stored in `src/locales/tooltips.ts` as a structured object, allowing for runtime language switching.
+  - **Content:** Each entry includes title, description, mechanics, and suggested (mode-aware).
 
 ## 6. Anti-Semantic Piggybacking Defense
 Addresses the attack vector where a malicious or off-topic instruction is appended to an otherwise legitimate prompt, causing the averaged embedding to pass dimensional excitation while the piggybacked payload executes unchecked.
@@ -271,7 +279,7 @@ Implements the BaseProvider interface for the Groq API (OpenAI-compatible).
 - **Security:** Requires `GROQ_API_KEY`. The key is sent via the `Authorization: Bearer` header. The system performs a fail-fast check at request time.
 
 ### 9.5 Provider Factory
-The `chat_endpoint` and `openai_proxy` resolve the provider lazily at request time via `get_provider()` (defined in `endpoints/chat.py`). The factory returns the correct provider based on the `UPSTREAM_PROVIDER` environment variable. Lazy instantiation means a missing Google API key does not crash the app at import time — it only fails when the `/chat` or proxy endpoint is actually called. This ensures the Semantic Firewall remains provider-agnostic and the system prompt for context-confined operation is injected at the endpoint level (prepended to the messages array) before calling `provider.stream_chat()`.
+The `chat_endpoint` and `openai_proxy` resolve the provider lazily at request time via `get_provider(cfg: ConfigState) -> tuple[BaseProvider, str]`. This returns a tuple of the provider instance and the model ID from settings based on the `UPSTREAM_PROVIDER` environment variable. Lazy instantiation means a missing Google API key does not crash the app at import time — it only fails when the `/chat` or proxy endpoint is actually called. This ensures the Semantic Firewall remains provider-agnostic and the system prompt for context-confined operation is injected at the endpoint level (prepended to the messages array) before calling `provider.stream_chat()`.
 
 ## 10. Real-Time Semantic Sniffer (RTSS)
 A zero-latency observability layer for the OpenAI V1 Proxy (`/v1/chat/completions`). Captures every firewall decision and LLM response preview without introducing latency to the primary inference stream.

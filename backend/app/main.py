@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Three-Headed Semantic Firewall",
-    version="2.15.0",
+    version="2.30.0",
     docs_url=None if settings.api_key_value else "/docs",
     redoc_url=None if settings.api_key_value else "/redoc",
     lifespan=lifespan,

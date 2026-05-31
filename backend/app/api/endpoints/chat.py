@@ -31,7 +31,7 @@ router = APIRouter()
 
 # --- Provider Abstraction (Lazy Init — Finding A2) ---
 
-def get_provider(cfg):
+def get_provider(cfg: ConfigState):
     """Resolve provider at call time to prevent boot-time crashes if keys are missing."""
     provider_name = cfg.upstream_provider
     if provider_name == "google":
@@ -150,14 +150,13 @@ async def chat_endpoint(request: Request, req: ChatRequest):
         )
         
         telemetry_block = (
-            f"📊 [FIREWALL_AUDIT]\n"
-            f"🛡️ Engine: [{cfg.upstream_provider.upper()} | {model_id}]\n"
-            f"🔍 Noise (Entropy): {entropy:.2f} / {cfg.global_noise_limit}\n"
-            f"📐 Cosine Sim: {last_cosine:.3f} / {cfg.cosine_threshold}\n"
-            f"⚡ Excitation: {last_activations} / {cfg.excitation_threshold}\n"
-            f"🧩 Mode: {cfg.firewall_mode.upper()}\n"
-            f"{'-' * 34}\n"
-            f"💬 [LLM RESPONSE]:\n\n"
+            f"[FIREWALL_AUDIT]\n"
+            f"[FW_PASS]\n"
+            f"Engine: {cfg.upstream_provider.upper()} | {model_id}\n"
+            f"Mode: {cfg.firewall_mode.upper()}\n"
+            f"Metrics: Entropy({entropy:.2f}) | Cosine({last_cosine:.3f}) | Resonance({last_activations})\n"
+            f"{'-' * 40}\n"
+            f"[LLM_RESPONSE]:\n\n"
         )
         
         async def ui_stream_wrapper():
@@ -226,7 +225,7 @@ async def _stream_via_provider(prompt: str, context: str, cfg: ConfigState, stri
                     pass
     except Exception as e:
         logger.error("Provider connection failed: %s", e)
-        yield json.dumps({"response": "🔴 [LLM OFFLINE] Cannot reach the language model. Ensure the inference server is running."}).encode("utf-8") + b"\n"
+        yield json.dumps({"response": "[LLM_OFFLINE] Cannot reach the language model. Ensure the inference server is running."}).encode("utf-8") + b"\n"
 
 
 def _format_block_message(
@@ -239,58 +238,35 @@ def _format_block_message(
     # Strip mode prefix for matching (e.g. "negative:cosine" → "cosine")
     bare_reason = reason.split(":", 1)[-1] if reason.startswith("negative:") else reason
 
+    header = f"[FIREWALL_AUDIT]\n[FW_BLOCK]{mode_tag}"
+    
     if bare_reason == "cosine":
-        if negative:
-            msg = (
-                f'🛑 [FW]{mode_tag} Restricted content detected: "{failed_clause}". '
-                f'Cosine: {details.get("cosine_sim", 0):.3f} '
-                f'(Limit: <{cfg.cosine_threshold:.2f}). '
-                f'Query matches denylist corpus.'
-            )
-        else:
-            msg = (
-                f'🛑 [FW] Segment violation: "{failed_clause}". '
-                f'Cosine: {details.get("cosine_sim", 0):.3f} '
-                f'(Required: >={cfg.cosine_threshold:.2f}). '
-                f'Vector direction diverges from corpus.'
-            )
+        val = details.get("cosine_sim", 0)
+        req = cfg.cosine_threshold
+        metric_line = f'Metrics: Cosine({val:.3f}) | Limit: {req:.2f}'
     elif bare_reason == "noise":
-        msg = (
-            f'🛑 [FW]{mode_tag} Burst Detection Breach: "{failed_clause}". '
-            f'Entropy: {details.get("entropy", 0):.4f} '
-            f'(Limit: {cfg.global_noise_limit:.3f}).'
-        )
+        val = details.get("entropy", 0)
+        metric_line = f'Metrics: Entropy({val:.4f}) | Limit: {cfg.global_noise_limit:.3f}'
     elif bare_reason == "no_context":
-        msg = (
-            f'🛑 [FW] Segment violation: "{failed_clause}". '
-            f'No context match in corpus.'
-        )
+        metric_line = f'Reason: no_context'
     elif bare_reason == "excitation":
-        adaptive_note = ""
-        if details.get("adaptive_applied"):
-            adaptive_note = f' [ADAPTIVE] Factor: {details.get("adaptive_factor", 1.0)}x.'
-        if negative:
-            msg = (
-                f'🛑 [FW]{mode_tag} Restricted content detected: "{failed_clause}". '
-                f'Resonance: {details.get("activations", 0)}/{details.get("threshold", 0):.0f}.{adaptive_note} '
-                f'Query matches denylist corpus.'
-            )
-        else:
-            msg = (
-                f'🛑 [FW] Segment violation: "{failed_clause}". '
-                f'Resonance: {details.get("activations", 0)}/{details.get("threshold", 0):.0f}.{adaptive_note}'
-            )
+        act = details.get("activations", 0)
+        thr = details.get("threshold", 0)
+        metric_line = f'Metrics: Resonance({act}) | Limit: {thr:.0f}'
     else:
-        msg = (
-            f'🛑 [FW]{mode_tag} Segment violation: "{failed_clause}". '
-            f'Reason: {reason}.'
-        )
+        metric_line = f'Reason: {reason}'
 
-    stage_summary = " → ".join(
-        f'{r["stage"]}:{"OK" if r["passed"] else "BREACH"}' for r in traces
+    pipeline = " -> ".join([f"{r['stage']}:{'OK' if r['passed'] else 'FAIL'}" for r in traces])
+    
+    return (
+        f"{header}\n"
+        f"Mode: {cfg.firewall_mode.upper()}\n"
+        f"Segment: \"{failed_clause}\"\n"
+        f"{metric_line}\n"
+        f"Pipeline: [{pipeline}]\n"
+        f"{'-' * 40}\n"
+        f"[CONNECTION_TERMINATED]\n\n"
     )
-    msg += f'\nPipeline: [{stage_summary}]'
-    return msg
 
 
 # --- OpenAI-Compatible Transparent Proxy ---
@@ -335,7 +311,7 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
                 return Response(
                     content=json.dumps({
                         "error": {
-                            "message": f"\ud83d\uded1 [FW] Segment violation: no context match for \"{clause}\"",
+                            "message": f"[FW_BLOCK] Segment violation: no context match for \"{clause}\"",
                             "type": "security_breach",
                             "code": "403"
                         }
@@ -364,7 +340,7 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
                 return Response(
                     content=json.dumps({
                         "error": {
-                            "message": f"\ud83d\uded1 [FW] Segment violation: {res['breach_reason']}",
+                            "message": f"[FW_BLOCK] Segment violation: {res['breach_reason']}",
                             "type": "security_breach",
                             "code": "403"
                         }

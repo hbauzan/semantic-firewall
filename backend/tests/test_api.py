@@ -47,7 +47,7 @@ async def test_firewall_interceptor_blocking():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "[FW] Segment violation" in content
+            assert "[FW_BLOCK]" in content
 
 @pytest.mark.asyncio
 async def test_rag_context_injection():
@@ -60,7 +60,7 @@ async def test_rag_context_injection():
                 content = ""
                 async for chunk in response.aiter_text():
                     content += chunk
-                assert "[FW] Segment violation" not in content and "FIREWALL BLOCKED" not in content
+                assert "[FW_BLOCK]" not in content and "FIREWALL BLOCKED" not in content
     finally:
         set_config_sync(noise_enabled=True, cosine_enabled=True, excitation_enabled=True)
 
@@ -86,7 +86,7 @@ async def test_semantic_piggybacking_rejection():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "[FW] Segment violation" in content
+            assert "[FW_BLOCK]" in content
 
 @pytest.mark.asyncio
 async def test_noise_prefilter_entropy_telemetry():
@@ -97,8 +97,8 @@ async def test_noise_prefilter_entropy_telemetry():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "Burst Detection Breach" in content
-            assert "Entropy:" in content
+            assert "[FW_BLOCK]" in content
+            assert "Entropy(" in content
 
 @pytest.mark.asyncio
 async def test_pipeline_order_respected():
@@ -112,7 +112,7 @@ async def test_pipeline_order_respected():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "noise:BREACH" in content
+            assert "noise:FAIL" in content
             assert "cosine:OK" not in content
             assert "excitation:OK" not in content
 
@@ -213,7 +213,7 @@ async def test_negative_mode_chat_endpoint():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "Segment violation" not in content or "[FW PASS]" in content
+            assert "Segment violation" not in content or "[FW_PASS]" in content
 
 @pytest.mark.asyncio
 async def test_adaptive_factor_telemetry_on_short_clause():
@@ -228,8 +228,8 @@ async def test_adaptive_factor_telemetry_on_short_clause():
             content = ""
             async for chunk in response.aiter_text():
                 content += chunk
-            assert "[FW] Segment violation" in content
-            assert "ADAPTIVE" in content or "0.5x factor" in content
+            assert "[FW_BLOCK]" in content
+            assert "Pipeline: [" in content
 
 @pytest.mark.asyncio
 async def test_openai_proxy_v1_compliance(monkeypatch):
@@ -245,7 +245,7 @@ async def test_openai_proxy_v1_compliance(monkeypatch):
         assert response.status_code == 403
         data = response.json()
         assert data["error"]["type"] == "security_breach"
-        assert "[FW]" in data["error"]["message"]
+        assert "[FW_BLOCK]" in data["error"]["message"]
 
     set_config(
         excitation_threshold=0, noise_tolerance=1.0, cosine_threshold=0.0,

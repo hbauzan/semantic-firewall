@@ -7,7 +7,7 @@ import psutil
 import torch
 from fastapi import APIRouter, Depends
 
-from app.modules.sniffer import subscribe, unsubscribe, stream_sniffer_sse, get_sniffer_history
+from app.modules.sniffer import subscribe, unsubscribe, stream_sniffer_sse, get_sniffer_history, clear_history_backend
 from app.api.endpoints._shared import verify_api_key
 from fastapi.responses import StreamingResponse
 
@@ -54,18 +54,30 @@ async def health_check():
 @router.get("/v1/sniffer/stream", dependencies=[Depends(verify_api_key)])
 async def sniffer_stream():
     """SSE endpoint for real-time firewall telemetry observation."""
+    from app.core import state as state_mod
+    limit = state_mod.config_state.sniffer_view_limit
+
     sub_q = await subscribe()
     async def event_generator():
         try:
-            async for event in stream_sniffer_sse(sub_q):
+            async for event in stream_sniffer_sse(sub_q, limit):
                 yield event
         finally:
             await unsubscribe(sub_q)
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @router.get("/system/logs/export", dependencies=[Depends(verify_api_key)])
-async def export_logs():
-    """Forensic Export: aggregates in-memory sniffer traces and chat history into a portable JSON forensic package."""
+async def export_forensic_logs():
+    """Aggregates all in-memory sniffer traces for forensic audit."""
     history = get_sniffer_history()
-    return {"traces": [t.model_dump() for t in history]}
+    return {
+        "export_version": "v2.30.0",
+        "total_traces": len(history),
+        "traces": [t.model_dump() for t in history]
+    }
 
+@router.delete("/system/sniffer/history", dependencies=[Depends(verify_api_key)])
+async def clear_sniffer_history():
+    """Wipes the forensic sniffer history completely."""
+    await clear_history_backend()
+    return {"status": "cleared"}

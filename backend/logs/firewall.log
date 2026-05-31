@@ -88,3 +88,976 @@
 2026-05-31 11:14:05,908 - app.modules.profiles - INFO - Profile saved: _last_used
 2026-05-31 11:14:06,428 - app.modules.profiles - INFO - Profile saved: _last_used
 2026-05-31 11:14:06,428 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:29:19,790 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:29:19,790 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:32:09,702 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:32:09,702 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:32:12,074 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:32:12,074 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:32:16,038 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:32:16,038 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:32:20,724 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:32:20,724 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:34:32,526 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:34:32,526 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:34:49,663 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:34:49,663 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:34:55,829 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:34:55,829 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:34:56,561 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:34:56,561 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:34:59,227 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:34:59,227 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:35:24,168 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:35:24,168 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:35:25,224 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:35:25,224 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:36:23,230 - app.modules.ingestor - INFO - Starting text extraction for Finanzas.pdf
+2026-05-31 11:36:23,230 - app.modules.ingestor - INFO - Starting text extraction for Finanzas.pdf
+2026-05-31 11:36:25,086 - app.modules.ingestor - INFO - Ingestion complete: Finanzas.pdf (1 chunks)
+2026-05-31 11:36:25,086 - app.modules.ingestor - INFO - Ingestion complete: Finanzas.pdf (1 chunks)
+2026-05-31 11:36:54,978 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:36:54,978 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:36:57,530 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:36:57,530 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:42:08,858 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:42:08,858 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:42:09,716 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:42:09,716 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:42:10,288 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:42:10,288 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:42:29,344 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:42:29,344 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:42:35,442 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:42:35,442 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:42:42,880 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:42:42,880 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:42:45,226 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:42:45,226 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:44:09,256 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:44:09,256 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:44:18,624 - app.modules.sniffer - INFO - RTSS consumer shutting down
+2026-05-31 11:44:18,624 - app.modules.sniffer - INFO - RTSS consumer shutting down
+2026-05-31 11:44:33,456 - __main__ - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 11:44:33,504 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 11:44:33,504 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 11:44:33,513 - app.modules.sniffer - INFO - Loaded 352 sniffer traces from history.
+2026-05-31 11:44:33,513 - app.modules.sniffer - INFO - Loaded 352 sniffer traces from history.
+2026-05-31 11:44:33,513 - app.modules.sniffer - INFO - RTSS consumer started
+2026-05-31 11:44:33,513 - app.modules.sniffer - INFO - RTSS consumer started
+2026-05-31 11:45:01,583 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 11:45:01,601 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 11:45:01,611 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 11:45:01,611 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 11:45:01,612 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/324940db-471b-444c-8931-deb5d7911f12 "HTTP/1.1 200 OK"
+2026-05-31 11:45:02,061 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 11:45:02,112 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 11:45:02,541 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:45:05,934 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 11:45:06,044 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 11:45:06,175 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 11:45:06,203 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 11:45:06,228 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 11:45:06,232 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:06,232 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:06,233 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:06,233 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:06,234 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:06,235 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:06,236 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 11:45:06,237 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:06,237 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:06,238 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:06,239 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:06,518 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,681 - app.modules.sniffer - WARNING - update_trace: trace_id 80aa3836-bbe6-4027-b7b3-813647abae9f not found in buffer
+2026-05-31 11:45:09,681 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,769 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,796 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 11:45:09,797 - app.modules.sniffer - WARNING - update_trace: trace_id 22ab1aab-e521-41b7-aa0b-acee135d3d73 not found in buffer
+2026-05-31 11:45:09,797 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,822 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 11:45:09,845 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 11:45:09,846 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 11:45:09,846 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 11:45:09,846 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 11:45:09,846 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 11:45:09,847 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:09,848 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,848 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 11:45:09,849 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 11:45:09,850 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:09,850 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,851 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:09,851 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,852 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:09,853 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,853 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:09,854 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,854 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:09,855 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,855 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:09,856 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,857 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:09,857 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,858 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,881 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,887 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 11:45:09,890 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:09,891 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:45:09,891 - app.api.endpoints.chat - CRITICAL - UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.
+2026-05-31 11:45:23,068 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:23,068 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:45:40,429 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:45:40,429 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:45:44,340 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:45:44,340 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:48:10,660 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:10,660 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:12,215 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:48:12,215 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:48:17,075 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:48:17,075 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:48:19,605 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:48:19,605 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:48:21,625 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:21,625 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:21,933 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:48:21,933 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:48:22,234 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:22,234 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:22,582 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:48:22,582 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:48:23,689 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:23,689 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:24,471 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:48:24,471 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:48:24,853 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:48:24,853 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:48:27,295 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:27,295 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:29,637 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:48:29,637 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:48:29,961 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:29,961 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:48:44,962 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:48:44,962 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:48:50,103 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:48:50,103 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:49:10,701 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:49:10,701 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:49:31,130 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:49:31,130 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 11:49:52,693 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:49:52,693 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 11:53:29,672 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:53:29,672 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:53:36,081 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:53:36,081 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 11:53:58,245 - app.modules.sniffer - INFO - RTSS consumer shutting down
+2026-05-31 11:53:58,245 - app.modules.sniffer - INFO - RTSS consumer shutting down
+2026-05-31 11:54:12,623 - __main__ - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 11:54:12,686 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 11:54:12,686 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 11:54:12,695 - app.modules.sniffer - INFO - Loaded 357 sniffer traces from history.
+2026-05-31 11:54:12,695 - app.modules.sniffer - INFO - Loaded 357 sniffer traces from history.
+2026-05-31 11:54:12,695 - app.modules.sniffer - INFO - RTSS consumer started
+2026-05-31 11:54:12,695 - app.modules.sniffer - INFO - RTSS consumer started
+2026-05-31 11:54:46,724 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:46,724 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:55,617 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 11:54:55,635 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 11:54:55,644 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 11:54:55,644 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 11:54:55,645 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/6f34cbd7-865d-4389-884e-60b9340ddd81 "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,098 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,428 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,780 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,780 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,781 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,781 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,782 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,783 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,784 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,785 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,785 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,786 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,787 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,971 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-05-31 11:54:56,976 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-05-31 11:54:56,980 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-05-31 11:54:56,985 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 11:54:56,985 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 11:54:56,985 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 11:54:56,985 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 11:54:56,986 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,986 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,987 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 11:54:56,987 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 11:54:56,988 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,989 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,989 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,990 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,990 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,991 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,991 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,992 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,993 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,993 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,993 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,994 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,995 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:56,995 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:56,996 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:54:57,028 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 11:54:57,034 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 11:54:57,037 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:54:57,037 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:18,140 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 11:55:18,157 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 11:55:18,165 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 11:55:18,166 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 11:55:18,167 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/e411491c-5671-40ca-9c13-91e153fcfdf1 "HTTP/1.1 200 OK"
+2026-05-31 11:55:18,580 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 11:55:18,907 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,256 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,256 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,257 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,257 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,258 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,258 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,260 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,260 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,261 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,262 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,262 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,445 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-05-31 11:55:19,450 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-05-31 11:55:19,454 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-05-31 11:55:19,459 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 11:55:19,459 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 11:55:19,459 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 11:55:19,459 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 11:55:19,460 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,460 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,461 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 11:55:19,461 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 11:55:19,462 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,463 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,463 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,464 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,465 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,465 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,466 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,466 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,467 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,467 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,468 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,468 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,469 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,469 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,470 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,506 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 11:55:19,514 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 11:55:19,517 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:55:19,517 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:16,104 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 11:56:16,121 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 11:56:16,131 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 11:56:16,132 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 11:56:16,133 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/89f06732-1d93-4a26-9b9f-ff94c276e2df "HTTP/1.1 200 OK"
+2026-05-31 11:56:16,587 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 11:56:16,920 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,290 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,291 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,292 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,292 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,293 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,294 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,295 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,296 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,296 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,297 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,297 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,482 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-05-31 11:56:17,487 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-05-31 11:56:17,491 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-05-31 11:56:17,496 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 11:56:17,496 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 11:56:17,496 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 11:56:17,496 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 11:56:17,497 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,498 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,498 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 11:56:17,499 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 11:56:17,500 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,500 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,500 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,501 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,502 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,502 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,503 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,503 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,504 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,504 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,505 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,505 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,506 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,506 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,507 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,541 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 11:56:17,547 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 11:56:17,550 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 11:56:17,551 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:05:37,105 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:05:37,120 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:37,140 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:37,895 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 12:05:38,440 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:38,441 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:38,446 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:38,450 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 12:05:38,452 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:38,457 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:38,875 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:05:38,900 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:05:38,952 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:05:38,977 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:05:38,980 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 12:05:38,980 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 12:05:38,980 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 12:05:38,980 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 12:05:38,981 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:38,986 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 12:05:38,986 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 12:05:38,988 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:38,988 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:38,993 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:38,994 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:38,999 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:39,000 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:39,005 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:39,005 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:39,010 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 404 Not Found"
+2026-05-31 12:05:39,016 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:22,057 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:06:22,073 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:22,093 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:22,237 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:06:22,304 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:06:22,412 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 12:06:22,519 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:06:22,566 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:06:22,631 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:06:22,637 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:22,638 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:22,642 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:22,647 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 12:06:22,647 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:22,652 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:22,774 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:06:22,848 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:06:22,880 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:06:22,906 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:06:22,957 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:06:22,984 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:06:22,985 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 12:06:22,985 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 12:06:22,985 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 12:06:22,985 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 12:06:22,986 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:22,992 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 12:06:22,993 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 12:06:22,994 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:22,995 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:23,000 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:23,001 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:23,008 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:23,008 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:23,015 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:23,016 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:23,022 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 404 Not Found"
+2026-05-31 12:06:23,029 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 404 Not Found"
+2026-05-31 12:07:16,968 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:07:17,150 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:08:20,416 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:08:20,432 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 12:08:20,437 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 12:08:20,438 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 12:08:20,439 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/c248d7e2-2f4d-4174-8872-0145ebab74e5 "HTTP/1.1 200 OK"
+2026-05-31 12:08:20,555 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:08:20,601 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:08:24,563 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:08:26,506 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:08:26,621 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 12:08:27,182 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:08:27,220 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:08:27,247 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:08:27,249 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:27,250 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:27,250 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:27,251 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:27,252 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:27,252 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:27,253 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 12:08:27,254 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:27,255 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:27,255 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:27,256 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:27,585 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,277 - app.modules.sniffer - WARNING - update_trace: trace_id d99cc035-c390-4866-b80d-c51dff33fe4f not found in buffer
+2026-05-31 12:08:29,279 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,395 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,424 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:08:29,425 - app.modules.sniffer - WARNING - update_trace: trace_id c856a6a7-f84a-4a2f-ba6e-3227456e458a not found in buffer
+2026-05-31 12:08:29,426 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,450 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:08:29,474 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:08:29,476 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 12:08:29,476 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 12:08:29,476 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 12:08:29,476 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 12:08:29,477 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:29,478 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,478 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 12:08:29,479 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 12:08:29,480 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:29,481 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,481 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:29,482 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,483 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:29,483 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,484 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:29,484 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,485 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:29,485 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,486 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:29,486 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,487 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:29,488 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,488 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,513 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,515 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:08:29,515 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:08:29,516 - app.api.endpoints.chat - CRITICAL - UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.
+2026-05-31 12:10:55,279 - app.modules.sniffer - INFO - RTSS consumer shutting down
+2026-05-31 12:10:55,279 - app.modules.sniffer - INFO - RTSS consumer shutting down
+2026-05-31 12:11:13,697 - __main__ - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:11:13,746 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:11:13,746 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:11:13,756 - app.modules.sniffer - INFO - Loaded 357 sniffer traces from history.
+2026-05-31 12:11:13,756 - app.modules.sniffer - INFO - Loaded 357 sniffer traces from history.
+2026-05-31 12:11:13,756 - app.modules.sniffer - INFO - RTSS consumer started
+2026-05-31 12:11:13,756 - app.modules.sniffer - INFO - RTSS consumer started
+2026-05-31 12:11:33,449 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:11:33,467 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 12:11:33,470 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 12:11:33,471 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 12:11:33,472 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/3b522cb0-bea0-4ae4-b752-4f36493af1f7 "HTTP/1.1 200 OK"
+2026-05-31 12:11:33,889 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:11:33,944 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:11:34,382 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:11:36,475 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:11:36,584 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 12:11:36,697 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:11:36,724 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:11:36,750 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:11:36,752 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:36,753 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:36,753 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:36,754 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:36,754 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:36,755 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:36,756 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 12:11:36,757 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:36,757 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:36,758 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:36,759 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:37,037 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:11:37,964 - app.modules.sniffer - WARNING - update_trace: trace_id cc773b80-38a8-4187-8870-460710370b5a not found in buffer
+2026-05-31 12:11:37,964 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,041 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,067 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:11:38,068 - app.modules.sniffer - WARNING - update_trace: trace_id fee76760-975c-49b3-a7ea-ef5e7d6cab9a not found in buffer
+2026-05-31 12:11:38,068 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,091 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:11:38,114 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:11:38,115 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 12:11:38,116 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 12:11:38,116 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 12:11:38,116 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 12:11:38,117 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:38,117 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,118 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 12:11:38,118 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 12:11:38,119 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:38,119 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,120 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:38,120 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,121 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:38,122 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,122 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:38,123 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,124 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:38,124 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,125 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:38,125 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,126 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:38,126 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,127 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,150 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,155 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 12:11:38,158 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:38,158 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:11:38,159 - app.api.endpoints.chat - CRITICAL - UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.
+2026-05-31 12:11:44,366 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:44,366 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:46,268 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:46,268 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:49,027 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:11:49,027 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:12:30,537 - app.modules.ingestor - INFO - Starting text extraction for Finanzas.pdf
+2026-05-31 12:12:30,537 - app.modules.ingestor - INFO - Starting text extraction for Finanzas.pdf
+2026-05-31 12:12:31,141 - app.modules.ingestor - INFO - Ingestion complete: Finanzas.pdf (1 chunks)
+2026-05-31 12:12:31,141 - app.modules.ingestor - INFO - Ingestion complete: Finanzas.pdf (1 chunks)
+2026-05-31 12:12:52,952 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:12:52,952 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:13:00,216 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:13:00,216 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:13:09,406 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:13:09,406 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:13:20,042 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:13:20,042 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:13:24,179 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:13:24,179 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:13:24,694 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:13:24,694 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:13:29,984 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:13:29,984 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:13:35,619 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:13:35,619 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:13:39,155 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:13:39,155 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:13:39,263 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:13:39,263 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:13:43,371 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:13:43,371 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:13:43,475 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:13:43,475 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:13:53,695 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:13:53,695 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:14:20,404 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:14:20,404 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:15:08,252 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:15:08,252 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:16:38,963 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:16:38,963 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:26:58,370 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:26:58,389 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 12:26:58,393 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 12:26:58,394 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 12:26:58,395 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/cb281ec4-32a5-42ff-8313-19e4ac8c786f "HTTP/1.1 200 OK"
+2026-05-31 12:26:58,796 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:26:58,845 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:27:04,829 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:27:06,546 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:27:06,655 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 12:27:07,132 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:27:07,178 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:27:07,247 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:27:07,255 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:07,255 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:07,256 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:07,256 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:07,257 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:07,257 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:07,259 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 12:27:07,260 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:07,260 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:07,261 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:07,261 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:07,588 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:27:08,789 - app.modules.sniffer - WARNING - update_trace: trace_id 9dd61994-4248-43ad-b976-96394f785194 not found in buffer
+2026-05-31 12:27:08,790 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:27:08,935 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:27:08,969 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:27:08,999 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:27:09,025 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:27:09,027 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 12:27:09,027 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 12:27:09,027 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 12:27:09,027 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 12:27:09,028 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:09,029 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:09,030 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 12:27:09,030 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 12:27:09,031 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:09,031 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:09,032 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:09,033 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:09,034 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:09,034 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:09,035 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:09,035 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:09,036 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:09,037 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:09,037 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:09,038 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:09,038 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:09,039 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:09,040 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:09,064 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:27:09,070 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 12:27:09,074 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:27:09,074 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:27:09,075 - app.api.endpoints.chat - CRITICAL - UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.
+2026-05-31 12:27:57,479 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:27:57,554 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 12:27:57,558 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 12:27:57,559 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 12:27:57,560 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/9a52e35f-4240-4dfa-a7df-0e27adc3148e "HTTP/1.1 200 OK"
+2026-05-31 12:27:58,049 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:27:58,098 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:27:58,583 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:27:59,959 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:00,073 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 12:28:00,186 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:00,215 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:00,270 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:00,273 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:00,273 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:00,274 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:00,274 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:00,275 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:00,276 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:00,277 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 12:28:00,278 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:00,278 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:00,279 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:00,280 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:00,591 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,719 - app.modules.sniffer - WARNING - update_trace: trace_id d50f7f5f-8ad5-4723-949a-dacff9143e94 not found in buffer
+2026-05-31 12:28:03,720 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,839 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,868 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:28:03,869 - app.modules.sniffer - WARNING - update_trace: trace_id b030f43b-4dc6-474f-8f77-69e0f0257bde not found in buffer
+2026-05-31 12:28:03,869 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,899 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:28:03,926 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:28:03,929 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 12:28:03,930 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 12:28:03,930 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 12:28:03,930 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 12:28:03,932 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:03,932 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,934 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 12:28:03,935 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 12:28:03,937 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:03,938 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,939 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:03,939 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,940 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:03,941 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,943 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:03,943 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,945 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:03,945 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,946 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:03,946 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,947 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:03,948 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,948 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,978 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,985 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 12:28:03,990 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:03,990 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:03,991 - app.api.endpoints.chat - CRITICAL - UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.
+2026-05-31 12:28:32,537 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:28:32,598 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 12:28:32,604 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 12:28:32,604 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 12:28:32,605 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/b14586b3-9061-4f8b-8c3e-95a6e1e45b02 "HTTP/1.1 200 OK"
+2026-05-31 12:28:33,005 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:28:33,063 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:33,559 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:28:35,612 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:35,723 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 12:28:35,829 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:35,856 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:35,882 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:35,884 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:35,885 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:35,886 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:35,886 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:35,887 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:35,887 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:35,889 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 12:28:35,890 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:35,890 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:35,891 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:35,891 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:36,207 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,770 - app.modules.sniffer - WARNING - update_trace: trace_id 6804bab7-306c-41ca-b076-7fd89799fa42 not found in buffer
+2026-05-31 12:28:37,771 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,882 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,909 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:28:37,910 - app.modules.sniffer - WARNING - update_trace: trace_id f593b72a-d08f-4c5d-9f9a-23284ebda2dd not found in buffer
+2026-05-31 12:28:37,911 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,934 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:28:37,958 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:28:37,960 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 12:28:37,960 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 12:28:37,960 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 12:28:37,960 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 12:28:37,961 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:37,961 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,962 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 12:28:37,962 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 12:28:37,963 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:37,964 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,964 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:37,965 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,966 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:37,966 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,967 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:37,967 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,968 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:37,968 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,969 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:37,969 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,970 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:37,971 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,971 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:37,995 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:28:38,001 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 12:28:38,005 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:28:38,005 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:28:38,005 - app.api.endpoints.chat - CRITICAL - UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.
+2026-05-31 12:30:24,669 - app.modules.sniffer - INFO - RTSS consumer shutting down
+2026-05-31 12:30:24,669 - app.modules.sniffer - INFO - RTSS consumer shutting down
+2026-05-31 12:30:46,000 - __main__ - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:30:46,071 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:30:46,071 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:30:46,194 - app.modules.sniffer - INFO - Loaded 359 sniffer traces from history.
+2026-05-31 12:30:46,194 - app.modules.sniffer - INFO - Loaded 359 sniffer traces from history.
+2026-05-31 12:30:46,194 - app.modules.sniffer - INFO - RTSS consumer started
+2026-05-31 12:30:46,194 - app.modules.sniffer - INFO - RTSS consumer started
+2026-05-31 12:37:39,106 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:37:39,123 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 12:37:39,126 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 12:37:39,127 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 12:37:39,128 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/97359db6-4347-441a-9061-0239a73c36c2 "HTTP/1.1 200 OK"
+2026-05-31 12:37:39,480 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:37:39,528 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:37:44,716 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:37:46,663 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:37:46,773 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 12:37:47,179 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:37:47,218 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:37:47,284 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:37:47,286 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:47,286 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:47,287 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:47,288 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:47,288 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:47,289 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:47,290 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 12:37:47,291 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:47,291 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:47,292 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:47,293 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:47,621 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:37:49,793 - app.modules.sniffer - WARNING - update_trace: trace_id 7f365c15-2b15-40ce-934e-2f09410f8b09 not found in buffer
+2026-05-31 12:37:49,794 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:37:49,908 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:37:49,943 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:37:49,945 - app.modules.sniffer - WARNING - update_trace: trace_id 2816623c-bc5d-41a1-93c4-08cac368f6b5 not found in buffer
+2026-05-31 12:37:49,945 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-31 12:37:49,972 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:37:49,998 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:37:49,999 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 12:37:49,999 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 12:37:49,999 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 12:37:50,000 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 12:37:50,000 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:50,001 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:50,002 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 12:37:50,002 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 12:37:50,003 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:50,004 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:50,005 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:50,005 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:50,006 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:50,007 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:50,007 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:50,008 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:50,009 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:50,009 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:50,010 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:50,010 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:50,011 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:50,011 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:50,012 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:50,037 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:37:50,042 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 12:37:50,045 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:37:50,046 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:37:50,046 - app.api.endpoints.chat - CRITICAL - UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.
+2026-05-31 12:38:20,772 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:38:20,838 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 12:38:20,843 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 12:38:20,843 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 12:38:20,844 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/1cd6e8cd-4fb8-4e95-a60c-a351e44bc2f7 "HTTP/1.1 200 OK"
+2026-05-31 12:38:21,178 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:38:21,225 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:38:21,628 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,003 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,109 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,203 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,230 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,256 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,259 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:23,260 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,261 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:23,261 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,262 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:23,263 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,264 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,265 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:23,265 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,266 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:23,267 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:23,582 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,669 - app.modules.sniffer - WARNING - update_trace: trace_id 1ce1742a-be22-4808-bf2b-2be2b82c878c not found in buffer
+2026-05-31 12:38:25,670 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,784 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,811 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:38:25,812 - app.modules.sniffer - WARNING - update_trace: trace_id 3206c187-5c62-4175-b44b-1135e9bccb43 not found in buffer
+2026-05-31 12:38:25,813 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,838 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:38:25,863 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:38:25,865 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 12:38:25,865 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 12:38:25,865 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 12:38:25,865 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 12:38:25,866 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:25,866 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,867 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 12:38:25,868 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 12:38:25,869 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:25,869 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,870 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:25,870 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,871 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:25,872 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,872 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:25,872 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,873 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:25,874 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,874 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:25,875 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,876 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:25,876 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,877 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,901 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,906 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 12:38:25,909 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:38:25,910 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:38:25,910 - app.api.endpoints.chat - CRITICAL - UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.
+2026-05-31 12:43:49,972 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 12:43:49,988 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 12:43:49,992 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 12:43:49,993 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 12:43:49,994 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/89a063f8-3cfc-4518-82ba-23265d594aed "HTTP/1.1 200 OK"
+2026-05-31 12:43:50,207 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:43:50,254 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:43:54,129 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:43:54,649 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:43:54,762 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 12:43:55,333 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:43:55,373 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:43:55,400 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:43:55,404 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:55,404 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:55,405 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:55,405 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:55,407 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:55,407 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:55,408 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 12:43:55,409 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:55,410 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:55,411 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:55,411 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:55,766 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,701 - app.modules.sniffer - WARNING - update_trace: trace_id 8e14904c-2883-4226-9c71-975c932573d7 not found in buffer
+2026-05-31 12:43:56,703 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,824 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,854 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:43:56,855 - app.modules.sniffer - WARNING - update_trace: trace_id 3be8ec6f-a53f-4455-9528-1584932165ae not found in buffer
+2026-05-31 12:43:56,855 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,881 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:43:56,907 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 12:43:56,909 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 12:43:56,909 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 12:43:56,909 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 12:43:56,909 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 12:43:56,910 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:56,911 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,912 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 12:43:56,913 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 12:43:56,914 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:56,915 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,915 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:56,916 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,917 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:56,917 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,918 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:56,918 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,919 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:56,920 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,920 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:56,921 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,922 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:56,922 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,923 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,952 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,962 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 12:43:56,966 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:43:56,966 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 12:43:56,967 - app.api.endpoints.chat - CRITICAL - UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.
+2026-05-31 12:47:53,172 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:47:53,172 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:48:17,510 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:48:17,510 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:48:20,945 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:48:20,945 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:48:21,052 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:48:21,052 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:48:24,975 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:48:24,975 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:48:26,289 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:48:26,289 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:48:33,326 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:48:33,326 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:48:34,774 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:48:34,774 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:48:38,067 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:48:38,067 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:48:38,846 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:48:38,846 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:53:36,359 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:53:36,359 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:53:36,467 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:53:36,467 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:53:40,778 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:53:40,778 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:53:41,408 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:53:41,408 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:53:41,408 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:53:41,408 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:53:46,502 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:53:46,502 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 12:58:00,437 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:58:00,437 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 12:58:00,438 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 12:58:00,438 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
