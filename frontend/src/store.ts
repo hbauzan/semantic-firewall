@@ -62,6 +62,7 @@ export interface FirewallSlice {
   firewallMode: 'positive' | 'negative';
   activeTab: 'chat' | 'sniffer';
   upstreamProvider: 'ollama' | 'google' | 'openai' | 'anthropic' | 'groq';
+  snifferViewLimit: number;
   setExcitationThreshold: (val: number) => void;
   setNoiseTolerance: (val: number) => void;
   setCosineThreshold: (val: number) => void;
@@ -77,6 +78,7 @@ export interface FirewallSlice {
   setFirewallMode: (val: 'positive' | 'negative') => void;
   setActiveTab: (val: 'chat' | 'sniffer') => void;
   setUpstreamProvider: (val: 'ollama' | 'google' | 'openai' | 'anthropic' | 'groq') => void;
+  setSnifferViewLimit: (val: number) => void;
 }
 
 // --- Chat Slice ---
@@ -137,6 +139,7 @@ const createFirewallSlice: StateCreator<StoreState, [], [], FirewallSlice> = (se
   firewallMode: 'positive',
   activeTab: 'chat',
   upstreamProvider: 'ollama',
+  snifferViewLimit: 10,
   setExcitationThreshold: (val) => set({ excitationThreshold: val }),
   setNoiseTolerance: (val) => set({ noiseTolerance: val }),
   setCosineThreshold: (val) => set({ cosineThreshold: val }),
@@ -152,6 +155,7 @@ const createFirewallSlice: StateCreator<StoreState, [], [], FirewallSlice> = (se
   setFirewallMode: (val) => set({ firewallMode: val }),
   setActiveTab: (val) => set({ activeTab: val }),
   setUpstreamProvider: (val) => set({ upstreamProvider: val }),
+  setSnifferViewLimit: (val) => set({ snifferViewLimit: val }),
 });
 
 const createChatSlice: StateCreator<StoreState, [], [], ChatSlice> = (set) => ({
@@ -181,7 +185,7 @@ const createSnifferSlice: StateCreator<StoreState, [], [], SnifferSlice> = (set)
       updated[existingIdx] = trace;
       return { snifferLogs: updated };
     }
-    const logs = [trace, ...state.snifferLogs].slice(0, 100);
+    const logs = [trace, ...state.snifferLogs].slice(0, 1000);
     return { snifferLogs: logs };
   }),
   updateSnifferLog: (trace) => set((state) => {

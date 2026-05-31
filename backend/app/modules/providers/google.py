@@ -22,7 +22,7 @@ class GoogleGeminiProvider(BaseProvider):
             async with client.stream("POST", url, json={"contents": contents}, headers=headers) as response:
                 if response.status_code != 200:
                     await response.aread()
-                    error_text = f"🔴 [LLM ERROR] Google Gemini API Error ({response.status_code}): {response.text}"
+                    error_text = f"[LLM_ERROR] Google Gemini API Error ({response.status_code}): {response.text}"
                     yield f"data: {json.dumps({'choices': [{'delta': {'content': error_text}, 'finish_reason': 'error'}]})}\n\n"
                     yield "data: [DONE]\n\n"
                     return

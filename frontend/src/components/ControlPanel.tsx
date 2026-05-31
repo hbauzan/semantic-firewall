@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import { API_BASE_URL } from '../config';
+import { TOOLTIP_REGISTRY, type TooltipEntry } from '../locales/tooltips';
 import '../styles/ControlPanel.css';
 
 // Reusable slider with - / + step buttons
@@ -21,12 +22,18 @@ const StepSlider: React.FC<{
   );
 };
 
-// Tooltip Content Mapping
-const TOOLTIPS = {
-  noise: "Filters repetitive character attacks (GCG). Suggested: 4.5 (Entropy). Lower = more permissive.",
-  cosine: "Semantic similarity gate. Suggested: 0.53 (Pos) / 0.62 (Neg). Higher = stricter.",
-  excitation: "Exact dimensional resonance. Suggested: 150. Higher = requires near-total alignment."
-};
+const lang = 'en';
+
+const InfoTooltip: React.FC<{ entry: TooltipEntry }> = ({ entry }) => (
+  <span className="info-icon">
+    i
+    <div className="tooltip-box">
+      <div style={{ marginBottom: '4px' }}><strong>What is it?</strong> {entry.what}</div>
+      <div style={{ marginBottom: '4px' }}><strong>How it works:</strong> {entry.how}</div>
+      <div><strong>Suggested:</strong> {entry.suggested}</div>
+    </div>
+  </span>
+);
 
 
 export const ControlPanel: React.FC = () => {
@@ -34,11 +41,11 @@ export const ControlPanel: React.FC = () => {
     excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit,
     cosineOrder, excitationOrder, noiseOrder, adaptiveFactor,
     noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode, activeTab,
-    upstreamProvider,
+    upstreamProvider, snifferViewLimit,
     setExcitationThreshold, setNoiseTolerance, setCosineThreshold, setGlobalNoiseLimit,
     setCosineOrder, setExcitationOrder, setNoiseOrder, setAdaptiveFactor,
     setNoiseEnabled, setCosineEnabled, setExcitationEnabled, setRagTopK, setFirewallMode,
-    setUpstreamProvider,
+    setUpstreamProvider, setSnifferViewLimit,
     ingestionStatus, setIngestionStatus, setSystemAction
   } = useStore();
 
@@ -100,6 +107,7 @@ export const ControlPanel: React.FC = () => {
         setCosineEnabled(c.cosine_enabled);
         setExcitationEnabled(c.excitation_enabled);
         setFirewallMode(c.firewall_mode);
+        if (c.sniffer_view_limit) setSnifferViewLimit(c.sniffer_view_limit);
         if (c.upstream_provider) setUpstreamProvider(c.upstream_provider);
         setConfigHydrated(true);
       })
@@ -170,6 +178,7 @@ export const ControlPanel: React.FC = () => {
       setCosineEnabled(c.cosine_enabled);
       setExcitationEnabled(c.excitation_enabled);
       setFirewallMode(c.firewall_mode);
+      if (c.sniffer_view_limit) setSnifferViewLimit(c.sniffer_view_limit);
       if (c.upstream_provider) setUpstreamProvider(c.upstream_provider);
     } catch (err) {
       console.error("Failed to load profile:", err);
@@ -211,13 +220,14 @@ export const ControlPanel: React.FC = () => {
           firewall_mode: firewallMode,
           active_tab: activeTab,
           upstream_provider: upstreamProvider,
+          sniffer_view_limit: snifferViewLimit,
         })
       }).then(res => {
         if (!res.ok) console.warn(`Config sync failed: ${res.status}`);
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
-  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode, activeTab, upstreamProvider, configHydrated]);
+  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode, activeTab, upstreamProvider, snifferViewLimit, configHydrated]);
 
   // Poll for ingestion status if task is active
   useEffect(() => {
@@ -312,7 +322,10 @@ export const ControlPanel: React.FC = () => {
 
       {/* --- Upstream Provider Selection --- */}
       <div className="config-section" style={{ marginBottom: '1rem' }}>
-        <div className="slider-label">Upstream LLM Engine</div>
+        <div className="slider-label">
+          Upstream LLM Engine
+          <InfoTooltip entry={TOOLTIP_REGISTRY[lang].upstream} />
+        </div>
         <select
           value={upstreamProvider}
           onChange={(e) => setUpstreamProvider(e.target.value as any)}
@@ -331,6 +344,7 @@ export const ControlPanel: React.FC = () => {
         <div className="mode-info">
           <div className="mode-title">
             {isNeg ? 'NEGATIVE \u2014 Denylist' : 'POSITIVE \u2014 Allowlist'}
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].mode} />
           </div>
           <div className="mode-subtitle">
             {isNeg ? 'Corpus topics are blocked' : 'Only corpus topics pass'}
@@ -357,7 +371,7 @@ export const ControlPanel: React.FC = () => {
         <div style={{ flex: 1 }}>
           <div className="slider-label">
             Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong>
-            <span className="info-icon" title={TOOLTIPS.noise} style={{ cursor: 'help', marginLeft: '5px' }}>ⓘ</span>
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].noise} />
           </div>
           <StepSlider value={globalNoiseLimit} min={0.10} max={2.00} step={0.01} onChange={setGlobalNoiseLimit} />
         </div>
@@ -377,7 +391,7 @@ export const ControlPanel: React.FC = () => {
         <div style={{ flex: 1 }}>
           <div className="slider-label">
             Cosine Gate: <strong>{cosineThreshold.toFixed(2)}</strong>
-            <span className="info-icon" title={TOOLTIPS.cosine} style={{ cursor: 'help', marginLeft: '5px' }}>ⓘ</span>
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].cosine} />
           </div>
           <StepSlider value={cosineThreshold} min={0.00} max={1.00} step={0.01} onChange={setCosineThreshold} />
           <div className="slider-hint">
@@ -400,16 +414,20 @@ export const ControlPanel: React.FC = () => {
         <div style={{ flex: 1 }}>
           <div className="slider-label">
             Excitation: <strong>{excitationThreshold}</strong>
-            <span className="info-icon" title={TOOLTIPS.excitation} style={{ cursor: 'help', marginLeft: '5px' }}>ⓘ</span>
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].excitation} />
           </div>
           <StepSlider value={excitationThreshold} min={0} max={1024} step={1} onChange={setExcitationThreshold} />
           <div className="noise-tolerance-label">
             Noise Tolerance: {noiseTolerance.toFixed(3)}
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].tolerance} />
           </div>
           <StepSlider value={noiseTolerance} min={0.001} max={0.100} step={0.001} onChange={setNoiseTolerance} />
         </div>
         <div className="seq-column">
-          <div className="seq-label">Seq</div>
+          <div className="seq-label">
+            Seq
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].seq} />
+          </div>
           <input type="number" min="1" max="3" step="1" value={excitationOrder}
             onChange={(e) => handleOrderChange('excitation', Number(e.target.value))} className="seq-input" />
         </div>
@@ -417,7 +435,10 @@ export const ControlPanel: React.FC = () => {
 
       {/* --- Adaptive Factor --- */}
       <div className="config-section">
-        <div className="slider-label">Adaptive Factor: <strong>{adaptiveFactor.toFixed(2)}</strong></div>
+        <div className="slider-label">
+          Adaptive Factor: <strong>{adaptiveFactor.toFixed(2)}</strong>
+          <InfoTooltip entry={TOOLTIP_REGISTRY[lang].adaptive} />
+        </div>
         <StepSlider value={adaptiveFactor} min={0.01} max={1.00} step={0.01} onChange={setAdaptiveFactor} />
         <div className="slider-sublabel">
           <span>Short: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
@@ -427,7 +448,10 @@ export const ControlPanel: React.FC = () => {
 
       {/* --- RAG Top-K --- */}
       <div className="config-section">
-        <div className="slider-label">RAG Context Depth: <strong>{ragTopK}</strong> chunk{ragTopK > 1 ? 's' : ''}</div>
+        <div className="slider-label">
+          RAG Context Depth: <strong>{ragTopK}</strong> chunk{ragTopK > 1 ? 's' : ''}
+          <InfoTooltip entry={TOOLTIP_REGISTRY[lang].rag} />
+        </div>
         <StepSlider value={ragTopK} min={1} max={10} step={1} onChange={setRagTopK} />
         <div className="slider-sublabel">
           <span>1 (fast)</span>
@@ -437,7 +461,10 @@ export const ControlPanel: React.FC = () => {
 
       {/* --- Config Profiles --- */}
       <div className="profiles-section">
-        <div className="section-title">Config Profiles</div>
+        <div className="section-title">
+          Config Profiles
+          <InfoTooltip entry={TOOLTIP_REGISTRY[lang].profiles} />
+        </div>
         <div className="profiles-row">
           <select
             value={selectedProfile}
@@ -482,6 +509,10 @@ export const ControlPanel: React.FC = () => {
 
       {/* --- Corpus Upload --- */}
       <div className="corpus-section">
+        <div className="section-title" style={{ marginBottom: '0.4rem' }}>
+          Document Corpus
+          <InfoTooltip entry={TOOLTIP_REGISTRY[lang].corpus} />
+        </div>
         <input type="file" accept="application/pdf" ref={fileInputRef}
           onChange={handleFileUpload} className="file-input" />
         <button onClick={() => fileInputRef.current?.click()} className="corpus-upload-btn">

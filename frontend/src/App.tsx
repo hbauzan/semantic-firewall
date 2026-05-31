@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { TelemetryHUD } from './components/TelemetryHUD';
 import { ControlPanel } from './components/ControlPanel';
 import { ChatInterface } from './components/ChatInterface';
-import { AuditPanel } from './components/AuditPanel';
 import { SnifferTab } from './components/SnifferTab';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -26,14 +25,14 @@ function App() {
             className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
             onClick={() => setActiveTab('chat')}
           >
-            💬 Chat
+            CHAT
           </button>
           <button
             id="tab-sniffer"
             className={`tab-btn ${activeTab === 'sniffer' ? 'active' : ''}`}
             onClick={() => setActiveTab('sniffer')}
           >
-            🔍 Sniffer
+            SNIFFER
           </button>
         </div>
         {activeTab === 'chat' ? (
@@ -41,9 +40,7 @@ function App() {
             <ErrorBoundary label="ChatInterface">
               <ChatInterface />
             </ErrorBoundary>
-            <ErrorBoundary label="AuditPanel">
-              <AuditPanel />
-            </ErrorBoundary>
+            {/* AuditPanel Removed - Redundant with Sniffer FPI */}
           </>
         ) : (
           <ErrorBoundary label="SnifferTab">

@@ -134,6 +134,15 @@ button:hover {
   border-radius: 4px;
   max-width: 80%;
   word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.chat-message.audit-block {
+  font-family: 'Courier New', Courier, monospace;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  border-radius: 4px;
+  border-left: 3px solid var(--accent);
 }
 
 .chat-message.user {

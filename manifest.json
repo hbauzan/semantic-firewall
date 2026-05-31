@@ -1,7 +1,21 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.25.0",
+    "version": "v2.31.0",
     "active_features": {
+        "reactive_sniffer_limit": true,
+        "expanded_sniffer_buffer": true,
+        "version_sync_complete": true,
+        "spec_alignment_v3": true,
+        "configurable_sniffer_limit": true,
+        "confirmed_wipe_logic": true,
+        "industrial_ui_complete": true,
+        "sniffer_backend_clear": true,
+        "zero_emoji_compliance": true,
+        "log_sanitization_no_emojis": true,
+        "sniffer_export_json": true,
+        "sniffer_clear_fix": true,
+        "audit_panel_decommissioning": true,
+        "structured_telemetry_v2": true,
         "unified_sniffer_capture": true,
         "aesthetic_telemetry_block": true,
         "sequential_order_swap_logic": true,
@@ -14,6 +28,7 @@
         "forensic_log_export": true,
         "chat_input_history_navigation": true,
         "semantic_ui_tooltips": true,
+        "i18n_tooltip_registry": true,
         "telemetry_aesthetic_refactor": true,
         "mode_aware_youden_reset": true,
         "corpus_densification_1k": true,
@@ -128,7 +143,11 @@
         "anthropic_sse_normalization": true,
         "groq_fast_inference_support": true,
         "multi_cloud_llm_support": true,
-        "lazy_key_validation": true
+        "lazy_key_validation": true,
+        "slowapi_request_injection": true,
+        "provider_factory_tuple_return": true,
+        "openai_v1_route_registration": true,
+        "test_suite_alignment_v2": true
     },
     "state_schema": {
         "excitation_threshold": {

@@ -16,7 +16,7 @@ class OllamaProvider(BaseProvider):
             ) as response:
                 if response.status_code != 200:
                     await response.aread()
-                    error_text = f"🔴 [LLM ERROR] Ollama API Error ({response.status_code}): {response.text}"
+                    error_text = f"[LLM_ERROR] Ollama API Error ({response.status_code}): {response.text}"
                     yield f"data: {json.dumps({'choices': [{'delta': {'content': error_text}, 'finish_reason': 'error'}]})}\n\n"
                     yield "data: [DONE]\n\n"
                     return

@@ -173,7 +173,7 @@ export const ChatInterface: React.FC = () => {
     <div className="main-panel">
       <div className="chat-history">
         {messages.map((msg) => (
-          <div key={msg.id} className={`chat-message ${msg.role}`}>
+          <div key={msg.id} className={`chat-message ${msg.role} ${msg.content.includes('FIREWALL_AUDIT') ? 'audit-block' : ''}`}>
             {msg.role === 'user' ? '> ' : ''}
             {msg.content}
           </div>
