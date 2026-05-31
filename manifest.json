@@ -1,7 +1,13 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.24.0",
+    "version": "v2.25.0",
     "active_features": {
+        "unified_sniffer_capture": true,
+        "aesthetic_telemetry_block": true,
+        "sequential_order_swap_logic": true,
+        "descriptive_ui_tooltips": true,
+        "cross_endpoint_trace_correlation": true,
+        "pydantic_sequence_uniqueness_enforcement": true,
         "last_session_visibility": true,
         "reset_to_recommended_config": true,
         "industrial_rotating_logger": true,

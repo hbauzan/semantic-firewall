@@ -74,6 +74,7 @@ def _process_pdf_sync(file_bytes: bytes, filename: str, task_id: str):
     import json
     doc = None
     try:
+        logger.info("Starting text extraction for %s", filename)
         tasks.put(task_id, TaskStatus(task_id=task_id, status="processing", progress=10.0, message="Extracting text"))
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         full_text = ""
@@ -120,16 +121,24 @@ def _process_pdf_sync(file_bytes: bytes, filename: str, task_id: str):
             doc.close()
 
 
+_background_tasks = set()
+
 async def process_pdf_async(file_bytes: bytes, filename: str) -> str:
     task_id = str(uuid.uuid4())
     tasks.put(task_id, TaskStatus(task_id=task_id, status="pending", progress=0.0, message="Task queued"))
     tasks.prune()  # Clean up old tasks on each new upload
 
     async def _guarded_ingestion():
-        async with _ingestion_semaphore:
-            await asyncio.to_thread(_process_pdf_sync, file_bytes, filename, task_id)
+        try:
+            async with _ingestion_semaphore:
+                await asyncio.to_thread(_process_pdf_sync, file_bytes, filename, task_id)
+        except Exception as e:
+            logger.error("Guarded ingestion failed: %s", e)
+            tasks.put(task_id, TaskStatus(task_id=task_id, status="failed", progress=0.0, message="Failed to process"))
 
-    asyncio.create_task(_guarded_ingestion())
+    task = asyncio.create_task(_guarded_ingestion())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
     return task_id
 
 

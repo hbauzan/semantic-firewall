@@ -21,6 +21,14 @@ const StepSlider: React.FC<{
   );
 };
 
+// Tooltip Content Mapping
+const TOOLTIPS = {
+  noise: "Filters repetitive character attacks (GCG). Suggested: 4.5 (Entropy). Lower = more permissive.",
+  cosine: "Semantic similarity gate. Suggested: 0.53 (Pos) / 0.62 (Neg). Higher = stricter.",
+  excitation: "Exact dimensional resonance. Suggested: 150. Higher = requires near-total alignment."
+};
+
+
 export const ControlPanel: React.FC = () => {
   const {
     excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit,
@@ -42,6 +50,33 @@ export const ControlPanel: React.FC = () => {
   const [selectedProfile, setSelectedProfile] = useState<string>('');
   const [newProfileName, setNewProfileName] = useState<string>('');
   const [configHydrated, setConfigHydrated] = useState(false);
+
+  const handleOrderChange = (filterName: 'noise' | 'cosine' | 'excitation', newOrder: number) => {
+    const currentOrders = {
+      noise: noiseOrder,
+      cosine: cosineOrder,
+      excitation: excitationOrder
+    };
+    
+    // Find which filter currently has the target order
+    const conflictFilter = Object.keys(currentOrders).find(
+      key => currentOrders[key as keyof typeof currentOrders] === newOrder
+    ) as keyof typeof currentOrders;
+
+    if (conflictFilter && conflictFilter !== filterName) {
+      // Perform the swap: Assign the old order of the current filter to the conflicting one
+      const oldOrder = currentOrders[filterName];
+      if (conflictFilter === 'noise') setNoiseOrder(oldOrder);
+      if (conflictFilter === 'cosine') setCosineOrder(oldOrder);
+      if (conflictFilter === 'excitation') setExcitationOrder(oldOrder);
+    }
+    
+    // Set the new order for the target filter
+    if (filterName === 'noise') setNoiseOrder(newOrder);
+    if (filterName === 'cosine') setCosineOrder(newOrder);
+    if (filterName === 'excitation') setExcitationOrder(newOrder);
+  };
+
 
   // --- Config Hydration from Backend (Finding Q4/F5) ---
   useEffect(() => {
@@ -217,6 +252,12 @@ export const ControlPanel: React.FC = () => {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Clear input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     setSystemAction("UPLOADING_PDF...");
@@ -316,14 +357,14 @@ export const ControlPanel: React.FC = () => {
         <div style={{ flex: 1 }}>
           <div className="slider-label">
             Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong>
-            <span className="info-icon" title="Detects repetitive patterns or GCG attacks. Higher = Stricter." style={{ cursor: 'help', marginLeft: '5px' }}>ⓘ</span>
+            <span className="info-icon" title={TOOLTIPS.noise} style={{ cursor: 'help', marginLeft: '5px' }}>ⓘ</span>
           </div>
           <StepSlider value={globalNoiseLimit} min={0.10} max={2.00} step={0.01} onChange={setGlobalNoiseLimit} />
         </div>
         <div className="seq-column">
           <div className="seq-label">Seq</div>
           <input type="number" min="1" max="3" step="1" value={noiseOrder}
-            onChange={(e) => setNoiseOrder(Number(e.target.value))} className="seq-input" />
+            onChange={(e) => handleOrderChange('noise', Number(e.target.value))} className="seq-input" />
         </div>
       </div>
 
@@ -334,7 +375,10 @@ export const ControlPanel: React.FC = () => {
           {cosineEnabled ? 'ON' : 'OFF'}
         </button>
         <div style={{ flex: 1 }}>
-          <div className="slider-label">Cosine Gate: <strong>{cosineThreshold.toFixed(2)}</strong></div>
+          <div className="slider-label">
+            Cosine Gate: <strong>{cosineThreshold.toFixed(2)}</strong>
+            <span className="info-icon" title={TOOLTIPS.cosine} style={{ cursor: 'help', marginLeft: '5px' }}>ⓘ</span>
+          </div>
           <StepSlider value={cosineThreshold} min={0.00} max={1.00} step={0.01} onChange={setCosineThreshold} />
           <div className="slider-hint">
             <span>0 LAX</span><span>STRICT 1</span>
@@ -343,7 +387,7 @@ export const ControlPanel: React.FC = () => {
         <div className="seq-column">
           <div className="seq-label">Seq</div>
           <input type="number" min="1" max="3" step="1" value={cosineOrder}
-            onChange={(e) => setCosineOrder(Number(e.target.value))} className="seq-input" />
+            onChange={(e) => handleOrderChange('cosine', Number(e.target.value))} className="seq-input" />
         </div>
       </div>
 
@@ -354,7 +398,10 @@ export const ControlPanel: React.FC = () => {
           {excitationEnabled ? 'ON' : 'OFF'}
         </button>
         <div style={{ flex: 1 }}>
-          <div className="slider-label">Excitation: <strong>{excitationThreshold}</strong></div>
+          <div className="slider-label">
+            Excitation: <strong>{excitationThreshold}</strong>
+            <span className="info-icon" title={TOOLTIPS.excitation} style={{ cursor: 'help', marginLeft: '5px' }}>ⓘ</span>
+          </div>
           <StepSlider value={excitationThreshold} min={0} max={1024} step={1} onChange={setExcitationThreshold} />
           <div className="noise-tolerance-label">
             Noise Tolerance: {noiseTolerance.toFixed(3)}
@@ -364,7 +411,7 @@ export const ControlPanel: React.FC = () => {
         <div className="seq-column">
           <div className="seq-label">Seq</div>
           <input type="number" min="1" max="3" step="1" value={excitationOrder}
-            onChange={(e) => setExcitationOrder(Number(e.target.value))} className="seq-input" />
+            onChange={(e) => handleOrderChange('excitation', Number(e.target.value))} className="seq-input" />
         </div>
       </div>
 

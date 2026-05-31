@@ -63,11 +63,11 @@ async def task_status(task_id: str):
     return get_task_status(task_id)
 
 @router.get("/corpus/packs", dependencies=[Depends(verify_api_key)])
-async def list_packs():
+def list_packs():
     return {"packs": storage.get_summary()}
 
 @router.delete("/corpus/packs/{filename}", dependencies=[Depends(verify_api_key)])
-async def delete_pack(filename: str):
+def delete_pack(filename: str):
     try:
         storage.delete_pack(filename)
     except ValueError:
