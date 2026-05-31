@@ -100,6 +100,7 @@ export function SnifferTab() {
         switch (status) {
             case 'COMPLETED': return 'sniffer-status-completed';
             case 'BREACH': return 'sniffer-status-breach';
+            case 'ERROR': return 'sniffer-status-error';
             default: return 'sniffer-status-pending';
         }
     };
@@ -186,7 +187,9 @@ export function SnifferTab() {
                                     {trace.firewall.decision}
                                 </span>
                                 <span className="sniffer-model">{trace.request.model}</span>
-                                <span className={`sniffer-status-badge ${getStatusBadgeClass(trace.status)}`}>
+                                <span 
+                                    className={`sniffer-status-badge ${getStatusBadgeClass(trace.status)}`}
+                                >
                                     {trace.status || 'PENDING'}
                                 </span>
                                 <span className="sniffer-expand-icon">
@@ -208,9 +211,9 @@ export function SnifferTab() {
                                     </span>
                                 ))}
                             </div>
-                            {trace.response_preview && !expandedId && (
+                            {(trace.response_preview || trace.status === 'ERROR') && !expandedId && (
                                 <div className="sniffer-preview">
-                                    ↳ {trace.response_preview}
+                                    ↳ {trace.response_preview || trace.response_content}
                                 </div>
                             )}
                             {expandedId === trace.id && (

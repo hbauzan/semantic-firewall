@@ -1061,3 +1061,163 @@
 2026-05-31 12:58:00,437 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
 2026-05-31 12:58:00,438 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
 2026-05-31 12:58:00,438 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:01:40,313 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:01:40,313 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:01:40,338 - app.modules.sniffer - INFO - RTSS consumer shutting down
+2026-05-31 13:01:40,338 - app.modules.sniffer - INFO - RTSS consumer shutting down
+2026-05-31 13:01:54,745 - __main__ - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 13:01:54,796 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 13:01:54,796 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 13:01:54,855 - app.modules.sniffer - INFO - Loaded 359 sniffer traces from history.
+2026-05-31 13:01:54,855 - app.modules.sniffer - INFO - Loaded 359 sniffer traces from history.
+2026-05-31 13:01:54,855 - app.modules.sniffer - INFO - RTSS consumer started
+2026-05-31 13:01:54,855 - app.modules.sniffer - INFO - RTSS consumer started
+2026-05-31 13:02:16,637 - app.main - WARNING - FIREWALL_API_KEY is not set — all endpoints are unauthenticated. Set FIREWALL_API_KEY in .env for production deployments.
+2026-05-31 13:02:16,664 - app.modules.ingestor - INFO - Starting text extraction for dummy.pdf
+2026-05-31 13:02:16,670 - app.modules.ingestor - ERROR - Invalid PDF 'dummy.pdf': Failed to open stream
+2026-05-31 13:02:16,671 - httpx - INFO - HTTP Request: POST http://testserver/corpus/upload-pdf "HTTP/1.1 200 OK"
+2026-05-31 13:02:16,672 - httpx - INFO - HTTP Request: GET http://testserver/corpus/task-status/089bcaa1-a72d-42f4-9c43-bafb7a0cc5a5 "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,136 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,183 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,239 - app.api.endpoints.chat - ERROR - Provider connection failed: All connection attempts failed
+2026-05-31 13:02:17,240 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,348 - httpx - INFO - HTTP Request: GET http://testserver/system/stats "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,401 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,428 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,454 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,456 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,457 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,458 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,458 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,459 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,460 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,461 - httpx - INFO - HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,462 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,462 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,463 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,464 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,468 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,468 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,515 - app.api.endpoints.chat - ERROR - Provider connection failed: All connection attempts failed
+2026-05-31 13:02:17,515 - app.modules.sniffer - WARNING - update_trace: trace_id 182244b3-991e-4511-b30a-1ff2144784bb not found in buffer
+2026-05-31 13:02:17,516 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,557 - httpx - INFO - HTTP Request: POST http://test/chat "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,583 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 13:02:17,584 - app.modules.sniffer - WARNING - update_trace: trace_id 9ebd4127-f861-4fe8-b3c2-48366fab4a4a not found in buffer
+2026-05-31 13:02:17,584 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,607 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 13:02:17,630 - httpx - INFO - HTTP Request: POST http://test/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2026-05-31 13:02:17,632 - app.modules.profiles - INFO - Profile saved: test_profile_roundtrip
+2026-05-31 13:02:17,632 - app.modules.profiles - INFO - Profile saved: _internal
+2026-05-31 13:02:17,632 - app.modules.profiles - WARNING - Attempted to delete protected profile: _internal
+2026-05-31 13:02:17,632 - app.modules.profiles - INFO - Profile deleted: test_profile_roundtrip
+2026-05-31 13:02:17,633 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,633 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,634 - app.modules.sniffer - WARNING - Failed to load sniffer history: Expecting value: line 1 column 1 (char 0)
+2026-05-31 13:02:17,634 - app.modules.sniffer - INFO - Loaded 1 sniffer traces from history.
+2026-05-31 13:02:17,635 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,636 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,636 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,637 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,637 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,638 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,639 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,639 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,640 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,640 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,641 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,641 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,642 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,642 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,643 - httpx - INFO - HTTP Request: GET http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,668 - httpx - INFO - HTTP Request: POST http://testserver/audit "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,674 - app.core.firewall - WARNING - Zero-norm vector in cosine filter (q_norm=32.0000, c_norm=0.0000)
+2026-05-31 13:02:17,678 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:17,678 - httpx - INFO - HTTP Request: POST http://testserver/galaxy/config "HTTP/1.1 200 OK"
+2026-05-31 13:02:17,678 - app.api.endpoints.chat - CRITICAL - UPSTREAM_PROVIDER set to 'google' but GOOGLE_API_KEY is missing.
+2026-05-31 13:02:37,153 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:37,153 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:39,167 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:39,167 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:02:46,650 - app.modules.ingestor - INFO - Starting text extraction for Finanzas.pdf
+2026-05-31 13:02:46,650 - app.modules.ingestor - INFO - Starting text extraction for Finanzas.pdf
+2026-05-31 13:02:47,392 - app.modules.ingestor - INFO - Ingestion complete: Finanzas.pdf (1 chunks)
+2026-05-31 13:02:47,392 - app.modules.ingestor - INFO - Ingestion complete: Finanzas.pdf (1 chunks)
+2026-05-31 13:02:57,599 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 13:02:57,599 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 13:03:33,055 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:03:33,055 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:03,616 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:03,616 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:09,668 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 13:06:09,668 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-05-31 13:06:28,950 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:28,950 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:35,393 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:35,393 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:35,395 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:35,395 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:35,539 - app.modules.sniffer - INFO - Sniffer SSE client connected (2 total)
+2026-05-31 13:06:35,539 - app.modules.sniffer - INFO - Sniffer SSE client connected (2 total)
+2026-05-31 13:06:35,540 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (1 remaining)
+2026-05-31 13:06:35,540 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (1 remaining)
+2026-05-31 13:06:36,030 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:06:36,030 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:06:36,229 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:36,229 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:36,230 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:36,230 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:36,724 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:06:36,724 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:06:36,850 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:36,850 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:36,852 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:36,852 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:37,030 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:37,030 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:37,032 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:37,032 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:37,548 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:06:37,548 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:06:37,904 - app.modules.sniffer - INFO - Sniffer SSE client connected (2 total)
+2026-05-31 13:06:37,904 - app.modules.sniffer - INFO - Sniffer SSE client connected (2 total)
+2026-05-31 13:06:37,904 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (1 remaining)
+2026-05-31 13:06:37,904 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (1 remaining)
+2026-05-31 13:06:38,103 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:38,103 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:38,104 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:38,104 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:38,286 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:38,286 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:38,288 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:38,288 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:38,782 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:06:38,782 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:06:39,543 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:39,543 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:42,133 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:42,133 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:45,840 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:45,840 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:46,536 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:06:46,536 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:06:48,337 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:48,337 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:49,546 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:49,546 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:06:52,813 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:06:52,813 - app.modules.sniffer - INFO - Sniffer SSE client connected (1 total)
+2026-05-31 13:20:49,682 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:20:49,682 - app.modules.sniffer - INFO - Sniffer SSE client disconnected (0 remaining)
+2026-05-31 13:20:52,927 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:20:52,927 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:20:53,692 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:20:53,692 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:20:54,338 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:20:54,338 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:20:54,967 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:20:54,967 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:20:55,980 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:20:55,980 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:21:11,664 - app.modules.profiles - INFO - Profile saved: _last_used
+2026-05-31 13:21:11,664 - app.modules.profiles - INFO - Profile saved: _last_used

@@ -8,6 +8,7 @@
     "noise_order": 1,
     "adaptive_factor": 0.85,
     "rag_top_k": 3,
+    "sniffer_view_limit": 8,
     "noise_enabled": true,
     "cosine_enabled": true,
     "excitation_enabled": true,

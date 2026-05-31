@@ -484,6 +484,14 @@ button:hover {
   border: 1px solid rgba(255, 51, 102, 0.3);
 }
 
+.sniffer-status-error {
+  background-color: #ff0033;
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
 @keyframes sniffer-pulse {
 
   0%,
