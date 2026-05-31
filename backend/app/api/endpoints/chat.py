@@ -139,13 +139,47 @@ async def chat_endpoint(request: Request, req: ChatRequest):
                 entropy = t.get("value", 0.0)
                 break
                 
-        telemetry_prefix = f"🟢 [FW PASS] [Resonance: {last_activations} | Cosine: {last_cosine:.3f} | Entropy: {entropy:.2f}]\n\n"
+        provider, model_id = get_provider(cfg)
+        trace_id = emit_trace(
+            model=model_id,
+            last_message=req.prompt,
+            decision="PASS",
+            pipeline_trace=all_traces,
+            request_history=[{"role": "user", "content": req.prompt}],
+            status="PENDING"
+        )
         
-        async def prefixed_stream():
-            yield json.dumps({"response": telemetry_prefix}).encode("utf-8") + b"\n"
+        telemetry_block = (
+            f"📊 [FIREWALL_AUDIT]\n"
+            f"🛡️ Engine: [{cfg.upstream_provider.upper()} | {model_id}]\n"
+            f"🔍 Noise (Entropy): {entropy:.2f} / {cfg.global_noise_limit}\n"
+            f"📐 Cosine Sim: {last_cosine:.3f} / {cfg.cosine_threshold}\n"
+            f"⚡ Excitation: {last_activations} / {cfg.excitation_threshold}\n"
+            f"🧩 Mode: {cfg.firewall_mode.upper()}\n"
+            f"{'-' * 34}\n"
+            f"💬 [LLM RESPONSE]:\n\n"
+        )
+        
+        async def ui_stream_wrapper():
+            full_content = []
+            yield json.dumps({"response": telemetry_block}).encode("utf-8") + b"\n"
+            
             async for chunk in _stream_via_provider(clean_prompt, context, cfg, strict=True):
+                try:
+                    line = chunk.decode("utf-8").strip()
+                    if line:
+                        payload = json.loads(line)
+                        delta = payload.get("response", "")
+                        if delta:
+                            full_content.append(delta)
+                except Exception:
+                    pass
                 yield chunk
-        return StreamingResponse(prefixed_stream(), media_type="application/x-ndjson")
+            
+            reconstructed = "".join(full_content)
+            update_trace(trace_id, response_content=reconstructed, status="COMPLETED")
+            
+        return StreamingResponse(ui_stream_wrapper(), media_type="application/x-ndjson")
 
     return StreamingResponse(
         _stream_via_provider(clean_prompt, context, cfg), media_type="application/x-ndjson"
