@@ -6,9 +6,11 @@ Key changes from the original:
   - Provider instantiation is lazy (Finding A2): get_provider() called inside handlers
   - System prompt injection at endpoint level (per user decision Q2)
 """
+import asyncio
 import json
 import logging
 import numpy as np
+import uuid
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
@@ -24,6 +26,7 @@ from app.modules.providers.openai import OpenAIProvider
 from app.modules.providers.anthropic import AnthropicProvider
 from app.modules.providers.groq import GroqProvider
 from app.api.endpoints._shared import verify_api_key, limiter
+from app.modules.persistence import persist_interaction
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +166,33 @@ async def chat_endpoint(request: Request, req: ChatRequest):
             full_content = []
             yield json.dumps({"response": telemetry_block}).encode("utf-8") + b"\n"
             
-            async for chunk in _stream_via_provider(clean_prompt, context, cfg, strict=True):
+            try:
+                async for chunk in _stream_via_provider(clean_prompt, context, cfg, strict=True):
+                    try:
+                        line = chunk.decode("utf-8").strip()
+                        if line:
+                            payload = json.loads(line)
+                            delta = payload.get("response", "")
+                            if delta:
+                                full_content.append(delta)
+                    except Exception:
+                        pass
+                    yield chunk
+            except Exception as e:
+                update_trace(trace_id, status="ERROR", response_content=f"🔴 [LLM_ERROR] {str(e)}")
+                raise e
+            
+            reconstructed = "".join(full_content)
+            update_trace(trace_id, response_content=reconstructed, status="COMPLETED")
+            
+            await asyncio.to_thread(persist_interaction, clean_prompt, reconstructed)
+            
+        return StreamingResponse(ui_stream_wrapper(), media_type="application/x-ndjson")
+
+    async def no_fw_stream_wrapper():
+        full_content = []
+        try:
+            async for chunk in _stream_via_provider(clean_prompt, context, cfg):
                 try:
                     line = chunk.decode("utf-8").strip()
                     if line:
@@ -174,14 +203,14 @@ async def chat_endpoint(request: Request, req: ChatRequest):
                 except Exception:
                     pass
                 yield chunk
+        except Exception as e:
+            raise e
             
-            reconstructed = "".join(full_content)
-            update_trace(trace_id, response_content=reconstructed, status="COMPLETED")
-            
-        return StreamingResponse(ui_stream_wrapper(), media_type="application/x-ndjson")
+        reconstructed = "".join(full_content)
+        await asyncio.to_thread(persist_interaction, clean_prompt, reconstructed)
 
     return StreamingResponse(
-        _stream_via_provider(clean_prompt, context, cfg), media_type="application/x-ndjson"
+        no_fw_stream_wrapper(), media_type="application/x-ndjson"
     )
 
 
@@ -225,7 +254,8 @@ async def _stream_via_provider(prompt: str, context: str, cfg: ConfigState, stri
                     pass
     except Exception as e:
         logger.error("Provider connection failed: %s", e)
-        yield json.dumps({"response": "[LLM_OFFLINE] Cannot reach the language model. Ensure the inference server is running."}).encode("utf-8") + b"\n"
+        yield json.dumps({"response": f"🔴 [LLM_ERROR] Cannot reach the language model. Ensure the inference server is running. {str(e)}"}).encode("utf-8") + b"\n"
+        raise e
 
 
 def _format_block_message(
@@ -277,7 +307,6 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
     """Transparent proxy: OpenAI v1/chat/completions spec with firewall interception."""
     from app.core import state as state_mod
     from fastapi.responses import Response
-    import uuid as _uuid
     cfg = state_mod.config_state
 
     # 1. Capture full message history for FPI
@@ -350,7 +379,7 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
                 )
 
     # 3. Emit PASS trace with trace_id for stream correlation
-    trace_id = str(_uuid.uuid4())
+    trace_id = str(uuid.uuid4())
     if fw_on:
         emit_trace(
             trace_id=trace_id,
@@ -369,26 +398,49 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
     async def stream_wrapper(gen, tid):
         """Pass-through generator that buffers response tokens for sniffer reconstruction."""
         full_content = []
-        async for chunk in gen:
-            # Extract content from SSE data line for buffering
-            if chunk.startswith("data: ") and chunk.strip() != "data: [DONE]":
-                try:
-                    payload = json.loads(chunk[6:])
-                    delta = payload.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                    if delta:
-                        full_content.append(delta)
-                except (json.JSONDecodeError, IndexError, KeyError):
-                    pass
-            yield chunk
+        try:
+            async for chunk in gen:
+                # Extract content from SSE data line for buffering
+                if chunk.startswith("data: ") and chunk.strip() != "data: [DONE]":
+                    try:
+                        payload = json.loads(chunk[6:])
+                        delta = payload.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                        if delta:
+                            full_content.append(delta)
+                    except (json.JSONDecodeError, IndexError, KeyError):
+                        pass
+                yield chunk
+        except Exception as e:
+            if tid:
+                update_trace(tid, status="ERROR", response_content=f"🔴 [LLM_ERROR] {str(e)}")
+            raise e
         # Post-stream: fire-and-forget trace update with reconstructed response
         reconstructed = "".join(full_content)
-        update_trace(tid, response_content=reconstructed, status="COMPLETED")
+        if tid:
+            update_trace(tid, response_content=reconstructed, status="COMPLETED")
+        
+        # Unification: save history for proxy
+        await asyncio.to_thread(persist_interaction, last_msg, reconstructed)
 
     # 5. Forward to Provider (wrapped for FPI)
     return StreamingResponse(
         stream_wrapper(
             provider.stream_chat(config.model, [m.model_dump() for m in config.messages]),
-            trace_id,
+            trace_id if fw_on else None,
         ),
         media_type="text/event-stream"
     )
+
+# --- History Routes ---
+
+@router.get("/chat/history", dependencies=[Depends(verify_api_key)])
+async def get_chat_history():
+    from app.modules.persistence import load_chat_history
+    history = await asyncio.to_thread(load_chat_history)
+    return history
+
+@router.delete("/chat/history", dependencies=[Depends(verify_api_key)])
+async def delete_chat_history():
+    from app.modules.persistence import save_chat_history
+    await asyncio.to_thread(save_chat_history, [])
+    return {"status": "cleared"}

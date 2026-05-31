@@ -1,6 +1,6 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.31.0",
+    "version": "v2.33.0",
     "active_features": {
         "reactive_sniffer_limit": true,
         "expanded_sniffer_buffer": true,
@@ -147,7 +147,15 @@
         "slowapi_request_injection": true,
         "provider_factory_tuple_return": true,
         "openai_v1_route_registration": true,
-        "test_suite_alignment_v2": true
+        "test_suite_alignment_v2": true,
+        "chat_persistence_v1": true,
+        "backend_chat_mirroring": true,
+        "sniffer_error_propagation_fix": true,
+        "trace_status_error_mapping": true,
+        "atomic_persistence_lock": true,
+        "proxy_history_parity": true,
+        "reentrant_persistence_lock": true,
+        "sniffer_type_strictness": true
     },
     "state_schema": {
         "excitation_threshold": {

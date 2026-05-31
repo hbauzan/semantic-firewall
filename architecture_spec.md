@@ -336,6 +336,8 @@ Evolves the RTSS from a firewall-decision-only observer into a full I/O capture 
 
 **Zero-Latency Guarantee:** The wrapper is a pure pass-through: every chunk is yielded immediately after (not before) buffering. The post-stream `update_trace()` uses fire-and-forget `put_nowait()` — the client connection is already closed by the time the update fires.
 
+**Error Propagation:** Upstream LLM exceptions (e.g. `httpx.ConnectError`, Ollama 500) are caught during generator consumption. The trace `status` is updated to `ERROR` and the exception string is committed as the `response_content` with a `🔴 [LLM_ERROR]` prefix, ensuring the frontend accurately reflects provider failures instead of silent "False OKs".
+
 ### 10.6 Stage Semantics: `no_context` & `noise`
 `no_context` is a valid `PipelineStageTrace.stage` value alongside `noise`, `cosine`, and `excitation`. It is emitted when the corpus returns zero results for a clause — the firewall cannot evaluate dimensional alignment because there is no reference vector to compare against.
 The noise stage now explicitly reports Shannon Entropy as its primary metric in the SnifferTrace.
@@ -371,8 +373,8 @@ interface SnifferTrace {
     }>;
   };
   response_preview: string;  // First 100 chars of LLM response
-  response_content: string;  // Full reconstructed response (FPI)
-  status: "PENDING" | "COMPLETED" | "BREACH";
+  response_content: string;  // Full reconstructed response (FPI) or error message
+  status: "PENDING" | "COMPLETED" | "BREACH" | "ERROR";
 }
 ```
 
@@ -382,11 +384,12 @@ interface SnifferTrace {
 
 ### 11.1 Overview
 
-The SSA (Session State Architecture) protocol provides persistent configuration across restarts through two orthogonal mechanisms:
+The SSA (Session State Architecture) protocol provides persistent configuration across restarts through orthogonal mechanisms:
 
 1. **Config Profiles** — named JSON snapshots of `ConfigState` stored in `backend/data/`
 2. **Sniffer History** — circular trace buffer flushed to `backend/data/sniffer_history.json`
-3. **Active Tab Persistence** — last UI tab stored as `active_tab` inside `ConfigState` and carried forward via `_last_used`
+3. **Chat Persistence** — Last 100 messages flushed to `backend/data/chat_history.json` and synchronized with Zustand (`firewall-chat-storage`).
+4. **Active Tab Persistence** — last UI tab stored as `active_tab` inside `ConfigState` and carried forward via `_last_used`
 
 ### 11.2 ProfileManager (`backend/app/modules/profiles.py`)
 
@@ -468,6 +471,10 @@ asyncio.create_task(asyncio.to_thread(_save_history_sync, snapshot))
 
 **Resilience:** `_load_history_sync()` catches all `json.JSONDecodeError` and generic exceptions, returning `[]` on failure. The consumer continues normally even if history is corrupted.
 
+### 11.7.5 Chat Persistence (Hybrid Architecture)
+The chat endpoint triggers a background save to `backend/data/chat_history.json` (max 100 entries) on every successful LLM generation round. All file I/O operations for `chat_history.json` are wrapped with a `threading.RLock` that covers the entire Read-Modify-Write cycle. This guarantees reentrant atomic transactions and thread-safety during concurrent accesses, eliminating race conditions. The RLock protects all entry points to chat history (CRUD + Atomic).
+On the frontend, `App.tsx` hydrates the Zustand store on mount by polling `GET /chat/history`, seamlessly merging with the `persist` middleware `firewall-chat-storage`.
+
 ### 11.8 Data Directory Layout
 
 ```
@@ -475,6 +482,7 @@ backend/
 └── data/
     ├── _last_used.json          # Auto-saved on every config change
     ├── sniffer_history.json     # RTSS buffer — last 1000 traces
+    ├── chat_history.json        # Unified chat message persistence (max 100)
     ├── production.json          # Example user profile
     └── dev_strict.json          # Example user profile
 ```

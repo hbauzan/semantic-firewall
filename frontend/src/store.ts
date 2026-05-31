@@ -1,4 +1,5 @@
 import { create, type StateCreator } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 // ============================================================
 // Slice Interfaces
@@ -37,7 +38,7 @@ export interface SnifferTrace {
   };
   response_preview: string;
   response_content: string;
-  status: 'PENDING' | 'COMPLETED' | 'BREACH';
+  status: 'PENDING' | 'COMPLETED' | 'BREACH' | 'ERROR';
 }
 
 interface SnifferFilter {
@@ -202,9 +203,17 @@ const createSnifferSlice: StateCreator<StoreState, [], [], SnifferSlice> = (set)
 // Unified Store (API-compatible — no consumer changes required)
 // ============================================================
 
-export const useStore = create<StoreState>()((...a) => ({
-  ...createFirewallSlice(...a),
-  ...createChatSlice(...a),
-  ...createSystemSlice(...a),
-  ...createSnifferSlice(...a),
-}));
+export const useStore = create<StoreState>()(
+  persist(
+    (...a) => ({
+      ...createFirewallSlice(...a),
+      ...createChatSlice(...a),
+      ...createSystemSlice(...a),
+      ...createSnifferSlice(...a),
+    }),
+    {
+      name: 'firewall-chat-storage',
+      partialize: (state) => ({ messages: state.messages } as any),
+    }
+  )
+);

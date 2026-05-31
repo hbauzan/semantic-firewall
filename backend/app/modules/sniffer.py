@@ -16,7 +16,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Literal
 
 from pydantic import BaseModel, Field
 
@@ -61,7 +61,7 @@ class SnifferTrace(BaseModel):
     firewall: SnifferTraceFirewall
     response_preview: str
     response_content: str = ""
-    status: str = "PENDING"  # PENDING → COMPLETED | BREACH
+    status: Literal["PENDING", "COMPLETED", "BREACH", "ERROR"] = "PENDING"  # PENDING → COMPLETED | BREACH | ERROR
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ def emit_trace(
 
 
 def update_trace(
-    trace_id: str,
+    trace_id: Optional[str],
     *,
     response_content: str = "",
     status: str = "COMPLETED",
@@ -215,6 +215,9 @@ def update_trace(
     and pushes the updated trace back through the queue so SSE subscribers
     receive the completed payload.
     """
+    if not trace_id:
+        return
+
     updated_trace: Optional[SnifferTrace] = None
     for i, t in enumerate(_trace_buffer):
         if t.id == trace_id:
