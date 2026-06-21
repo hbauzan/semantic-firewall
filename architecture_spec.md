@@ -286,7 +286,7 @@ A zero-latency observability layer for the OpenAI V1 Proxy (`/v1/chat/completion
 
 ### 10.1 Producer-Consumer Decoupling
 - **Pattern:** `asyncio.Queue(maxsize=256)` with fire-and-forget `put_nowait()`.
-- **Producer:** `emit_trace()` is called synchronously from the proxy endpoint on both BREACH and PASS paths. The proxy stream never awaits sniffer persistence.
+- **Producer:** `emit_trace()` is called synchronously from the proxy endpoint on both BREACH and PASS paths. The proxy stream never awaits sniffer persistence. `emit_trace()` is mandatory for all terminal firewall decisions (PASS/BREACH) across both `/chat` and `/v1/chat/completions` endpoints to ensure forensic parity in the RTSS.
 - **Consumer:** A background `asyncio.Task` (spawned at startup via `asyncio.create_task()` inside the FastAPI lifespan, cancelled at shutdown) reads from the queue, appends to a circular buffer (max 100 entries), and broadcasts to all SSE subscribers.
 - **Task Spawning:** `start_consumer()` uses `asyncio.create_task()` — the modern Python 3.10+ API. This avoids the `DeprecationWarning` emitted by `asyncio.get_event_loop()` when no running loop is present. It is always called from within the async lifespan context where a loop is guaranteed to exist.
 

@@ -37,5 +37,10 @@ backend/data/*.json
 # Logs (no van al repo)
 backend/logs/
 
+# Agent/dev tooling local (no es código del proyecto)
+.agents/
+.claude/skills/
+skills-lock.json
+
 # Generated
 context.txt
