@@ -1,7 +1,10 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.33.0",
+    "version": "v2.33.1",
     "active_features": {
+        "chat_endpoint_breach_telemetry": true,
+        "unified_sniffer_capture_v2": true,
+        "breach_trace_parity": true,
         "reactive_sniffer_limit": true,
         "expanded_sniffer_buffer": true,
         "version_sync_complete": true,

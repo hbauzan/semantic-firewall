@@ -124,7 +124,19 @@ async def chat_endpoint(request: Request, req: ChatRequest):
 
     # --- Telemetry Formatting & Response ---
     if fw_on:
+        provider, model_id = get_provider(cfg)
+        
         if failed_clause is not None:
+            # NEW: Emit BREACH trace to Sniffer for UI parity
+            emit_trace(
+                model=model_id,
+                last_message=prompt,
+                decision="BREACH",
+                pipeline_trace=all_traces,
+                request_history=[{"role": "user", "content": prompt}],
+                status="BREACH"
+            )
+            
             block_msg = _format_block_message(
                 failed_clause, block_reason, block_details, cfg, all_traces
             )
@@ -142,7 +154,6 @@ async def chat_endpoint(request: Request, req: ChatRequest):
                 entropy = t.get("value", 0.0)
                 break
                 
-        provider, model_id = get_provider(cfg)
         trace_id = emit_trace(
             model=model_id,
             last_message=req.prompt,
