@@ -7,7 +7,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
-from app.api.routes import router
+from app.api.router_main import router
 from app.core.settings import settings
 from app.modules.sniffer import start_consumer, stop_consumer
 
@@ -17,6 +17,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
 )
+
+from app.core.logging_config import setup_industrial_logging
+setup_industrial_logging()
 
 # --- Startup warning if API Key is not configured ---
 if settings.api_key_value is None:
@@ -39,7 +42,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Three-Headed Semantic Firewall",
-    version="2.15.0",
+    version="2.30.0",
     docs_url=None if settings.api_key_value else "/docs",
     redoc_url=None if settings.api_key_value else "/redoc",
     lifespan=lifespan,

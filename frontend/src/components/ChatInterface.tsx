@@ -5,12 +5,32 @@ import { API_BASE_URL } from '../config';
 export const ChatInterface: React.FC = () => {
   const { messages, addMessage } = useStore();
   const [input, setInput] = useState('');
+  const [inputHistory, setInputHistory] = useState<string[]>([]);
+  const [historyIdx, setHistoryIdx] = useState(-1);
   const [isStreaming, setIsStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const newIdx = Math.min(historyIdx + 1, inputHistory.length - 1);
+      if (newIdx >= 0) {
+        setHistoryIdx(newIdx);
+        setInput(inputHistory[inputHistory.length - 1 - newIdx]);
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const newIdx = Math.max(historyIdx - 1, -1);
+      setHistoryIdx(newIdx);
+      setInput(newIdx === -1 ? '' : inputHistory[inputHistory.length - 1 - newIdx]);
+    } else if (e.key === 'Enter') {
+      handleSend();
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
@@ -20,6 +40,8 @@ export const ChatInterface: React.FC = () => {
 
     const currentInput = input;
     setInput('');
+    setInputHistory(prev => [...prev, currentInput]);
+    setHistoryIdx(-1);
     setIsStreaming(true);
     let connectionFailed = false;
 
@@ -151,7 +173,7 @@ export const ChatInterface: React.FC = () => {
     <div className="main-panel">
       <div className="chat-history">
         {messages.map((msg) => (
-          <div key={msg.id} className={`chat-message ${msg.role}`}>
+          <div key={msg.id} className={`chat-message ${msg.role} ${msg.content.includes('FIREWALL_AUDIT') ? 'audit-block' : ''}`}>
             {msg.role === 'user' ? '> ' : ''}
             {msg.content}
           </div>
@@ -171,7 +193,7 @@ export const ChatInterface: React.FC = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Enter query..."
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          onKeyDown={handleKeyDown}
           disabled={isStreaming}
         />
         <button onClick={handleSend} disabled={isStreaming} style={{ opacity: isStreaming ? 0.5 : 1 }}>

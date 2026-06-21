@@ -17,13 +17,16 @@ class ConfigState(BaseModel):
 
     excitation_threshold: int = Field(default=150, ge=0, le=1024)
     noise_tolerance: float = Field(default=0.005, ge=0.0, le=1.0)
-    cosine_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
-    global_noise_limit: float = Field(default=0.50, ge=0.0, le=10.0)
+    # Optimized Youden Threshold (0.5315) for Negative Mode default
+    cosine_threshold: float = Field(default=0.5315, ge=0.0, le=1.0)
+    # Global Noise Limit — Shannon Entropy Floor (corpus-independent)
+    global_noise_limit: float = Field(default=4.5, ge=0.0, le=10.0)
     cosine_order: int = Field(default=2, ge=1, le=3)
     excitation_order: int = Field(default=3, ge=1, le=3)
     noise_order: int = Field(default=1, ge=1, le=3)
     adaptive_factor: float = Field(default=0.85, ge=0.01, le=1.0)
     rag_top_k: int = Field(default=3, ge=1, le=10)
+    sniffer_view_limit: int = Field(default=10, ge=1, le=1000)
     noise_enabled: bool = Field(default=True)
     cosine_enabled: bool = Field(default=True)
     excitation_enabled: bool = Field(default=True)
@@ -33,6 +36,14 @@ class ConfigState(BaseModel):
             "positive: only corpus-aligned queries pass (allowlist). "
             "negative: corpus-aligned queries are blocked (denylist)."
         ),
+    )
+    active_tab: str = Field(
+        default="chat",
+        description="Last active UI tab. Persisted to _last_used profile for session continuity.",
+    )
+    upstream_provider: Literal["ollama", "google", "openai", "anthropic", "groq"] = Field(
+        default="ollama",
+        description="Active Upstream LLM Provider",
     )
 
     @model_validator(mode='after')
@@ -51,16 +62,19 @@ class ConfigUpdate(BaseModel):
     excitation_threshold: int = Field(ge=0, le=1024)
     noise_tolerance: float = Field(ge=0.0, le=1.0)
     cosine_threshold: float = Field(ge=0.0, le=1.0)
-    global_noise_limit: float = Field(default=0.50, ge=0.0, le=10.0)
+    global_noise_limit: float = Field(default=4.5, ge=0.0, le=10.0)
     cosine_order: int = Field(default=2, ge=1, le=3)
     excitation_order: int = Field(default=3, ge=1, le=3)
     noise_order: int = Field(default=1, ge=1, le=3)
     adaptive_factor: float = Field(default=0.85, ge=0.01, le=1.0)
     rag_top_k: int = Field(default=3, ge=1, le=10)
+    sniffer_view_limit: int = Field(default=10, ge=1, le=1000)
     noise_enabled: bool = Field(default=True)
     cosine_enabled: bool = Field(default=True)
     excitation_enabled: bool = Field(default=True)
     firewall_mode: Literal["positive", "negative"] = Field(default="positive")
+    active_tab: str = Field(default="chat")
+    upstream_provider: Literal["ollama", "google", "openai", "anthropic", "groq"] = Field(default="ollama")
 
 
 # Max prompt length to prevent memory exhaustion before vectorization
