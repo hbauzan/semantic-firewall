@@ -1,0 +1,87 @@
+===============================================================================
+  THREE-HEADED SEMANTIC FIREWALL — PASOS A SEGUIR
+  Evaluación del dev-protocol + decisiones tomadas
+  Fecha: 2026-06-21
+===============================================================================
+
+
+-------------------------------------------------------------------------------
+  1. VEREDICTO SOBRE EL DEV-PROTOCOL
+-------------------------------------------------------------------------------
+
+  Contenido sólido y hecho a medida tuya, alineado con las herramientas
+  nativas del harness (TDD, deep modules, two-axis review, loop de debugging
+  de 6 fases, conventional commits, git guardrails). No es un PDF genérico de
+  ChatGPT: fue diseñado para Claude Code.
+
+  Su debilidad NO es el "qué", sino dos cosas:
+
+    a) BRECHA entre lo escrito y lo instalado. El protocolo describe
+       infraestructura que no existe en el repo:
+
+         - Git guardrails (.claude/hooks/...)      -> NO instalado
+         - CONTEXT.md / CONTEXT.blueprint.md        -> NO existen (hay context.txt)
+         - Pre-commit Husky + lint-staged           -> NO instalado
+         - Auto-carga vía CLAUDE.md                 -> NO existe
+
+    b) DRIFT interno. Convivían DOS versiones del protocolo:
+         - dev-protocol.md (raíz, V7.2, monolítico)
+         - dev-protocol/   (carpeta, V8.0, modular)
+       Tener las dos es justo la trampa que el propio protocolo condena.
+
+  Lo MEJOR del protocolo: la sección 3 (tooling uv/pnpm). Está bien escrita
+  y es literalmente la especificación del Bloque B de la Etapa 1.
+
+  Lo que hay que TRADUCIR (no seguir literal): las reglas de "emitir un bloque
+  YAML de git al final" y "entregar bloques de código completos". Eso es
+  paradigma de chat (copiar-pegar en Gemini/ChatGPT). En un harness de agente
+  se edita y commitea directo.
+
+
+-------------------------------------------------------------------------------
+  2. DECISIONES TOMADAS
+-------------------------------------------------------------------------------
+
+  [Q1] VERSIONES  -> Consolidar a la carpeta.
+       HECHO. dev-protocol.md (raíz) es ahora un puntero de una línea a
+       dev-protocol/README.md. Cero drift; los links viejos siguen válidos.
+
+  [Q2] CABLEADO   -> Solo referencia manual.
+       El protocolo se aplica cuando se lo apunta explícitamente en el prompt.
+       NO se instala CLAUDE.md ni hooks. Cero infraestructura nueva.
+
+  [Q3] BLOQUE B   -> Migración primero, doc-sync después.
+       Al arrancar el Bloque B se sigue la sección 3 (uv/pnpm) al pie para la
+       migración, con commits chicos. El doc-sync pesado (manifest / README /
+       spec / CONTEXT) queda agrupado en el Bloque E, como ya prevé el roadmap.
+
+
+-------------------------------------------------------------------------------
+  3. PRÓXIMO PASO CONCRETO (BLOQUE B — MIGRACIÓN DE TOOLING)
+-------------------------------------------------------------------------------
+
+  Backend -> uv:
+    - Declarar dependencias reales en backend/pyproject.toml (tabla [project]
+      a partir de requirements.txt).
+    - Generar uv.lock con `uv sync`.
+    - Verificar `uv run pytest -v tests/` y
+      `uv run uvicorn app.main:app --reload`.
+    - Mantener requirements.txt como artefacto GENERADO, no como fuente.
+
+  Frontend -> pnpm:
+    - `pnpm import` (package-lock.json -> pnpm-lock.yaml), luego `pnpm install`.
+    - Verificar `pnpm run dev`. Borrar package-lock.json.
+
+  Después: Bloques C (diagnóstico), D (fix de crashes), E (doc-sync).
+
+
+-------------------------------------------------------------------------------
+  4. OBSERVACIÓN MENOR (para cuando toque)
+-------------------------------------------------------------------------------
+
+  El git-workflow del protocolo ejemplifica el pre-commit con
+  `npm run typecheck && npm run test`, lo cual contradice el mandato pnpm/uv
+  de la sección 3. Inconsistencia interna a corregir si algún día se instalan
+  esos hooks.
+
+===============================================================================
