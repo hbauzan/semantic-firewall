@@ -1,4 +1,9 @@
-import { create } from 'zustand';
+import { create, type StateCreator } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+// ============================================================
+// Slice Interfaces
+// ============================================================
 
 interface Message {
   id: string;
@@ -33,7 +38,7 @@ export interface SnifferTrace {
   };
   response_preview: string;
   response_content: string;
-  status: 'PENDING' | 'COMPLETED' | 'BREACH';
+  status: 'PENDING' | 'COMPLETED' | 'BREACH' | 'ERROR';
 }
 
 interface SnifferFilter {
@@ -41,7 +46,8 @@ interface SnifferFilter {
   filterType: 'ALL' | 'noise' | 'cosine' | 'excitation';
 }
 
-interface StoreState {
+// --- Firewall Slice ---
+export interface FirewallSlice {
   excitationThreshold: number;
   noiseTolerance: number;
   cosineThreshold: number;
@@ -55,6 +61,9 @@ interface StoreState {
   cosineEnabled: boolean;
   excitationEnabled: boolean;
   firewallMode: 'positive' | 'negative';
+  activeTab: 'chat' | 'sniffer';
+  upstreamProvider: 'ollama' | 'google' | 'openai' | 'anthropic' | 'groq';
+  snifferViewLimit: number;
   setExcitationThreshold: (val: number) => void;
   setNoiseTolerance: (val: number) => void;
   setCosineThreshold: (val: number) => void;
@@ -68,25 +77,35 @@ interface StoreState {
   setCosineEnabled: (val: boolean) => void;
   setExcitationEnabled: (val: boolean) => void;
   setFirewallMode: (val: 'positive' | 'negative') => void;
+  setActiveTab: (val: 'chat' | 'sniffer') => void;
+  setUpstreamProvider: (val: 'ollama' | 'google' | 'openai' | 'anthropic' | 'groq') => void;
+  setSnifferViewLimit: (val: number) => void;
+}
 
+// --- Chat Slice ---
+export interface ChatSlice {
   messages: Message[];
   addMessage: (msg: Message) => void;
   clearMessages: () => void;
+}
 
+// --- System Slice (telemetry, ingestion, global status) ---
+export interface SystemSlice {
   telemetry: TelemetryData;
   setTelemetry: (data: TelemetryData) => void;
-
   systemAction: string;
   setSystemAction: (action: string) => void;
-
   ingestionStatus: {
     taskId: string | null;
     status: string;
     progress: number;
     message: string;
   };
-  setIngestionStatus: (status: Partial<StoreState['ingestionStatus']>) => void;
+  setIngestionStatus: (status: Partial<SystemSlice['ingestionStatus']>) => void;
+}
 
+// --- Sniffer Slice ---
+export interface SnifferSlice {
   snifferLogs: SnifferTrace[];
   snifferFilter: SnifferFilter;
   addSnifferLog: (trace: SnifferTrace) => void;
@@ -95,7 +114,17 @@ interface StoreState {
   clearSnifferLogs: () => void;
 }
 
-export const useStore = create<StoreState>((set) => ({
+// ============================================================
+// Combined Store Type
+// ============================================================
+
+export type StoreState = FirewallSlice & ChatSlice & SystemSlice & SnifferSlice;
+
+// ============================================================
+// Slice Creators
+// ============================================================
+
+const createFirewallSlice: StateCreator<StoreState, [], [], FirewallSlice> = (set) => ({
   excitationThreshold: 150,
   noiseTolerance: 0.005,
   cosineThreshold: 0.50,
@@ -109,6 +138,9 @@ export const useStore = create<StoreState>((set) => ({
   cosineEnabled: true,
   excitationEnabled: true,
   firewallMode: 'positive',
+  activeTab: 'chat',
+  upstreamProvider: 'ollama',
+  snifferViewLimit: 10,
   setExcitationThreshold: (val) => set({ excitationThreshold: val }),
   setNoiseTolerance: (val) => set({ noiseTolerance: val }),
   setCosineThreshold: (val) => set({ cosineThreshold: val }),
@@ -122,33 +154,39 @@ export const useStore = create<StoreState>((set) => ({
   setCosineEnabled: (val) => set({ cosineEnabled: val }),
   setExcitationEnabled: (val) => set({ excitationEnabled: val }),
   setFirewallMode: (val) => set({ firewallMode: val }),
+  setActiveTab: (val) => set({ activeTab: val }),
+  setUpstreamProvider: (val) => set({ upstreamProvider: val }),
+  setSnifferViewLimit: (val) => set({ snifferViewLimit: val }),
+});
 
+const createChatSlice: StateCreator<StoreState, [], [], ChatSlice> = (set) => ({
   messages: [],
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
   clearMessages: () => set({ messages: [] }),
+});
 
+const createSystemSlice: StateCreator<StoreState, [], [], SystemSlice> = (set) => ({
   telemetry: { cpu: 0, ram: 0, gpu: 0 },
   setTelemetry: (data) => set({ telemetry: data }),
-
   systemAction: 'SYSTEM IDLE',
   setSystemAction: (action) => set({ systemAction: action }),
-
   ingestionStatus: { taskId: null, status: 'idle', progress: 0, message: '' },
   setIngestionStatus: (status) => set((state) => ({
     ingestionStatus: { ...state.ingestionStatus, ...status }
   })),
+});
 
+const createSnifferSlice: StateCreator<StoreState, [], [], SnifferSlice> = (set) => ({
   snifferLogs: [],
   snifferFilter: { status: 'ALL', filterType: 'ALL' },
   addSnifferLog: (trace) => set((state) => {
-    // If a trace with this ID already exists, update it (FPI stream completion)
     const existingIdx = state.snifferLogs.findIndex(t => t.id === trace.id);
     if (existingIdx !== -1) {
       const updated = [...state.snifferLogs];
       updated[existingIdx] = trace;
       return { snifferLogs: updated };
     }
-    const logs = [trace, ...state.snifferLogs].slice(0, 100);
+    const logs = [trace, ...state.snifferLogs].slice(0, 1000);
     return { snifferLogs: logs };
   }),
   updateSnifferLog: (trace) => set((state) => {
@@ -159,4 +197,23 @@ export const useStore = create<StoreState>((set) => ({
     snifferFilter: { ...state.snifferFilter, ...filter }
   })),
   clearSnifferLogs: () => set({ snifferLogs: [] }),
-}));
+});
+
+// ============================================================
+// Unified Store (API-compatible — no consumer changes required)
+// ============================================================
+
+export const useStore = create<StoreState>()(
+  persist(
+    (...a) => ({
+      ...createFirewallSlice(...a),
+      ...createChatSlice(...a),
+      ...createSystemSlice(...a),
+      ...createSnifferSlice(...a),
+    }),
+    {
+      name: 'firewall-chat-storage',
+      partialize: (state) => ({ messages: state.messages } as any),
+    }
+  )
+);

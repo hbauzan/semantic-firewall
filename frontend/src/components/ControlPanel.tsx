@@ -1,60 +1,121 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import { API_BASE_URL } from '../config';
-
-// Shared toggle button style generator
-const toggleStyle = (on: boolean): React.CSSProperties => ({
-  width: '2.2rem', height: '1.3rem', fontSize: '0.55rem', fontWeight: 'bold',
-  border: '1px solid', borderColor: on ? 'var(--accent)' : '#555',
-  background: on ? 'var(--accent)' : '#222', color: on ? '#000' : '#555',
-  cursor: 'pointer', borderRadius: '3px', flexShrink: 0, padding: 0,
-});
-
-// Shared Seq input style
-const seqInputStyle: React.CSSProperties = {
-  width: '2.2rem', textAlign: 'center', background: '#111',
-  color: 'var(--accent)', border: '1px solid var(--accent)', padding: '1px', fontSize: '0.7rem',
-};
-
-// Step button style
-const stepBtnStyle: React.CSSProperties = {
-  width: '1.4rem', height: '1.2rem', fontSize: '0.7rem', fontWeight: 'bold',
-  padding: 0, border: '1px solid #444', background: '#1a1a1a', color: 'var(--accent)',
-  cursor: 'pointer', borderRadius: '2px', flexShrink: 0, lineHeight: 1,
-};
+import { TOOLTIP_REGISTRY, type TooltipEntry } from '../locales/tooltips';
+import '../styles/ControlPanel.css';
 
 // Reusable slider with - / + step buttons
 const StepSlider: React.FC<{
   value: number; min: number; max: number; step: number;
-  onChange: (v: number) => void; style?: React.CSSProperties;
-}> = ({ value, min, max, step, onChange, style }) => {
+  onChange: (v: number) => void;
+}> = ({ value, min, max, step, onChange }) => {
   const clamp = (v: number) => Math.min(max, Math.max(min, parseFloat(v.toFixed(10))));
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-      <button type="button" style={stepBtnStyle}
+    <div className="slider-row">
+      <button type="button" className="step-btn"
         onClick={() => onChange(clamp(value - step))}>-</button>
       <input type="range" min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        style={{ flex: 1, height: '12px', ...style }} />
-      <button type="button" style={stepBtnStyle}
+        onChange={(e) => onChange(Number(e.target.value))} />
+      <button type="button" className="step-btn"
         onClick={() => onChange(clamp(value + step))}>+</button>
     </div>
   );
 };
 
+const lang = 'en';
+
+const InfoTooltip: React.FC<{ entry: TooltipEntry }> = ({ entry }) => (
+  <span className="info-icon">
+    i
+    <div className="tooltip-box">
+      <div style={{ marginBottom: '4px' }}><strong>What is it?</strong> {entry.what}</div>
+      <div style={{ marginBottom: '4px' }}><strong>How it works:</strong> {entry.how}</div>
+      <div><strong>Suggested:</strong> {entry.suggested}</div>
+    </div>
+  </span>
+);
+
+
 export const ControlPanel: React.FC = () => {
   const {
     excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit,
     cosineOrder, excitationOrder, noiseOrder, adaptiveFactor,
-    noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode,
+    noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode, activeTab,
+    upstreamProvider, snifferViewLimit,
     setExcitationThreshold, setNoiseTolerance, setCosineThreshold, setGlobalNoiseLimit,
     setCosineOrder, setExcitationOrder, setNoiseOrder, setAdaptiveFactor,
     setNoiseEnabled, setCosineEnabled, setExcitationEnabled, setRagTopK, setFirewallMode,
+    setUpstreamProvider, setSnifferViewLimit,
     ingestionStatus, setIngestionStatus, setSystemAction
   } = useStore();
 
   const [packs, setPacks] = useState<{ filename: string, chunks: number }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Profile state ---
+  const [profiles, setProfiles] = useState<string[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState<string>('');
+  const [newProfileName, setNewProfileName] = useState<string>('');
+  const [configHydrated, setConfigHydrated] = useState(false);
+
+  const handleOrderChange = (filterName: 'noise' | 'cosine' | 'excitation', newOrder: number) => {
+    const currentOrders = {
+      noise: noiseOrder,
+      cosine: cosineOrder,
+      excitation: excitationOrder
+    };
+    
+    // Find which filter currently has the target order
+    const conflictFilter = Object.keys(currentOrders).find(
+      key => currentOrders[key as keyof typeof currentOrders] === newOrder
+    ) as keyof typeof currentOrders;
+
+    if (conflictFilter && conflictFilter !== filterName) {
+      // Perform the swap: Assign the old order of the current filter to the conflicting one
+      const oldOrder = currentOrders[filterName];
+      if (conflictFilter === 'noise') setNoiseOrder(oldOrder);
+      if (conflictFilter === 'cosine') setCosineOrder(oldOrder);
+      if (conflictFilter === 'excitation') setExcitationOrder(oldOrder);
+    }
+    
+    // Set the new order for the target filter
+    if (filterName === 'noise') setNoiseOrder(newOrder);
+    if (filterName === 'cosine') setCosineOrder(newOrder);
+    if (filterName === 'excitation') setExcitationOrder(newOrder);
+  };
+
+
+  // --- Config Hydration from Backend (Finding Q4/F5) ---
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/galaxy/config`)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        const c = data.config;
+        setExcitationThreshold(c.excitation_threshold);
+        setNoiseTolerance(c.noise_tolerance);
+        setCosineThreshold(c.cosine_threshold);
+        setGlobalNoiseLimit(c.global_noise_limit);
+        setCosineOrder(c.cosine_order);
+        setExcitationOrder(c.excitation_order);
+        setNoiseOrder(c.noise_order);
+        setAdaptiveFactor(c.adaptive_factor);
+        setRagTopK(c.rag_top_k);
+        setNoiseEnabled(c.noise_enabled);
+        setCosineEnabled(c.cosine_enabled);
+        setExcitationEnabled(c.excitation_enabled);
+        setFirewallMode(c.firewall_mode);
+        if (c.sniffer_view_limit) setSnifferViewLimit(c.sniffer_view_limit);
+        if (c.upstream_provider) setUpstreamProvider(c.upstream_provider);
+        setConfigHydrated(true);
+      })
+      .catch(err => {
+        console.error("Failed to hydrate config from backend:", err);
+        setConfigHydrated(true); // proceed with defaults
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchPacks = useCallback(async () => {
     try {
@@ -70,10 +131,75 @@ export const ControlPanel: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { fetchPacks(); }, [fetchPacks]);
+  const fetchProfiles = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/galaxy/profiles`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setProfiles(data.profiles || []);
+    } catch (err) {
+      console.error("Failed to fetch profiles:", err);
+    }
+  }, []);
 
-  // Debounce API calls for config
+  useEffect(() => { fetchPacks(); fetchProfiles(); }, [fetchPacks, fetchProfiles]);
+
+  const handleSaveProfile = async () => {
+    const name = newProfileName.trim();
+    if (!name) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/galaxy/profiles/save/${encodeURIComponent(name)}`, { method: 'POST' });
+      if (!res.ok) { console.warn(`Save profile failed: ${res.status}`); return; }
+      setNewProfileName('');
+      await fetchProfiles();
+    } catch (err) {
+      console.error("Failed to save profile:", err);
+    }
+  };
+
+  const handleLoadProfile = async () => {
+    if (!selectedProfile) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/galaxy/profiles/load/${encodeURIComponent(selectedProfile)}`, { method: 'POST' });
+      if (!res.ok) { console.warn(`Load profile failed: ${res.status}`); return; }
+      const data = await res.json();
+      // Hydrate store from profile response instead of full page reload (Finding F6)
+      const c = data.config;
+      setExcitationThreshold(c.excitation_threshold);
+      setNoiseTolerance(c.noise_tolerance);
+      setCosineThreshold(c.cosine_threshold);
+      setGlobalNoiseLimit(c.global_noise_limit);
+      setCosineOrder(c.cosine_order);
+      setExcitationOrder(c.excitation_order);
+      setNoiseOrder(c.noise_order);
+      setAdaptiveFactor(c.adaptive_factor);
+      setRagTopK(c.rag_top_k);
+      setNoiseEnabled(c.noise_enabled);
+      setCosineEnabled(c.cosine_enabled);
+      setExcitationEnabled(c.excitation_enabled);
+      setFirewallMode(c.firewall_mode);
+      if (c.sniffer_view_limit) setSnifferViewLimit(c.sniffer_view_limit);
+      if (c.upstream_provider) setUpstreamProvider(c.upstream_provider);
+    } catch (err) {
+      console.error("Failed to load profile:", err);
+    }
+  };
+
+  const handleDeleteProfile = async () => {
+    if (!selectedProfile) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/galaxy/profiles/${encodeURIComponent(selectedProfile)}`, { method: 'DELETE' });
+      if (!res.ok) { console.warn(`Delete profile failed: ${res.status}`); return; }
+      setSelectedProfile('');
+      await fetchProfiles();
+    } catch (err) {
+      console.error("Failed to delete profile:", err);
+    }
+  };
+
+  // Debounce API calls for config (only after initial hydration)
   useEffect(() => {
+    if (!configHydrated) return;
     const timer = setTimeout(() => {
       fetch(`${API_BASE_URL}/galaxy/config`, {
         method: 'POST',
@@ -91,14 +217,17 @@ export const ControlPanel: React.FC = () => {
           cosine_enabled: cosineEnabled,
           excitation_enabled: excitationEnabled,
           rag_top_k: ragTopK,
-          firewall_mode: firewallMode
+          firewall_mode: firewallMode,
+          active_tab: activeTab,
+          upstream_provider: upstreamProvider,
+          sniffer_view_limit: snifferViewLimit,
         })
       }).then(res => {
         if (!res.ok) console.warn(`Config sync failed: ${res.status}`);
       }).catch(err => console.error("Failed to sync config:", err));
     }, 500);
     return () => clearTimeout(timer);
-  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode]);
+  }, [excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit, cosineOrder, excitationOrder, noiseOrder, adaptiveFactor, noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode, activeTab, upstreamProvider, snifferViewLimit, configHydrated]);
 
   // Poll for ingestion status if task is active
   useEffect(() => {
@@ -133,6 +262,12 @@ export const ControlPanel: React.FC = () => {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Clear input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     setSystemAction("UPLOADING_PDF...");
@@ -167,146 +302,240 @@ export const ControlPanel: React.FC = () => {
     }
   };
 
+  const isNeg = firewallMode === 'negative';
+
+  const handleResetToRecommended = () => {
+    if (firewallMode === 'positive') {
+      setCosineThreshold(0.5315);
+      setExcitationThreshold(150);
+      setGlobalNoiseLimit(4.5);
+    } else {
+      setCosineThreshold(0.6197);
+      setExcitationThreshold(170);
+      setGlobalNoiseLimit(4.5);
+    }
+  };
+
   return (
     <div className="panel" style={{ width: 'auto', flex: 1, overflow: 'auto' }}>
       <h2 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', paddingBottom: '0.3rem' }}>Control Panel</h2>
 
+      {/* --- Upstream Provider Selection --- */}
+      <div className="config-section" style={{ marginBottom: '1rem' }}>
+        <div className="slider-label">
+          Upstream LLM Engine
+          <InfoTooltip entry={TOOLTIP_REGISTRY[lang].upstream} />
+        </div>
+        <select
+          value={upstreamProvider}
+          onChange={(e) => setUpstreamProvider(e.target.value as any)}
+          style={{ width: '100%', padding: '0.4rem', marginTop: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+        >
+          <option value="ollama">Ollama (Local)</option>
+          <option value="google">Google Gemini</option>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="groq">Groq</option>
+        </select>
+      </div>
+
       {/* --- Firewall Mode Toggle --- */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: '0.6rem', padding: '0.35rem 0.5rem',
-        background: firewallMode === 'negative' ? 'rgba(255, 60, 60, 0.12)' : 'rgba(0, 255, 136, 0.08)',
-        border: `1px solid ${firewallMode === 'negative' ? '#ff3c3c' : 'var(--accent)'}`,
-        borderRadius: '4px', transition: 'all 0.2s',
-      }}>
-        <div style={{ fontSize: '0.7rem', lineHeight: 1.3 }}>
-          <div style={{ fontWeight: 'bold', color: firewallMode === 'negative' ? '#ff3c3c' : 'var(--accent)' }}>
-            {firewallMode === 'positive' ? 'POSITIVE — Allowlist' : 'NEGATIVE — Denylist'}
+      <div className={`firewall-mode-banner ${isNeg ? 'firewall-mode-banner--negative' : ''}`}>
+        <div className="mode-info">
+          <div className="mode-title">
+            {isNeg ? 'NEGATIVE \u2014 Denylist' : 'POSITIVE \u2014 Allowlist'}
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].mode} />
           </div>
-          <div style={{ opacity: 0.6, fontSize: '0.6rem' }}>
-            {firewallMode === 'positive' ? 'Only corpus topics pass' : 'Corpus topics are blocked'}
+          <div className="mode-subtitle">
+            {isNeg ? 'Corpus topics are blocked' : 'Only corpus topics pass'}
           </div>
         </div>
         <button
-          onClick={() => setFirewallMode(firewallMode === 'positive' ? 'negative' : 'positive')}
-          style={{
-            width: '3.2rem', height: '1.5rem', fontSize: '0.6rem', fontWeight: 'bold',
-            border: '1px solid', cursor: 'pointer', borderRadius: '3px', padding: 0,
-            borderColor: firewallMode === 'negative' ? '#ff3c3c' : 'var(--accent)',
-            background: firewallMode === 'negative' ? '#ff3c3c' : 'var(--accent)',
-            color: '#000', transition: 'all 0.2s',
-          }}
+          onClick={() => setFirewallMode(isNeg ? 'positive' : 'negative')}
+          className={`firewall-mode-toggle ${isNeg ? 'firewall-mode-toggle--negative' : ''}`}
         >
-          {firewallMode === 'positive' ? 'POS' : 'NEG'}
+          {isNeg ? 'NEG' : 'POS'}
         </button>
       </div>
 
+      <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
+        <button onClick={handleResetToRecommended} className="reset-btn" style={{ padding: '0.4rem 1rem', cursor: 'pointer', borderRadius: '4px', backgroundColor: 'var(--bg-light)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>Reset to Recommended</button>
+      </div>
+
       {/* --- Noise Pre-Filter --- */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', opacity: noiseEnabled ? 1 : 0.4, transition: 'opacity 0.2s' }}>
-        <button onClick={() => setNoiseEnabled(!noiseEnabled)} style={toggleStyle(noiseEnabled)}>
+      <div className={`filter-group ${noiseEnabled ? '' : 'filter-group--disabled'}`}>
+        <button onClick={() => setNoiseEnabled(!noiseEnabled)}
+          className={`toggle-btn ${noiseEnabled ? 'toggle-btn--on' : ''}`}>
           {noiseEnabled ? 'ON' : 'OFF'}
         </button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong></div>
+          <div className="slider-label">
+            Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong>
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].noise} />
+          </div>
           <StepSlider value={globalNoiseLimit} min={0.10} max={2.00} step={0.01} onChange={setGlobalNoiseLimit} />
         </div>
-        <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
-          <div style={{ opacity: 0.5 }}>Seq</div>
+        <div className="seq-column">
+          <div className="seq-label">Seq</div>
           <input type="number" min="1" max="3" step="1" value={noiseOrder}
-            onChange={(e) => setNoiseOrder(Number(e.target.value))} style={seqInputStyle} />
+            onChange={(e) => handleOrderChange('noise', Number(e.target.value))} className="seq-input" />
         </div>
       </div>
 
       {/* --- Cosine Gate --- */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', opacity: cosineEnabled ? 1 : 0.4, transition: 'opacity 0.2s' }}>
-        <button onClick={() => setCosineEnabled(!cosineEnabled)} style={toggleStyle(cosineEnabled)}>
+      <div className={`filter-group ${cosineEnabled ? '' : 'filter-group--disabled'}`}>
+        <button onClick={() => setCosineEnabled(!cosineEnabled)}
+          className={`toggle-btn ${cosineEnabled ? 'toggle-btn--on' : ''}`}>
           {cosineEnabled ? 'ON' : 'OFF'}
         </button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Cosine Gate: <strong>{cosineThreshold.toFixed(2)}</strong></div>
+          <div className="slider-label">
+            Cosine Gate: <strong>{cosineThreshold.toFixed(2)}</strong>
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].cosine} />
+          </div>
           <StepSlider value={cosineThreshold} min={0.00} max={1.00} step={0.01} onChange={setCosineThreshold} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.55rem', opacity: 0.4, marginTop: '-2px' }}>
+          <div className="slider-hint">
             <span>0 LAX</span><span>STRICT 1</span>
           </div>
         </div>
-        <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
-          <div style={{ opacity: 0.5 }}>Seq</div>
+        <div className="seq-column">
+          <div className="seq-label">Seq</div>
           <input type="number" min="1" max="3" step="1" value={cosineOrder}
-            onChange={(e) => setCosineOrder(Number(e.target.value))} style={seqInputStyle} />
+            onChange={(e) => handleOrderChange('cosine', Number(e.target.value))} className="seq-input" />
         </div>
       </div>
 
       {/* --- Excitation Filter --- */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem', opacity: excitationEnabled ? 1 : 0.4, transition: 'opacity 0.2s' }}>
-        <button onClick={() => setExcitationEnabled(!excitationEnabled)} style={toggleStyle(excitationEnabled)}>
+      <div className={`filter-group ${excitationEnabled ? '' : 'filter-group--disabled'}`}>
+        <button onClick={() => setExcitationEnabled(!excitationEnabled)}
+          className={`toggle-btn ${excitationEnabled ? 'toggle-btn--on' : ''}`}>
           {excitationEnabled ? 'ON' : 'OFF'}
         </button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Excitation: <strong>{excitationThreshold}</strong></div>
+          <div className="slider-label">
+            Excitation: <strong>{excitationThreshold}</strong>
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].excitation} />
+          </div>
           <StepSlider value={excitationThreshold} min={0} max={1024} step={1} onChange={setExcitationThreshold} />
-          <div style={{ fontSize: '0.65rem', opacity: 0.5, marginTop: '-1px' }}>
+          <div className="noise-tolerance-label">
             Noise Tolerance: {noiseTolerance.toFixed(3)}
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].tolerance} />
           </div>
           <StepSlider value={noiseTolerance} min={0.001} max={0.100} step={0.001} onChange={setNoiseTolerance} />
         </div>
-        <div style={{ fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2 }}>
-          <div style={{ opacity: 0.5 }}>Seq</div>
+        <div className="seq-column">
+          <div className="seq-label">
+            Seq
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].seq} />
+          </div>
           <input type="number" min="1" max="3" step="1" value={excitationOrder}
-            onChange={(e) => setExcitationOrder(Number(e.target.value))} style={seqInputStyle} />
+            onChange={(e) => handleOrderChange('excitation', Number(e.target.value))} className="seq-input" />
         </div>
       </div>
 
       {/* --- Adaptive Factor --- */}
-      <div style={{ marginBottom: '0.5rem', padding: '0.3rem 0', borderTop: '1px solid #222' }}>
-        <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>Adaptive Factor: <strong>{adaptiveFactor.toFixed(2)}</strong></div>
+      <div className="config-section">
+        <div className="slider-label">
+          Adaptive Factor: <strong>{adaptiveFactor.toFixed(2)}</strong>
+          <InfoTooltip entry={TOOLTIP_REGISTRY[lang].adaptive} />
+        </div>
         <StepSlider value={adaptiveFactor} min={0.01} max={1.00} step={0.01} onChange={setAdaptiveFactor} />
-        <div style={{ fontSize: '0.6rem', opacity: 0.5, display: 'flex', justifyContent: 'space-between' }}>
+        <div className="slider-sublabel">
           <span>Short: {Math.floor(excitationThreshold * adaptiveFactor)} dims</span>
           <span>Full: {excitationThreshold} dims</span>
         </div>
       </div>
 
       {/* --- RAG Top-K --- */}
-      <div style={{ marginBottom: '0.5rem', padding: '0.3rem 0', borderTop: '1px solid #222' }}>
-        <div style={{ fontSize: '0.75rem', marginBottom: '1px' }}>RAG Context Depth: <strong>{ragTopK}</strong> chunk{ragTopK > 1 ? 's' : ''}</div>
+      <div className="config-section">
+        <div className="slider-label">
+          RAG Context Depth: <strong>{ragTopK}</strong> chunk{ragTopK > 1 ? 's' : ''}
+          <InfoTooltip entry={TOOLTIP_REGISTRY[lang].rag} />
+        </div>
         <StepSlider value={ragTopK} min={1} max={10} step={1} onChange={setRagTopK} />
-        <div style={{ fontSize: '0.6rem', opacity: 0.5, display: 'flex', justifyContent: 'space-between' }}>
+        <div className="slider-sublabel">
           <span>1 (fast)</span>
           <span>10 (deep)</span>
         </div>
       </div>
 
+      {/* --- Config Profiles --- */}
+      <div className="profiles-section">
+        <div className="section-title">
+          Config Profiles
+          <InfoTooltip entry={TOOLTIP_REGISTRY[lang].profiles} />
+        </div>
+        <div className="profiles-row">
+          <select
+            value={selectedProfile}
+            onChange={(e) => setSelectedProfile(e.target.value)}
+            className="profile-select"
+          >
+            <option value="">&mdash; select profile &mdash;</option>
+            {profiles.map(p => (
+              <option key={p} value={p}>{p === '_last_used' ? '🕒 Last Session (Auto-save)' : p}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleLoadProfile}
+            disabled={!selectedProfile}
+            className={`profile-btn ${!selectedProfile ? 'profile-btn--disabled' : ''}`}
+            title="Load selected profile"
+          >LOAD</button>
+          <button
+            onClick={handleDeleteProfile}
+            disabled={!selectedProfile}
+            className={`profile-btn profile-btn--danger ${!selectedProfile ? 'profile-btn--disabled' : ''}`}
+            title="Delete selected profile"
+          >DEL</button>
+        </div>
+        <div className="profiles-row">
+          <input
+            type="text"
+            placeholder="profile name..."
+            value={newProfileName}
+            onChange={(e) => setNewProfileName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveProfile(); }}
+            className="profile-input"
+          />
+          <button
+            onClick={handleSaveProfile}
+            disabled={!newProfileName.trim()}
+            className={`profile-btn ${!newProfileName.trim() ? 'profile-btn--disabled' : ''}`}
+            title="Save current config as new profile"
+          >SAVE</button>
+        </div>
+      </div>
+
       {/* --- Corpus Upload --- */}
-      <div style={{ borderTop: '1px solid #222', paddingTop: '0.4rem' }}>
+      <div className="corpus-section">
+        <div className="section-title" style={{ marginBottom: '0.4rem' }}>
+          Document Corpus
+          <InfoTooltip entry={TOOLTIP_REGISTRY[lang].corpus} />
+        </div>
         <input type="file" accept="application/pdf" ref={fileInputRef}
           onChange={handleFileUpload} className="file-input" />
-        <button onClick={() => fileInputRef.current?.click()}
-          style={{ width: '100%', padding: '0.35rem', fontSize: '0.75rem', marginBottom: '0.4rem' }}>
+        <button onClick={() => fileInputRef.current?.click()} className="corpus-upload-btn">
           Upload PDF Corpus
         </button>
 
         {packs.length > 0 && (
-          <div style={{ fontSize: '0.75rem' }}>
-            <div style={{ opacity: 0.6, marginBottom: '0.2rem' }}>Loaded Packs:</div>
+          <div className="packs-list">
+            <div className="packs-title">Loaded Packs:</div>
             {packs.map((p) => (
-              <div key={p.filename} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.15rem 0.3rem', background: '#1a1a1a', marginBottom: '2px', borderRadius: '2px',
-              }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px', fontSize: '0.7rem' }}
-                  title={p.filename}>{p.filename} ({p.chunks})</span>
-                <button onClick={() => handleDeletePack(p.filename)}
-                  style={{ padding: '0 0.25rem', fontSize: '0.6rem', color: 'var(--danger)', borderColor: 'var(--danger)', lineHeight: 1.4 }}>X</button>
+              <div key={p.filename} className="pack-item">
+                <span className="pack-name" title={p.filename}>{p.filename} ({p.chunks})</span>
+                <button onClick={() => handleDeletePack(p.filename)} className="pack-delete-btn">X</button>
               </div>
             ))}
           </div>
         )}
 
         {ingestionStatus.taskId && ingestionStatus.status !== 'completed' && (
-          <div style={{ marginTop: '0.3rem', fontSize: '0.7rem' }}>
-            <span style={{ opacity: 0.6 }}>{ingestionStatus.status}</span> {ingestionStatus.message}
-            <div style={{ width: '100%', background: '#333', height: '3px', marginTop: '3px', borderRadius: '2px' }}>
-              <div style={{ width: `${ingestionStatus.progress}%`, background: 'var(--accent)', height: '100%', borderRadius: '2px' }}></div>
+          <div className="ingestion-status">
+            <span className="status-label">{ingestionStatus.status}</span> {ingestionStatus.message}
+            <div className="progress-bar">
+              <div className="progress-bar-fill" style={{ width: `${ingestionStatus.progress}%` }}></div>
             </div>
           </div>
         )}

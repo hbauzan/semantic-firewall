@@ -1,0 +1,427 @@
+/* ============================================================
+   ControlPanel.css — Extracted inline styles (Finding Q2)
+   Covers ControlPanel.tsx and TelemetryHUD.tsx components.
+   ============================================================ */
+
+/* --- Toggle Buttons (ON/OFF per filter) --- */
+.toggle-btn {
+  width: 2.2rem;
+  height: 1.3rem;
+  font-size: 0.55rem;
+  font-weight: bold;
+  border: 1px solid #555;
+  background: #222;
+  color: #555;
+  cursor: pointer;
+  border-radius: 3px;
+  flex-shrink: 0;
+  padding: 0;
+  transition: all 0.2s;
+}
+
+.toggle-btn--on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #000;
+}
+
+/* --- Seq Input (Pipeline Order) --- */
+.seq-input {
+  width: 2.2rem;
+  text-align: center;
+  background: #111;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 1px;
+  font-size: 0.7rem;
+}
+
+/* --- Step Buttons (+/-) --- */
+.step-btn {
+  width: 1.4rem;
+  height: 1.2rem;
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 0;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  color: var(--accent);
+  cursor: pointer;
+  border-radius: 2px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* --- Filter Group (slider row with toggle + seq) --- */
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  transition: opacity 0.2s;
+}
+
+.filter-group--disabled {
+  opacity: 0.4;
+}
+
+/* --- Slider Row (step buttons + range input) --- */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+  height: 12px;
+}
+
+/* --- Seq Column (Seq label + input) --- */
+.seq-column {
+  font-size: 0.6rem;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.seq-column .seq-label {
+  opacity: 0.5;
+}
+
+/* --- Firewall Mode Banner --- */
+.firewall-mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(0, 255, 136, 0.08);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.firewall-mode-banner--negative {
+  background: rgba(255, 60, 60, 0.12);
+  border-color: #ff3c3c;
+}
+
+.firewall-mode-banner .mode-info {
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
+.firewall-mode-banner .mode-title {
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.firewall-mode-banner--negative .mode-title {
+  color: #ff3c3c;
+}
+
+.firewall-mode-banner .mode-subtitle {
+  opacity: 0.6;
+  font-size: 0.6rem;
+}
+
+.firewall-mode-toggle {
+  width: 3.2rem;
+  height: 1.5rem;
+  font-size: 0.6rem;
+  font-weight: bold;
+  border: 1px solid var(--accent);
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0;
+  background: var(--accent);
+  color: #000;
+  transition: all 0.2s;
+}
+
+.firewall-mode-toggle--negative {
+  border-color: #ff3c3c;
+  background: #ff3c3c;
+}
+
+/* --- Section Dividers --- */
+.config-section {
+  margin-bottom: 0.5rem;
+  padding: 0.3rem 0;
+  border-top: 1px solid #222;
+}
+
+/* --- Slider Labels --- */
+.slider-label {
+  font-size: 0.75rem;
+  margin-bottom: 1px;
+}
+
+.slider-sublabel {
+  font-size: 0.6rem;
+  opacity: 0.5;
+  display: flex;
+  justify-content: space-between;
+}
+
+.slider-hint {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.55rem;
+  opacity: 0.4;
+  margin-top: -2px;
+}
+
+.noise-tolerance-label {
+  font-size: 0.65rem;
+  opacity: 0.5;
+  margin-top: -1px;
+}
+
+/* --- Config Profiles --- */
+.profiles-section {
+  border-top: 1px solid #222;
+  padding-top: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.profiles-section .section-title {
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin-bottom: 0.3rem;
+}
+
+.profiles-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 0.3rem;
+}
+
+.profile-select {
+  flex: 1;
+  background: #111;
+  color: var(--accent);
+  border: 1px solid #444;
+  font-size: 0.7rem;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.profile-btn {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+}
+
+.profile-btn--disabled {
+  opacity: 0.4;
+}
+
+.profile-btn--danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.profile-input {
+  flex: 1;
+  background: #111;
+  color: var(--accent);
+  border: 1px solid #444;
+  font-size: 0.7rem;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+/* --- Corpus Section --- */
+.corpus-section {
+  border-top: 1px solid #222;
+  padding-top: 0.4rem;
+}
+
+.corpus-upload-btn {
+  width: 100%;
+  padding: 0.35rem;
+  font-size: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.packs-list {
+  font-size: 0.75rem;
+}
+
+.packs-list .packs-title {
+  opacity: 0.6;
+  margin-bottom: 0.2rem;
+}
+
+.pack-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.15rem 0.3rem;
+  background: #1a1a1a;
+  margin-bottom: 2px;
+  border-radius: 2px;
+}
+
+.pack-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 170px;
+  font-size: 0.7rem;
+}
+
+.pack-delete-btn {
+  padding: 0 0.25rem;
+  font-size: 0.6rem;
+  color: var(--danger);
+  border-color: var(--danger);
+  line-height: 1.4;
+}
+
+.ingestion-status {
+  margin-top: 0.3rem;
+  font-size: 0.7rem;
+}
+
+.ingestion-status .status-label {
+  opacity: 0.6;
+}
+
+.progress-bar {
+  width: 100%;
+  background: #333;
+  height: 3px;
+  margin-top: 3px;
+  border-radius: 2px;
+}
+
+.progress-bar-fill {
+  background: var(--accent);
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+/* ============================================================
+   TelemetryHUD Styles
+   ============================================================ */
+
+.monkey-head {
+  text-align: center;
+  min-width: 4.5rem;
+  transition: opacity 0.3s;
+}
+
+.monkey-head--dead {
+  opacity: 0.25;
+}
+
+.monkey-head pre {
+  margin: 0;
+  font-family: monospace;
+  font-size: 9px;
+  line-height: 10px;
+}
+
+.monkey-head--alive pre {
+  color: var(--accent);
+}
+
+.monkey-head--dead pre {
+  color: #555;
+}
+
+.monkey-head .monkey-label {
+  font-size: 0.55rem;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+  font-weight: bold;
+}
+
+.monkey-head--alive .monkey-label {
+  color: var(--accent);
+}
+
+.monkey-head--dead .monkey-label {
+  color: #444;
+}
+
+.monkey-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.3rem;
+  margin: 0.3rem 0;
+}
+
+.system-state {
+  font-family: monospace;
+  font-size: 0.7rem;
+  text-align: center;
+  margin: 0.3rem 0;
+}
+
+.system-state .sys-prefix {
+  opacity: 0.4;
+}
+
+.system-state .sys-value {
+  color: var(--accent);
+}
+
+.telemetry-line {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  font-family: monospace;
+  font-size: 0.6rem;
+  opacity: 0.5;
+  border-top: 1px solid #222;
+  padding-top: 0.3rem;
+  margin-top: 0.2rem;
+}
+
+/* --- Tooltips --- */
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  cursor: help;
+  margin-left: 6px;
+  position: relative;
+  font-size: 9px;
+  font-style: normal;
+  color: inherit;
+}
+
+.tooltip-box {
+  visibility: hidden;
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-dark, #111);
+  border: 1px solid var(--border-color, #444);
+  padding: 12px;
+  border-radius: 8px;
+  width: 250px;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.2s, visibility 0.2s;
+  color: #ccc;
+  font-size: 0.7rem;
+  font-weight: normal;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+
+.info-icon:hover .tooltip-box {
+  visibility: visible;
+  opacity: 1;
+}

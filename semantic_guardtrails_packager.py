@@ -12,6 +12,9 @@ FOCUS_FILES = [
     # Backend — Provider abstraction (stream_chat wrapped by FPI)
     "backend/app/modules/providers/base.py",
     "backend/app/modules/providers/ollama.py",
+    "backend/app/modules/providers/google.py",
+    # Backend — Profiles (named config persistence)
+    "backend/app/modules/profiles.py",
     # Backend — context (firewall engine, models, state)
     "backend/app/core/firewall.py",
     "backend/app/core/models.py",
@@ -19,8 +22,9 @@ FOCUS_FILES = [
     "backend/app/core/settings.py",
     # Backend — tests (includes FPI reconstruction tests)
     "backend/perform_tests.py",
-    # Frontend — FPI expandable sniffer UI
+    # Frontend — FPI expandable sniffer UI + Firewall Mode Controls
     "frontend/src/components/SnifferTab.tsx",
+    "frontend/src/components/ControlPanel.tsx",
     "frontend/src/App.tsx",
     "frontend/src/store.ts",
     "frontend/src/index.css",
@@ -28,6 +32,12 @@ FOCUS_FILES = [
     # Documentation
     "architecture_spec.md",
     "manifest.json",
+    "backend/app/api/endpoints/chat.py",
+    "backend/scripts/augment_corpus.py",
+    "backend/app/api/router_main.py",
+    "backend/app/api/endpoints/config.py",
+    "backend/app/api/endpoints/corpus.py",
+    "backend/app/api/endpoints/system.py",
 ]
 
 

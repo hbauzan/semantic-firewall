@@ -31,5 +31,16 @@ backend/tests/db_scaling_metrics.md
 .DS_Store
 Thumbs.db
 
+# Runtime data (prompts/respuestas interceptados — NO versionar)
+backend/data/*.json
+
+# Logs (no van al repo)
+backend/logs/
+
+# Agent/dev tooling local (no es código del proyecto)
+.agents/
+.claude/skills/
+skills-lock.json
+
 # Generated
 context.txt
