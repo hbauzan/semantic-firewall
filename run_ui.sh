@@ -1,3 +1,4 @@
 #!/bin/bash
 cd frontend
-npm run dev
+# Tooling: pnpm (dev-protocol §3.3).
+pnpm run dev
