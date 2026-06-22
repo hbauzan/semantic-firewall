@@ -50,7 +50,7 @@ async def test_firewall_interceptor_blocking():
             assert "[FW_BLOCK]" in content
 
 @pytest.mark.asyncio
-async def test_rag_context_injection():
+async def test_rag_context_injection(mock_llm_stream):
     from app.core.state import set_config_sync
     set_config_sync(noise_enabled=False, cosine_enabled=False, excitation_enabled=False)
     try:
@@ -201,7 +201,7 @@ def test_config_sync_includes_firewall_mode():
     assert cfg.firewall_mode == "negative"
 
 @pytest.mark.asyncio
-async def test_negative_mode_chat_endpoint():
+async def test_negative_mode_chat_endpoint(mock_llm_stream):
     """Negative mode + strict thresholds: query should behave correctly on /chat."""
     set_config(
         excitation_threshold=1024, noise_tolerance=0.0001,
