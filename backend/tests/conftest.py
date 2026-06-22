@@ -14,6 +14,25 @@ from app.core.state import set_config_sync as set_config
 client = TestClient(app)
 
 
+@pytest.fixture
+def mock_llm_stream(monkeypatch):
+    """Stub the default (Ollama) provider's stream_chat with a deterministic
+    fake, so PASS-path tests never reach a live model (dev-protocol §3.2).
+
+    Mirrors the inline mock already used in test_openai_proxy_v1_compliance,
+    centralized here for reuse. Yields OpenAI-style SSE chunks, which both
+    /chat (_stream_via_provider) and /v1/chat/completions parse identically.
+    """
+    from app.modules.providers.ollama import OllamaProvider
+
+    async def _fake_stream(*args, **kwargs):
+        yield 'data: {"choices": [{"delta": {"content": "Mocked response"}}]}\n\n'
+        yield "data: [DONE]\n\n"
+
+    monkeypatch.setattr(OllamaProvider, "stream_chat", _fake_stream)
+    return _fake_stream
+
+
 @pytest.fixture(autouse=True)
 def reset_config_after_test():
     """Ensure config state is reset to defaults after each test to prevent bleed."""
