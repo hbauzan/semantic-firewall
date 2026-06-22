@@ -190,12 +190,16 @@ async def chat_endpoint(request: Request, req: ChatRequest):
                         pass
                     yield chunk
             except Exception as e:
-                update_trace(trace_id, status="ERROR", response_content=f"🔴 [LLM_ERROR] {str(e)}")
-                raise e
-            
+                # Upstream LLM unreachable: surface a readable error, mark the
+                # trace ERROR, and close the stream cleanly (no re-raise).
+                err = _llm_error_text(e)
+                yield json.dumps({"response": err}).encode("utf-8") + b"\n"
+                update_trace(trace_id, status="ERROR", response_content=err)
+                return
+
             reconstructed = "".join(full_content)
             update_trace(trace_id, response_content=reconstructed, status="COMPLETED")
-            
+
             await asyncio.to_thread(persist_interaction, clean_prompt, reconstructed)
             
         return StreamingResponse(ui_stream_wrapper(), media_type="application/x-ndjson")
@@ -215,13 +219,23 @@ async def chat_endpoint(request: Request, req: ChatRequest):
                     pass
                 yield chunk
         except Exception as e:
-            raise e
-            
+            # Upstream LLM unreachable: surface a readable error and close clean.
+            yield json.dumps({"response": _llm_error_text(e)}).encode("utf-8") + b"\n"
+            return
+
         reconstructed = "".join(full_content)
         await asyncio.to_thread(persist_interaction, clean_prompt, reconstructed)
 
     return StreamingResponse(
         no_fw_stream_wrapper(), media_type="application/x-ndjson"
+    )
+
+
+def _llm_error_text(e: Exception) -> str:
+    """Client-facing message when the upstream LLM is unreachable mid-stream."""
+    return (
+        f"🔴 [LLM_ERROR] Cannot reach the language model. "
+        f"Ensure the inference server is running. {e}"
     )
 
 
@@ -265,8 +279,7 @@ async def _stream_via_provider(prompt: str, context: str, cfg: ConfigState, stri
                     pass
     except Exception as e:
         logger.error("Provider connection failed: %s", e)
-        yield json.dumps({"response": f"🔴 [LLM_ERROR] Cannot reach the language model. Ensure the inference server is running. {str(e)}"}).encode("utf-8") + b"\n"
-        raise e
+        raise
 
 
 def _format_block_message(
@@ -422,9 +435,22 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
                         pass
                 yield chunk
         except Exception as e:
+            # Upstream LLM unreachable: emit an OpenAI-style error chunk so the
+            # client gets a structured response instead of an empty stream, mark
+            # the trace ERROR, and close the stream cleanly (no re-raise).
+            logger.error("Proxy upstream connection failed: %s", e)
             if tid:
-                update_trace(tid, status="ERROR", response_content=f"🔴 [LLM_ERROR] {str(e)}")
-            raise e
+                update_trace(tid, status="ERROR", response_content=_llm_error_text(e))
+            err_payload = {
+                "error": {
+                    "message": _llm_error_text(e),
+                    "type": "upstream_error",
+                    "code": "502",
+                }
+            }
+            yield f"data: {json.dumps(err_payload)}\n\n"
+            yield "data: [DONE]\n\n"
+            return
         # Post-stream: fire-and-forget trace update with reconstructed response
         reconstructed = "".join(full_content)
         if tid:
