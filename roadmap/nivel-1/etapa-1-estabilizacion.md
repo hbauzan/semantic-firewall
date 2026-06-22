@@ -30,44 +30,44 @@ Si esto crashea en un demo, perdés credibilidad en 30 segundos. Pero peor que u
 
 ### Bloque A — Higiene de seguridad (🔴 PRIMERO, antes de generar más commits)
 La sangría de datos no espera. Esto va antes que la migración para no arrastrar datos en commits nuevos.
-- [ ] Agregar `backend/data/*.json` (o `backend/data/`) al `.gitignore`. Decidir si conservás `production.json`/`dev_strict.json` de ejemplo (esos sí, sin datos reales).
-- [ ] Sacar del tracking los archivos de datos: `git rm --cached backend/data/_last_used.json backend/data/sniffer_history.json backend/data/history_benchmark.json` (ajustar lista).
-- [ ] **Limpiar el historial de git** del commit con datos privados. Usá `git filter-repo` (no `filter-branch`). **Hacelo en una rama/clon de prueba primero.** Si el repo nunca se pusheó a un remoto público, alcanza con reescribir historia local antes del primer push.
-- [ ] Verificar que `.env` siga ignorado (✅ ya lo está) y que no haya secrets en ningún `*.json` ni en logs trackeados.
-- [ ] Revisar `backend/logs/` — los logs no deberían ir al repo público.
+- [x] Agregar `backend/data/*.json` (o `backend/data/`) al `.gitignore`. Decidir si conservás `production.json`/`dev_strict.json` de ejemplo (esos sí, sin datos reales).
+- [x] Sacar del tracking los archivos de datos: `git rm --cached backend/data/_last_used.json backend/data/sniffer_history.json backend/data/history_benchmark.json` (ajustar lista).
+- [x] **Limpiar el historial de git** del commit con datos privados. Usá `git filter-repo` (no `filter-branch`). **Hacelo en una rama/clon de prueba primero.** Si el repo nunca se pusheó a un remoto público, alcanza con reescribir historia local antes del primer push.
+- [x] Verificar que `.env` siga ignorado (✅ ya lo está) y que no haya secrets en ningún `*.json` ni en logs trackeados.
+- [x] Revisar `backend/logs/` — los logs no deberían ir al repo público.
 
 ### Bloque B — Migración de tooling a `uv` + `pnpm` (establecer el entorno único)
 Sobre la historia ya limpia, dejar un único camino de ejecución antes de diagnosticar.
-- [ ] **Backend → `uv`:** declarar dependencias reales en `backend/pyproject.toml` (tabla `[project]` con las deps que hoy están en `requirements.txt`). Generar `uv.lock` con `uv sync`. Verificar que `uv run pytest -v tests/` y `uv run uvicorn app.main:app --reload` funcionen.
-- [ ] Mantener `requirements.txt` como **artefacto generado** (`uv pip compile pyproject.toml -o requirements.txt`), no como fuente de verdad.
-- [ ] Decidir qué hacer con `.venv` y los scripts `run_*.sh` que la activan: o se actualizan para usar `uv run`, o se deprecan. Una sola verdad.
-- [ ] **Frontend → `pnpm`:** `pnpm import` para convertir `package-lock.json` → `pnpm-lock.yaml`, después `pnpm install`. Verificar `pnpm run dev`. Borrar `package-lock.json`.
+- [x] **Backend → `uv`:** declarar dependencias reales en `backend/pyproject.toml` (tabla `[project]` con las deps que hoy están en `requirements.txt`). Generar `uv.lock` con `uv sync`. Verificar que `uv run pytest -v tests/` y `uv run uvicorn app.main:app --reload` funcionen.
+- [x] Mantener `requirements.txt` como **artefacto generado** (`uv pip compile pyproject.toml -o requirements.txt`), no como fuente de verdad.
+- [x] Decidir qué hacer con `.venv` y los scripts `run_*.sh` que la activan: o se actualizan para usar `uv run`, o se deprecan. Una sola verdad.
+- [x] **Frontend → `pnpm`:** `pnpm import` para convertir `package-lock.json` → `pnpm-lock.yaml`, después `pnpm install`. Verificar `pnpm run dev`. Borrar `package-lock.json`.
 
 ### Bloque C — Diagnóstico (no arreglar todavía, solo mapear)
-- [ ] Correr la suite completa: `cd backend && uv run pytest -v tests/`. Anotar **qué pasa y qué falla**, sin tocar nada.
-- [ ] Arrancar backend (`cd backend && uv run uvicorn app.main:app --reload`) y frontend (`cd frontend && pnpm run dev`). Anotar errores de boot, warnings, stack traces.
-- [ ] Probar a mano cada flujo: chat, audit, upload PDF, sniffer, proxy `/v1/chat/completions`. Anotar qué crashea o se comporta raro.
+- [x] Correr la suite completa: `cd backend && uv run pytest -v tests/`. Anotar **qué pasa y qué falla**, sin tocar nada.
+- [x] Arrancar backend (`cd backend && uv run uvicorn app.main:app --reload`) y frontend (`cd frontend && pnpm run dev`). Anotar errores de boot, warnings, stack traces.
+- [x] Probar a mano cada flujo: chat, audit, upload PDF, sniffer, proxy `/v1/chat/completions`. Anotar qué crashea o se comporta raro.
 
 ### Bloque D — Arreglar los crashes encontrados en Bloque C
-- [ ] Arreglar **uno por uno**, un commit por fix, nombre descriptivo. Re-correr tests (`uv run pytest tests/`) después de cada uno.
-- [ ] Que la suite pase entera.
+- [x] Arreglar **uno por uno**, un commit por fix, nombre descriptivo. Re-correr tests (`uv run pytest tests/`) después de cada uno.
+- [x] Que la suite pase entera.
 
 ### Bloque E — Doc-sync (según dev-protocol.md §4)
-- [ ] Actualizar `README.md`: comandos correctos (`uv run pytest tests/`, `uv run uvicorn ...`, `pnpm run dev`), sacar referencias a `perform_tests.py`, venv y npm.
-- [ ] Actualizar `architecture_spec.md` §11.8 para que diga la verdad sobre el `.gitignore` (una vez arreglado en Bloque A).
-- [ ] Reconciliar `CONTEXT.md` vs `context.txt`: decidir si renombrás/regenerás según el propósito que pide el protocolo.
-- [ ] Actualizar `manifest.json` si la migración de tooling cambia el estado declarado.
-- [ ] Limpiar el working tree: commitear o descartar lo pendiente con mensajes claros.
+- [x] Actualizar `README.md`: comandos correctos (`uv run pytest tests/`, `uv run uvicorn ...`, `pnpm run dev`), sacar referencias a `perform_tests.py`, venv y npm.
+- [x] Actualizar `architecture_spec.md` §11.8 para que diga la verdad sobre el `.gitignore` (una vez arreglado en Bloque A).
+- [x] Reconciliar `CONTEXT.md` vs `context.txt`: decidir si renombrás/regenerás según el propósito que pide el protocolo.
+- [x] Actualizar `manifest.json` si la migración de tooling cambia el estado declarado.
+- [x] Limpiar el working tree: commitear o descartar lo pendiente con mensajes claros.
 
 ---
 
 ## Definición de "Etapa 1 terminada"
-- [ ] **Cero datos privados** en working tree y en historial de git. `.gitignore` correcto y verificado.
-- [ ] Backend corre con `uv`, frontend con `pnpm`. Lockfiles presentes. Sin `pip`/activación manual.
-- [ ] Suite de tests pasa entera (`uv run pytest tests/`); sabés qué cubre.
-- [ ] Todos los flujos corren sin crashear.
-- [ ] README, spec, manifest y CONTEXT reflejan la realidad (tooling, comandos, gitignore).
-- [ ] Working tree limpio, historial con commits chicos y nombrados.
+- [x] **Cero datos privados** en working tree y en historial de git. `.gitignore` correcto y verificado.
+- [x] Backend corre con `uv`, frontend con `pnpm`. Lockfiles presentes. Sin `pip`/activación manual.
+- [x] Suite de tests pasa entera (`uv run pytest tests/`); sabés qué cubre.
+- [x] Todos los flujos corren sin crashear.
+- [x] README, spec, manifest y CONTEXT reflejan la realidad (tooling, comandos, gitignore).
+- [x] Working tree limpio, historial con commits chicos y nombrados.
 
 ---
 
