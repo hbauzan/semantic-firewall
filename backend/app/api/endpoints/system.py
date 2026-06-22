@@ -3,6 +3,7 @@
 Extracted from routes.py as part of Router Decomposition (Finding A1).
 """
 import logging
+import json
 import psutil
 import torch
 from fastapi import APIRouter, Depends
@@ -68,13 +69,14 @@ async def sniffer_stream():
 
 @router.get("/system/logs/export", dependencies=[Depends(verify_api_key)])
 async def export_forensic_logs():
-    """Aggregates all in-memory sniffer traces for forensic audit."""
+    """Aggregates all in-memory sniffer traces for forensic audit in NDJSON format."""
     history = get_sniffer_history()
-    return {
-        "export_version": "v2.30.0",
-        "total_traces": len(history),
-        "traces": [t.model_dump() for t in history]
-    }
+
+    async def generate_ndjson():
+        for t in history:
+            yield json.dumps(t.to_flat_dict(), ensure_ascii=False) + "\n"
+
+    return StreamingResponse(generate_ndjson(), media_type="application/x-ndjson")
 
 @router.delete("/system/sniffer/history", dependencies=[Depends(verify_api_key)])
 async def clear_sniffer_history():

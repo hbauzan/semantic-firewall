@@ -63,6 +63,48 @@ class SnifferTrace(BaseModel):
     response_content: str = ""
     status: Literal["PENDING", "COMPLETED", "BREACH", "ERROR"] = "PENDING"  # PENDING → COMPLETED | BREACH | ERROR
 
+    def to_flat_dict(self) -> dict:
+        """Flatten trace to a single-level versioned event schema for SIEM ingestion."""
+        event = {
+            "schema_version": "1.0.0",
+            "timestamp": self.timestamp,
+            "trace_id": self.id,
+            "status": self.status,
+            "model": self.request.model,
+            "decision": self.firewall.decision,
+            "last_message": self.request.last_message,
+            "response_content": self.response_content,
+            "noise_passed": None,
+            "noise_value": None,
+            "noise_threshold": None,
+            "cosine_passed": None,
+            "cosine_value": None,
+            "cosine_threshold": None,
+            "excitation_passed": None,
+            "excitation_value": None,
+            "excitation_threshold": None,
+            "no_context_passed": None,
+        }
+
+        for stage in self.firewall.pipeline_trace:
+            s_name = stage.stage
+            if s_name == "noise":
+                event["noise_passed"] = stage.passed
+                event["noise_value"] = stage.value
+                event["noise_threshold"] = stage.threshold
+            elif s_name == "cosine":
+                event["cosine_passed"] = stage.passed
+                event["cosine_value"] = stage.value
+                event["cosine_threshold"] = stage.threshold
+            elif s_name == "excitation":
+                event["excitation_passed"] = stage.passed
+                event["excitation_value"] = stage.value
+                event["excitation_threshold"] = stage.threshold
+            elif s_name == "no_context":
+                event["no_context_passed"] = stage.passed
+
+        return event
+
 
 # ---------------------------------------------------------------------------
 # Global Queue & Subscriber Registry
@@ -83,6 +125,8 @@ _subscribers_lock = asyncio.Lock()
 # consumer is ever introduced, replace with threading.Lock or asyncio.Lock.
 _trace_buffer: list[SnifferTrace] = []
 _BUFFER_MAX = 1000
+
+_write_lock = asyncio.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +156,22 @@ def _save_history_sync(buffer: list[SnifferTrace]) -> None:
         logger.error("Failed to save sniffer history: %s", e)
 
 
+async def _save_history_async(buffer: list[SnifferTrace]) -> None:
+    """Acquire lock and flush history to disk via to_thread."""
+    async with _write_lock:
+        await asyncio.to_thread(_save_history_sync, buffer)
+
+
+def _schedule_history_save() -> None:
+    """Schedule history persistence, using running loop if present, otherwise sync fallback."""
+    snapshot = list(_trace_buffer)
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_save_history_async(snapshot))
+    except RuntimeError:
+        _save_history_sync(snapshot)
+
+
 def get_sniffer_history() -> list[SnifferTrace]:
     """Return a snapshot of the in-memory trace buffer."""
     return list(_trace_buffer)
@@ -122,7 +182,7 @@ async def clear_history_backend() -> None:
     global _trace_buffer
     _trace_buffer.clear()
     if HISTORY_FILE.exists():
-        await asyncio.to_thread(_save_history_sync, [])
+        await _save_history_async([])
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +255,12 @@ def emit_trace(
         status=resolved_status,
     )
 
+    _trace_buffer.append(trace)
+    if len(_trace_buffer) > _BUFFER_MAX:
+        _trace_buffer.pop(0)
+
+    _schedule_history_save()
+
     try:
         sniffer_queue.put_nowait(trace)
     except asyncio.QueueFull:
@@ -234,6 +300,8 @@ def update_trace(
         logger.warning("update_trace: trace_id %s not found in buffer", trace_id)
         return
 
+    _schedule_history_save()
+
     try:
         sniffer_queue.put_nowait(updated_trace)
     except asyncio.QueueFull:
@@ -248,7 +316,7 @@ _consumer_task: asyncio.Task | None = None
 
 
 async def sniffer_consumer() -> None:
-    """Read traces from the queue, buffer them, persist, and broadcast to SSE subscribers."""
+    """Read traces from the queue and broadcast to SSE subscribers."""
     global _trace_buffer
 
     # Restore history from disk at startup
@@ -261,19 +329,6 @@ async def sniffer_consumer() -> None:
         except asyncio.CancelledError:
             logger.info("RTSS consumer shutting down")
             return
-
-        # Find existing entry in buffer (update_trace path) or append new one
-        existing_idx = next((i for i, t in enumerate(_trace_buffer) if t.id == trace.id), None)
-        if existing_idx is not None:
-            _trace_buffer[existing_idx] = trace
-        else:
-            _trace_buffer.append(trace)
-            if len(_trace_buffer) > _BUFFER_MAX:
-                _trace_buffer.pop(0)
-
-        # Persist to disk without blocking the event loop
-        snapshot = list(_trace_buffer)
-        asyncio.create_task(asyncio.to_thread(_save_history_sync, snapshot))
 
         # Broadcast to all subscribers
         async with _subscribers_lock:
