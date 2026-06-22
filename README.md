@@ -4,7 +4,7 @@ A local-first RAG security layer that validates query-to-corpus geometric alignm
 
 Built for sovereign AI deployments where data never leaves the machine.
 
-> **Version:** v2.15.0 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama + llama3.1 | **DB:** LanceDB
+> **Version:** v2.33.1 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama / OpenAI / Anthropic / Google / Groq | **DB:** LanceDB
 
 ---
 
@@ -87,9 +87,11 @@ In **positive mode**, the corpus defines what's allowed — queries must be simi
 
 | Dependency | Version | Purpose |
 |-----------|---------|---------|
-| **Python** | 3.10+ | Backend (FastAPI, embeddings, vector math) |
-| **Node.js** | 20+ | Frontend (React 19, Vite) |
-| **Ollama** | Latest | Local LLM inference |
+| **Python** | 3.14+ | Backend (FastAPI, embeddings, vector math). Managed by `uv` — no manual venv needed. |
+| **uv** | Latest | Backend toolchain (dependencies, venv, execution). Source of truth: `backend/pyproject.toml`. |
+| **Node.js** | 20+ | Frontend runtime (React 19, Vite). |
+| **pnpm** | 9+ | Frontend package manager. Source of truth: `frontend/pnpm-lock.yaml`. |
+| **Ollama** | Latest | Default local LLM provider (optional if you point at a cloud provider). |
 | **Git** | Any | Clone the repository |
 
 Ollama must have the `llama3.1` model pulled:
@@ -112,12 +114,10 @@ cd semantic-firewall
 
 ```bash
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate        # Linux/macOS
-# .venv\Scripts\activate         # Windows
-
-pip install -r requirements.txt
+uv sync
 ```
+
+`uv sync` reads `pyproject.toml`, resolves the locked dependency set from `uv.lock`, and creates the `.venv` automatically. There is no manual virtual-environment activation and no `pip install` — every command runs through `uv run`. (`requirements.txt` is kept as a generated artifact for non-`uv` consumers, not as the source of truth.)
 
 > **First run note:** The `BAAI/bge-m3` model (~2.3 GB) will be automatically downloaded by HuggingFace on first boot. This is a one-time operation.
 
@@ -125,7 +125,7 @@ pip install -r requirements.txt
 
 ```bash
 cd ../frontend
-npm install
+pnpm install
 ```
 
 ### 4. Make scripts executable (macOS/Linux)
@@ -195,8 +195,8 @@ fetch(`${API_BASE_URL}/chat`, ...)
 ```
 
 Vite injects `VITE_API_BASE_URL` at **build time** (not runtime). This means:
-- During `npm run dev`, Vite reads the root `.env` and replaces the variable in-memory.
-- During `npm run build`, the value is baked into the compiled JS bundle.
+- During `pnpm run dev`, Vite reads the root `.env` and replaces the variable in-memory.
+- During `pnpm run build`, the value is baked into the compiled JS bundle.
 - If the variable is not set, the fallback `http://localhost:8000` is used automatically.
 
 To point the frontend at a different backend (e.g., production), just set the variable in `.env` before building:
@@ -230,14 +230,13 @@ Interactive menu:
 **Terminal 1 — Backend:**
 ```bash
 cd backend
-source .venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 **Terminal 2 — Frontend:**
 ```bash
 cd frontend
-npm run dev
+pnpm run dev
 ```
 
 **Terminal 3 — Ollama (if not already running):**
@@ -357,9 +356,9 @@ chmod +x run_commander.sh run_server.sh run_ui.sh run_tests.sh run_pack.sh
 | Script | What it does |
 |--------|-------------|
 | `./run_commander.sh` | Interactive TUI menu — launch server, UI, tests, or Ollama from a single terminal. |
-| `./run_server.sh` | Kills any process on port 8000, activates the backend venv, starts uvicorn with hot-reload. |
-| `./run_ui.sh` | Starts the Vite dev server (`npm run dev`) from the `frontend/` directory. |
-| `./run_tests.sh` | Activates the backend venv and runs the full pytest suite (`pytest -v perform_tests.py`). |
+| `./run_server.sh` | Kills any process on port 8000, then starts uvicorn via `uv run` (no manual venv activation). |
+| `./run_ui.sh` | Starts the Vite dev server (`pnpm run dev`) from the `frontend/` directory. |
+| `./run_tests.sh` | Runs the full pytest suite via `uv run pytest -v tests/`. |
 | `./run_pack.sh` | Bundles the entire project source into a single `context.txt` file (for sharing or review). |
 
 ### Commander TUI (`run_commander.sh`)
@@ -390,7 +389,7 @@ Each option runs the corresponding script. After execution, press Enter to retur
 
 ### Unit Tests
 
-Run the full test suite (29 tests):
+Run the full test suite (52 tests):
 
 ```bash
 ./run_tests.sh
@@ -400,11 +399,10 @@ Or manually:
 
 ```bash
 cd backend
-source .venv/bin/activate
-pytest -v perform_tests.py
+uv run pytest -v tests/
 ```
 
-The suite validates:
+The suite is partitioned across `tests/test_engine.py` (pure firewall math), `tests/test_api.py` (HTTP endpoints via `TestClient`), and `tests/test_security.py` (hardening), with shared fixtures in `tests/conftest.py`. It is deterministic and does **not** require a live LLM provider — the provider interface is stubbed via the `mock_llm_stream` fixture. It validates:
 
 | Category | Tests |
 |----------|-------|
@@ -413,7 +411,7 @@ The suite validates:
 | **Configuration** | Immutability, duplicate order rejection, range validation, adaptive factor, RAG top-k |
 | **Engine (unit)** | Segmentation, overflow chunking, clause evaluation pass/breach |
 | **Security** | Prompt length limits, API key enforcement |
-| **Proxy** | OpenAI v1 spec compliance, firewall interception on proxy, SSE streaming |
+| **Proxy** | OpenAI v1 spec compliance, firewall interception on proxy, SSE streaming, graceful upstream-failure handling |
 | **Health** | Health check endpoint response shape |
 
 ### Load Testing
@@ -426,8 +424,7 @@ An async load test suite extracts hard performance metrics under concurrent load
 
 # Terminal 2 — run the load tests
 cd backend
-source .venv/bin/activate
-python tests/load_test_suite.py
+uv run python tests/load_test_suite.py
 ```
 
 | Option | Default | Description |
@@ -444,8 +441,7 @@ Measures how LanceDB retrieval and firewall evaluation scale as the vector store
 
 ```bash
 cd backend
-source .venv/bin/activate
-python tests/db_stress_suite.py
+uv run python tests/db_stress_suite.py
 ```
 
 | Option | Default | Description |
@@ -472,13 +468,19 @@ semantic-firewall/
 ├── run_tests.sh                  # Test runner script
 ├── run_pack.sh                   # Source code bundler (generates context.txt)
 ├── semantic_guardtrails_packager.py  # Packager logic used by run_pack.sh
-├── manifest.json                 # Feature flags and state schema
+├── manifest.json                 # Feature flags and state schema (version ledger)
 ├── architecture_spec.md          # Detailed technical specification
+├── CONTEXT.md                    # Domain glossary (ubiquitous language)
 │
 ├── backend/
-│   ├── requirements.txt          # Python dependencies (pinned)
-│   ├── perform_tests.py          # Pytest test suite (29 tests)
+│   ├── pyproject.toml            # Dependency source of truth ([project]) + pytest config
+│   ├── uv.lock                   # Locked dependency set (uv)
+│   ├── requirements.txt          # Generated artifact (uv pip compile) — not the source of truth
 │   ├── tests/
+│   │   ├── conftest.py           # Shared fixtures (TestClient, mock_llm_stream, config reset)
+│   │   ├── test_engine.py        # Engine unit tests (pure firewall math)
+│   │   ├── test_api.py           # HTTP endpoint tests via TestClient
+│   │   ├── test_security.py      # Security hardening tests
 │   │   ├── load_test_suite.py    # Async load testing (latency, RPS, error rate)
 │   │   └── db_stress_suite.py    # DB saturation test (retrieval scaling)
 │   └── app/
@@ -487,19 +489,23 @@ semantic-firewall/
 │       │   ├── models.py         # Pydantic schemas (ConfigState, etc.)
 │       │   ├── state.py          # Global config singleton + lock
 │       │   ├── firewall.py       # SemanticFirewall engine (pure math)
+│       │   ├── logging_config.py # Rotating logger setup
 │       │   └── settings.py       # Environment-driven settings
 │       ├── api/
-│       │   └── routes.py         # HTTP routes (thin FastAPI layer)
+│       │   ├── router_main.py    # Aggregates the endpoint routers
+│       │   └── endpoints/        # Decomposed routers: chat, config, corpus, system, _shared
 │       └── modules/
 │           ├── embedder.py       # BGE-M3 embedding singleton
 │           ├── storage.py        # LanceDB vector store
 │           ├── ingestor.py       # PDF chunking pipeline
-│           └── providers/
-│               ├── base.py       # BaseProvider ABC (stream_chat interface)
-│               └── ollama.py     # OllamaProvider (Ollama → OpenAI SSE mapping)
+│           ├── sniffer.py        # Real-Time Semantic Sniffer (RTSS) + trace persistence
+│           ├── persistence.py    # Chat history persistence
+│           ├── profiles.py       # Config profile save/load
+│           └── providers/        # base.py (ABC) + ollama, openai, anthropic, google, groq
 │
 └── frontend/
     ├── package.json
+    ├── pnpm-lock.yaml
     └── src/
         ├── App.tsx               # Main layout + ErrorBoundary wrappers
         ├── config.ts             # Centralized API URL (env-driven)
@@ -598,7 +604,7 @@ Security hardening measures applied to the application infrastructure:
 7. **SQL Injection Prevention** — Filename whitelist regex + quote escaping on all storage layer queries.
 8. **Structured Logging** — All modules use Python `logging` with severity levels. Client-facing error messages are generic (no stack traces or internal URLs leaked).
 9. **Fail-Fast Configuration** — `pydantic-settings` validates all env vars at boot. Invalid types or out-of-range values crash the app immediately. `FIREWALL_API_KEY` uses `SecretStr` to prevent accidental exposure in logs. Startup warning logged when API key is not configured.
-10. **Repository Hygiene** — `.env` is excluded via root `.gitignore` to prevent accidental secret commits.
+10. **Repository Hygiene** — `.env`, runtime interception data (`backend/data/*.json`), logs (`backend/logs/`), the vector store (`lancedb_data/`), and the generated source bundle (`context.txt`) are all excluded via root `.gitignore`. No intercepted prompts, responses, or secrets are tracked in git.
 11. **Security Headers** — All responses include `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'`, `Referrer-Policy`, `Permissions-Policy`, and `Strict-Transport-Security` (HSTS, 2-year max-age).
 12. **DoS Mitigation** — Concurrent PDF ingestion capped at 3 threads via semaphore. Ollama streaming has a 300-second read timeout. Upload size enforced during chunked read (before full allocation).
 13. **Data Integrity** — Storage ID generation is serialized via `threading.Lock` to prevent duplicate IDs from concurrent uploads.

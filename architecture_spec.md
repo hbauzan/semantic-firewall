@@ -178,7 +178,7 @@ No internal state (embedder status, corpus size) is exposed. This is the only en
 `main.py` reads `HOST`, `PORT`, and `RELOAD` from environment variables. `reload=True` is the default for development; production deployments should set `RELOAD=false`. Structured logging (`logging.basicConfig`) is initialized at app startup with `INFO` level.
 
 ### 7.8 Dependency Pinning
-`requirements.txt` pins all production dependencies to exact versions (e.g. `fastapi==0.135.1`). This prevents silent breakage from upstream updates — particularly critical for `sentence-transformers` and `torch`, where version changes can alter embedding output and invalidate the entire corpus index.
+Backend dependencies are managed by `uv`. The source of truth is `backend/pyproject.toml` (the `[project]` table) with the exact resolved set locked in `backend/uv.lock`; pins target exact versions (e.g. `fastapi==0.135.1`). `requirements.txt` is retained only as a generated artifact (`uv pip compile pyproject.toml -o requirements.txt`) for consumers that cannot use `uv`, and must not be hand-edited. Exact pinning prevents silent breakage from upstream updates — particularly critical for `sentence-transformers` and `torch`, where version changes can alter embedding output and invalidate the entire corpus index. Target runtime: Python >= 3.14.
 
 ### 7.9 Rate Limiting
 Per-IP rate limiting is enforced via `slowapi` (a FastAPI-compatible wrapper around `limits`). Three configurable tiers:
@@ -479,15 +479,16 @@ On the frontend, `App.tsx` hydrates the Zustand store on mount by polling `GET /
 
 ```
 backend/
-└── data/
-    ├── _last_used.json          # Auto-saved on every config change
-    ├── sniffer_history.json     # RTSS buffer — last 1000 traces
-    ├── chat_history.json        # Unified chat message persistence (max 100)
-    ├── production.json          # Example user profile
-    └── dev_strict.json          # Example user profile
+├── data/
+│   ├── _last_used.json          # Auto-saved on every config change
+│   ├── sniffer_history.json     # RTSS buffer — last 1000 traces
+│   ├── chat_history.json        # Unified chat message persistence (max 100)
+│   └── <name>.json              # User-saved config profiles (created via the API)
+└── logs/
+    └── firewall.log[.YYYY-MM-DD] # Rotating daily logs, 30-day retention
 ```
 
-All `*.json` files in `data/` are excluded from version control (`.gitignore`). The directory itself is created at import time by `DATA_DIR.mkdir(exist_ok=True)` in both `profiles.py` and `sniffer.py`.
+All of the above are **runtime-generated and untracked**: `backend/data/*.json` and `backend/logs/` are excluded from version control via the root `.gitignore`, so no intercepted prompts, responses, chat history, or logs ever enter git. The `data/` directory is created at import time by `DATA_DIR.mkdir(exist_ok=True)` in both `profiles.py` and `sniffer.py`; config profiles are written on demand by `ProfileManager`, not shipped with the repo.
 
 ### 11.9 Mode-Aware Auto-Calibration (Non-Intrusive)
 

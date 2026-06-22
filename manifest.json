@@ -158,7 +158,14 @@
         "atomic_persistence_lock": true,
         "proxy_history_parity": true,
         "reentrant_persistence_lock": true,
-        "sniffer_type_strictness": true
+        "sniffer_type_strictness": true,
+        "uv_toolchain_migration": true,
+        "pnpm_package_manager_migration": true,
+        "pyproject_dependency_source_of_truth": true,
+        "deterministic_test_provider_mock": true,
+        "graceful_upstream_failure_no_reraise": true,
+        "private_data_gitignore_hardening": true,
+        "doc_sync_uv_pnpm_alignment": true
     },
     "state_schema": {
         "excitation_threshold": {
