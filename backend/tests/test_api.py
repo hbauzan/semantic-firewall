@@ -492,6 +492,119 @@ def test_sniffer_persistence():
             sniffer_mod.HISTORY_FILE = original_history_file
 
 
+def test_system_logs_export_ndjson():
+    """Verify that GET /system/logs/export returns flat NDJSON structured events."""
+    from app.modules.sniffer import emit_trace, sniffer_queue, _trace_buffer
+    
+    while not sniffer_queue.empty():
+        try:
+            sniffer_queue.get_nowait()
+        except Exception:
+            break
+    
+    original_buffer = list(_trace_buffer)
+    _trace_buffer.clear()
+    
+    try:
+        tid = emit_trace(
+            model="test-export-model",
+            last_message="Hello, this is a SIEM test",
+            decision="PASS",
+            pipeline_trace=[
+                {"stage": "noise", "passed": True, "entropy": 8.5, "limit": 4.5},
+                {"stage": "cosine", "passed": True, "cosine_sim": 0.75, "cosine_threshold": 0.5},
+                {"stage": "excitation", "passed": True, "activations": 100, "threshold": 80}
+            ],
+            status="COMPLETED"
+        )
+
+        
+        response = client.get("/system/logs/export")
+        assert response.status_code == 200
+        assert "application/x-ndjson" in response.headers["content-type"]
+        
+        lines = [line.strip() for line in response.text.split("\n") if line.strip()]
+        assert len(lines) == 1
+        
+        event = json.loads(lines[0])
+        assert event["schema_version"] == "1.0.0"
+        assert event["trace_id"] == tid
+        assert event["status"] == "COMPLETED"
+        assert event["model"] == "test-export-model"
+        assert event["decision"] == "PASS"
+        assert event["last_message"] == "Hello, this is a SIEM test"
+        
+        assert event["noise_passed"] is True
+        assert event["noise_value"] == 8.5
+        assert event["noise_threshold"] == 4.5
+        assert event["cosine_passed"] is True
+        assert event["cosine_value"] == 0.75
+        assert event["cosine_threshold"] == 0.5
+        assert event["excitation_passed"] is True
+        assert event["excitation_value"] == 100
+        assert event["excitation_threshold"] == 80
+        assert event["no_context_passed"] is None
+    finally:
+        _trace_buffer[:] = original_buffer
+
+
+@pytest.mark.asyncio
+async def test_upstream_error_mapped_to_trace_status_error(monkeypatch):
+    """Verify that upstream LLM errors update trace status to ERROR in proxy stream."""
+    from app.modules.sniffer import sniffer_queue, _trace_buffer
+    from app.modules.providers.ollama import OllamaProvider
+    
+    set_config(
+        excitation_threshold=0, noise_tolerance=1.0, cosine_threshold=0.0,
+        global_noise_limit=0.0,
+        noise_enabled=True, cosine_enabled=False, excitation_enabled=False
+    )
+    
+    async def mock_stream_error(*args, **kwargs):
+        raise RuntimeError("Mock connection error")
+        yield "data: {}\n\n"
+        
+    monkeypatch.setattr(OllamaProvider, "stream_chat", mock_stream_error)
+    
+    while not sniffer_queue.empty():
+        try:
+            sniffer_queue.get_nowait()
+        except Exception:
+            break
+            
+    original_buffer = list(_trace_buffer)
+    _trace_buffer.clear()
+    
+    try:
+        payload = {
+            "model": "llama3.1",
+            "messages": [{"role": "user", "content": "Hello"}],
+            "stream": True
+        }
+        
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+            async with ac.stream("POST", "/v1/chat/completions", json=payload) as response:
+                assert response.status_code == 200
+                content = ""
+                async for chunk in response.aiter_text():
+                    content += chunk
+                
+                assert "Mock connection error" in content
+                
+        import asyncio
+        for _ in range(20):
+            if any(t.status == "ERROR" for t in _trace_buffer):
+                break
+            await asyncio.sleep(0.1)
+            
+        error_traces = [t for t in _trace_buffer if t.status == "ERROR"]
+        assert len(error_traces) >= 1
+        assert "Mock connection error" in error_traces[0].response_content
+        
+    finally:
+        _trace_buffer[:] = original_buffer
+
+
 # --- Auto-Calibration Tests ---
 
 def test_auto_calibration_negative_mode():
