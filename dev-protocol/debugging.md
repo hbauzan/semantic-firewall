@@ -21,6 +21,7 @@ Everything else is mechanical. If you have a tight, pass/fail signal that goes r
 
 ### 1.2. Tighten and Verify
 - **Tighten the loop**: Make it fast (seconds, not minutes), deterministic (pin time/RNG, isolate network), and sharp (assert on the symptom, not just "didn't crash").
+- **LLM determinism**: When the bug is in a model-touching path, remove the model as a variable first. Mock/stub the provider interface or replay a recorded response; if a live model is unavoidable, pin `temperature=0` and a fixed seed. A loop whose redness depends on sampling noise is not red-capable. See [README.md](./README.md) §3.2.
 - **Phase 1 Completion Criterion**: You must establish **one command** that runs unattended, is fast, deterministic, and **red-capable** (successfully triggers and catches this exact bug).
 - **Prohibited action**: Do not jump to hypotheses or read code to build a theory before this command exists. No red-capable command, no Phase 2.
 

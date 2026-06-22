@@ -24,6 +24,7 @@ Do not substitute generic terms (like "component," "service," "API," or "boundar
 - **The Deletion Test**: If you delete the module and the complexity vanishes, it was a pass-through (shallow). If the complexity reappears across N callers, it was earning its keep (deep).
 - **The interface is the test surface**: Callers and tests cross the same seam. If you need to test past the interface, the module is probably the wrong shape.
 - **One adapter = hypothetical seam; Two adapters = real seam**: Don't introduce interfaces or seams unless something actually varies across them.
+  - *Canonical LLM example*: a **local** model backend and a **remote** API are two adapters behind one provider interface — that is a real seam, so the abstraction earns its keep. A single provider with no alternative does not (yet) justify one. See [README.md](./README.md) §3.2.
 - **Design for Testability**:
   1. *Accept dependencies, don't create them* (pass collaborators in).
   2. *Return results, don't produce side effects* where possible (pure computations).
