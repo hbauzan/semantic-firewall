@@ -1,6 +1,4 @@
 #!/bin/bash
 cd backend
-if [ -d ".venv" ]; then
-    source .venv/bin/activate
-fi
-pytest -v tests/
+# Tooling: uv (dev-protocol §3.1). No manual venv activation.
+uv run pytest -v tests/
