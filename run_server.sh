@@ -3,10 +3,6 @@
 lsof -ti:8000 | xargs kill -9 2>/dev/null
 
 cd backend
-# Activate venv if it exists, else skip
-if [ -d ".venv" ]; then
-    source .venv/bin/activate
-fi
-
+# Tooling: uv (dev-protocol §3.1). No manual venv activation.
 # Let settings.py handle host/port/reload from .env
-python -m app.main
+uv run python -m app.main
