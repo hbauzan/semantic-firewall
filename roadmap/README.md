@@ -6,7 +6,7 @@
 
 | Archivo | Contenido |
 | :--- | :--- |
-| **[`../roadmap.md`](../roadmap.md)** | **Activo ahora:** lista de tareas del momento. |
+| **[`../roadmap.md`](../roadmap.md)** | **Activo ahora:** benchmark suite / validación geométrica (Youden). |
 | **[`../roadmap-backlog.md`](../roadmap-backlog.md)** | Diferido: etapas 3–9, niveles 2–3, opciones B (sesión corpus) y C (caché provider). Opción A hecha. |
 
 ---
@@ -32,7 +32,7 @@ repo root
 - **Etapas 1 y 2:** hechas (estabilización, tooling `uv`/`pnpm`, logging NDJSON).
 - **Opción A (RAG rico):** hecha (`rag_top_k` 12/32, multi-cláusula, telemetría).
 - **Siguiente producto:** etapa 3 UX (ver backlog), salvo que B se priorice por dolor de corpus.
-- **Tareas del momento:** [`roadmap.md`](../roadmap.md).
+- **Tareas del momento:** [`roadmap.md`](../roadmap.md) — harness offline de benchmark (AdvBench + sweep Youden).
 
 Visión y claims: [`00-vision-y-niveles.md`](./00-vision-y-niveles.md).  
 Secuencia Nivel 1: [`nivel-1/README.md`](./nivel-1/README.md).
