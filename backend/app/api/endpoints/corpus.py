@@ -13,7 +13,11 @@ from slowapi.util import get_remote_address
 from app.modules.ingestor import process_pdf_async, get_task_status
 from app.modules.storage import storage
 from app.modules.profiles import ProfileManager
-from app.modules.corpus_calibration import calibrate_positive_for_pack, CalibrationError
+from app.modules.corpus_calibration import (
+    calibrate_positive_for_pack,
+    calibratable_filenames,
+    CalibrationError,
+)
 from app.core.models import ConfigState
 from app.core.state import _config_lock
 from app.core.settings import settings
@@ -69,7 +73,14 @@ async def task_status(task_id: str):
 
 @router.get("/corpus/packs", dependencies=[Depends(verify_api_key)])
 def list_packs():
-    return {"packs": storage.get_summary()}
+    calibratable = calibratable_filenames()
+    packs = []
+    for pack in storage.get_summary():
+        packs.append({
+            **pack,
+            "calibratable": pack["filename"] in calibratable,
+        })
+    return {"packs": packs, "calibratable_corpora": sorted(calibratable)}
 
 @router.delete("/corpus/packs/{filename}", dependencies=[Depends(verify_api_key)])
 def delete_pack(filename: str):

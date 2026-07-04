@@ -33,6 +33,30 @@ def test_calibrate_pack_not_loaded():
     assert res.status_code == 404
 
 
+def test_list_packs_reports_calibratable_corpora():
+    res = client.get("/corpus/packs")
+    assert res.status_code == 200
+    data = res.json()
+    assert "calibratable_corpora" in data
+    assert "automotive_maintenance.pdf" in data["calibratable_corpora"]
+    assert "medical_hypertension.pdf" in data["calibratable_corpora"]
+    for pack in data["packs"]:
+        assert "calibratable" in pack
+
+
+def test_calibrate_missing_dataset_detail(monkeypatch):
+    from app.modules import corpus_calibration
+
+    monkeypatch.setattr(
+        corpus_calibration.storage,
+        "get_summary",
+        lambda: [{"filename": "random_manual.pdf"}],
+    )
+    res = client.post("/corpus/packs/random_manual.pdf/calibrate-positive")
+    assert res.status_code == 404
+    assert "Cal is only available for" in res.json()["detail"]
+
+
 def test_dimensional_excitation_math():
     set_config(excitation_threshold=150, noise_tolerance=0.005)
     res = client.post("/audit", json={"query": "Safe hello world"})

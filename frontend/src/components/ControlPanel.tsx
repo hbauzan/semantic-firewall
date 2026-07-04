@@ -5,6 +5,7 @@ import { TOOLTIP_REGISTRY, type TooltipEntry } from '../locales/tooltips';
 import { NEGATIVE_RECOMMENDED, POSITIVE_RECOMMENDED, THRESHOLD_SLIDERS } from '../thresholdBounds';
 import { useBackendHealth } from '../hooks/useBackendHealth';
 import { TaskProgressBar } from './TaskProgressBar';
+import { parseApiError } from '../lib/parseApiError';
 import '../styles/ControlPanel.css';
 
 // Reusable slider with - / + step buttons
@@ -55,7 +56,8 @@ export const ControlPanel: React.FC = () => {
 
   useBackendHealth();
 
-  const [packs, setPacks] = useState<{ filename: string, chunks: number }[]>([]);
+  const [packs, setPacks] = useState<{ filename: string; chunks: number; calibratable?: boolean }[]>([]);
+  const [calibratableCorpora, setCalibratableCorpora] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Profile state ---
@@ -138,6 +140,7 @@ export const ControlPanel: React.FC = () => {
       }
       const data = await res.json();
       setPacks(data.packs || []);
+      setCalibratableCorpora(data.calibratable_corpora || []);
     } catch (err) {
       console.error("Failed to fetch packs:", err);
     }
@@ -295,7 +298,7 @@ export const ControlPanel: React.FC = () => {
       });
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`Upload failed (${res.status}): ${errText}`);
+        throw new Error(parseApiError(errText));
       }
       const data = await res.json();
       setIngestionStatus({ taskId: data.task_id, status: 'pending', progress: 0, message: 'Upload started…' });
@@ -338,7 +341,7 @@ export const ControlPanel: React.FC = () => {
       );
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(errText);
+        throw new Error(parseApiError(errText));
       }
       const data = await res.json();
       applyConfigToStore(data.config);
@@ -628,15 +631,24 @@ export const ControlPanel: React.FC = () => {
               <div key={p.filename} className="pack-item">
                 <span className="pack-name" title={p.filename}>{p.filename} ({p.chunks})</span>
                 <div className="pack-actions">
-                  <button
-                    type="button"
-                    onClick={() => handleCalibratePack(p.filename)}
-                    className="pack-calibrate-btn"
-                    disabled={calibratingPack !== null || activeTask?.kind === 'upload'}
-                    title="Calibrate thresholds for positive mode (labeled dataset required)"
-                  >
-                    {calibratingPack === p.filename ? '…' : 'Cal'}
-                  </button>
+                  {p.calibratable ? (
+                    <button
+                      type="button"
+                      onClick={() => handleCalibratePack(p.filename)}
+                      className="pack-calibrate-btn"
+                      disabled={calibratingPack !== null || activeTask?.kind === 'upload'}
+                      title="Calibrate thresholds for positive mode (labeled dataset)"
+                    >
+                      {calibratingPack === p.filename ? '…' : 'Cal'}
+                    </button>
+                  ) : (
+                    <span
+                      className="pack-cal-na"
+                      title={`No calibration dataset for this PDF. Cal works for: ${calibratableCorpora.join(', ') || 'none'}`}
+                    >
+                      Cal N/A
+                    </span>
+                  )}
                   <button type="button" onClick={() => handleDeletePack(p.filename)} className="pack-delete-btn">X</button>
                 </div>
               </div>
