@@ -1,5 +1,7 @@
 # Etapa 5 — Automatización de calibración
 
+> **Estado: pendiente** (después del checkpoint de la Etapa 4).
+
 > Objetivo: un harness que, dado un corpus, **encuentre la mejor calibración de thresholds** y mida cómo se comporta el firewall. Acá empieza la parte de investigación — el corazón del valor.
 
 ---

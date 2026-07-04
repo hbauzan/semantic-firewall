@@ -1,5 +1,7 @@
 # Etapa 9 — Plan de lanzamiento
 
+> **Estado: pendiente** (después del checkpoint de la Etapa 8).
+
 > Objetivo: convertir la evidencia en un **artefacto público que trabaja solo** y publicarlo en una secuencia adaptada a tu realidad (solo, sin red de contactos, energía intermitente). El artefacto hace el trabajo; vos no tenés que hacer networking.
 
 ---

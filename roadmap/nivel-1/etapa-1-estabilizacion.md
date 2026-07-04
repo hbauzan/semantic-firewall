@@ -1,5 +1,7 @@
 # Etapa 1 — Estabilización e higiene de repo
 
+> **Estado: HECHA** (cerrada en el ciclo de estabilización; higiene extra de árbol de trabajo en 2026-07-04).
+
 > Objetivo: dejar el sistema andando sin crashes sobre un entorno único y limpio (`uv` + `pnpm`), y el repo **seguro para mostrar**. Antes de pulir nada, en este orden: **frenar la fuga de datos privados**, establecer el entorno, y recién después diagnosticar y arreglar.
 
 > **Autoridad de tooling:** todo lo de Python va con `uv run` (nunca `pip`, nunca `source .venv`). Todo lo de frontend con `pnpm`. Lo manda `dev-protocol.md` en la raíz del repo. Léelo si tenés dudas.
@@ -12,17 +14,15 @@ Si esto crashea en un demo, perdés credibilidad en 30 segundos. Pero peor que u
 
 ---
 
-## Hallazgos concretos ya verificados (no asumas, esto está confirmado)
+## Hallazgos originales (diagnóstico al abrir la etapa — ya resueltos)
 
-1. **🔴 DATOS PRIVADOS TRACKEADOS EN GIT.** `backend/data/_last_used.json`, `sniffer_history.json`, `history_benchmark.json` están versionados. Contienen prompts y respuestas interceptados. El `architecture_spec.md` §11.8 **afirma** que todos los `*.json` de `data/` están en `.gitignore` — **es falso, no lo están**. Además existe el commit `decb393 "DATA PRIVADA - ELIMINAR antes de publicar"`: hay datos en el **historial**, no solo en el working tree.
+> Snapshot histórico. No describe el repo actual; los bloques A–E abajo los cerraron.
 
-2. **Tooling NO migrado a `uv`/`pnpm` (lo exige `dev-protocol.md`).** El backend tiene `requirements.txt` + `.venv` + un `pyproject.toml` que **solo** configura pytest (sin tabla `[project]`, sin dependencias, sin `uv.lock`). El frontend sigue en npm (`package-lock.json`, no hay `pnpm-lock.yaml`). El protocolo manda `uv` (backend) y `pnpm` (frontend) como única fuente de verdad. **La vieja duda `.venv` vs `sg_env` desaparece**: con `uv` no hay activación manual de venv.
-
-3. **Doc drift en el README.** Menciona `pytest -v perform_tests.py` con "29 tests". Ese archivo **no existe**. La suite real está partida en `backend/tests/test_engine.py`, `test_security.py`, `test_api.py` (+ `conftest.py`). También usa comandos `npm` y venv que ya no aplican.
-
-4. **Doc-sync incompleto.** `dev-protocol.md` §4 nombra `CONTEXT.md` como asset de regeneración del codebase, pero el repo tiene `context.txt` (generado por `run_pack.sh`). Hay que reconciliar nombre y propósito.
-
-5. **Working tree sucio.** Hay cambios sin commitear (chat.py, manifest.json, logs, package-lock). Hay que ordenar antes de seguir.
+1. **Datos privados trackeados en git** (`backend/data/*.json`, historial). → Resuelto: gitignore + `git rm --cached` + limpieza de historial.
+2. **Tooling no migrado** (venv/npm). → Resuelto: `uv` + `pnpm`, lockfiles, scripts con `uv run` / `pnpm`.
+3. **Doc drift en el README** (`perform_tests.py`, npm/venv). → Resuelto: README y suite en `backend/tests/`.
+4. **`CONTEXT.md` vs `context.txt`.** → Resuelto: `CONTEXT.md` = glosario de dominio; `context.txt` = bundle generado por `./run_pack.sh` (gitignored).
+5. **Working tree sucio.** → Resuelto al cerrar la etapa (y de nuevo en la higiene extra de 2026-07-04).
 
 ---
 
@@ -69,7 +69,14 @@ Sobre la historia ya limpia, dejar un único camino de ejecución antes de diagn
 - [x] README, spec, manifest y CONTEXT reflejan la realidad (tooling, comandos, gitignore).
 - [x] Working tree limpio, historial con commits chicos y nombrados.
 
+### Higiene extra (post-cierre, 2026-07-04)
+No era bloque de la etapa original; quedó hecha al retomar el trabajo:
+- [x] Exports de chats (Gemini/Claude), zip, sellos `.ots`, planes/marketing históricos fuera del árbol de trabajo (`_archive/` local, gitignored).
+- [x] `manifest.json` slim (`project` / `version` / `state_schema` / `constraints`); historial de capacidades en `CHANGELOG.md`.
+- [x] `./run_pack.sh` genera `context.txt` (briefing + docs centrales + runtime) para handoff a un LLM externo.
+
 ---
+
 
 ## Trampas
 - **La limpieza de historial es irreversible y va primero.** Cloná o rama de prueba antes. Si ya hay un remoto, coordiná el force-push con cuidado. No la dejes para después: cada commit que agregues mientras tanto la complica.

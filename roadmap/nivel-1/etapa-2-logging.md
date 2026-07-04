@@ -1,5 +1,7 @@
 # Etapa 2 — Logging y trazas confiables
 
+> **Estado: HECHA.**
+
 > Objetivo: que las trazas del firewall sean completas, confiables y **exportables a un formato estándar** que después se pueda enchufar a Graylog, Datadog u otro SIEM. La auditabilidad es tu argumento de venta — tiene que ser real, no decorativa.
 
 ---

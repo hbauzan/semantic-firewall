@@ -1,5 +1,7 @@
 # Etapa 4 — ⛔ CHECKPOINT: testeo
 
+> **Estado: pendiente.** Se ejecuta **después** de cerrar la Etapa 3. Los ítems de higiene/logging de abajo ya se cumplieron en etapas 1–2, pero en este checkpoint hay que **reconfirmarlos hoy**, no asumirlos.
+
 > Esto NO es opcional. Es un parate deliberado para decidir si seguís derecho o corregís rumbo. Saltearlo es deployar a producción sin mirar los logs.
 
 ---

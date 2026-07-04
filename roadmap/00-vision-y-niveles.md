@@ -31,7 +31,7 @@ Esto es lo que ninguna otra herramienta hace así. Llama Guard **clasifica** cat
 ## Los tres niveles
 
 ### Nivel 1 — Sólido, cercano, lanzable. **ES EL FOCO.**
-Firewall de allowlist geométrico, local, auditable, provider-agnóstico, contra cualquier LLM al que controles la entrada. **Ya existe y anda.** El roadmap entero del `nivel-1/` es esto: estabilizarlo, instrumentarlo, medirlo contra un baseline, y publicarlo bien.
+Firewall de allowlist geométrico, local, auditable, provider-agnóstico, contra cualquier LLM al que controles la entrada. **Ya existe y anda.** Estabilización e instrumentación de trazas (etapas 1–2) están hechas; sigue UX, evidencia, baseline y publicación (etapas 3–9). Detalle en `nivel-1/`.
 
 **Claim primario para el lanzamiento:** *allowlist por dominio del corpus* (modo positivo). "Mi RAG responde SOLO sobre mi dominio; todo intento de salirse queda bloqueado y loggeado con un score geométrico duro." Es la afirmación más diferenciada y la que más le habla a un CISO / compliance.
 

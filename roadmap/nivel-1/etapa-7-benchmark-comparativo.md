@@ -1,5 +1,7 @@
 # Etapa 7 — Benchmark comparativo
 
+> **Estado: pendiente** (después de la Etapa 6).
+
 > Objetivo: correr el **mismo dataset** por al menos un baseline reconocido y poner los números lado a lado. Sin comparación, tus números no significan nada — esto es lo que faltaba en tu plan original y es lo que hace creíble el claim.
 
 ---
