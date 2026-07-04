@@ -359,7 +359,7 @@ chmod +x run_commander.sh run_server.sh run_ui.sh run_tests.sh run_pack.sh
 | `./run_server.sh` | Kills any process on port 8000, then starts uvicorn via `uv run` (no manual venv activation). |
 | `./run_ui.sh` | Starts the Vite dev server (`pnpm run dev`) from the `frontend/` directory. |
 | `./run_tests.sh` | Runs the full pytest suite via `uv run pytest -v tests/`. |
-| `./run_pack.sh` | Bundles the entire project source into a single `context.txt` file (for sharing or review). |
+| `./run_pack.sh` | Builds `context.txt` (gitignored): briefing + central docs + runtime source for handoff to an external LLM/agent. Use `--all` to include `roadmap/`. |
 
 ### Commander TUI (`run_commander.sh`)
 
@@ -466,9 +466,10 @@ semantic-firewall/
 ├── run_server.sh                 # Backend startup script (auto-kills port 8000)
 ├── run_ui.sh                     # Frontend startup script
 ├── run_tests.sh                  # Test runner script
-├── run_pack.sh                   # Source code bundler (generates context.txt)
+├── run_pack.sh                   # Agent handoff bundler (generates context.txt)
 ├── semantic_guardtrails_packager.py  # Packager logic used by run_pack.sh
-├── manifest.json                 # Feature flags and state schema (version ledger)
+├── manifest.json                 # Version + state_schema + constraints (current state)
+├── CHANGELOG.md                  # Notable capabilities and releases
 ├── architecture_spec.md          # Detailed technical specification
 ├── CONTEXT.md                    # Domain glossary (ubiquitous language)
 │
@@ -604,7 +605,7 @@ Security hardening measures applied to the application infrastructure:
 7. **SQL Injection Prevention** — Filename whitelist regex + quote escaping on all storage layer queries.
 8. **Structured Logging** — All modules use Python `logging` with severity levels. Client-facing error messages are generic (no stack traces or internal URLs leaked).
 9. **Fail-Fast Configuration** — `pydantic-settings` validates all env vars at boot. Invalid types or out-of-range values crash the app immediately. `FIREWALL_API_KEY` uses `SecretStr` to prevent accidental exposure in logs. Startup warning logged when API key is not configured.
-10. **Repository Hygiene** — `.env`, runtime interception data (`backend/data/*.json`), logs (`backend/logs/`), the vector store (`lancedb_data/`), and the generated source bundle (`context.txt`) are all excluded via root `.gitignore`. No intercepted prompts, responses, or secrets are tracked in git.
+10. **Repository Hygiene** — `.env`, runtime interception data (`backend/data/*.json`), logs (`backend/logs/`), the vector store (`lancedb_data/`), the local `_archive/` tree, and the generated agent handoff bundle (`context.txt`) are all excluded via root `.gitignore`. No intercepted prompts, responses, or secrets are tracked in git.
 11. **Security Headers** — All responses include `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: frame-ancestors 'none'`, `Referrer-Policy`, `Permissions-Policy`, and `Strict-Transport-Security` (HSTS, 2-year max-age).
 12. **DoS Mitigation** — Concurrent PDF ingestion capped at 3 threads via semaphore. Ollama streaming has a 300-second read timeout. Upload size enforced during chunked read (before full allocation).
 13. **Data Integrity** — Storage ID generation is serialized via `threading.Lock` to prevent duplicate IDs from concurrent uploads.
