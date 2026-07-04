@@ -17,7 +17,7 @@ El `SKILL.md` es un router liviano; los módulos se leen bajo demanda:
 - Debugging (6 fases) → [`debugging.md`](./.claude/skills/dev-protocol/debugging.md).
 - Review de dos ejes + issues → [`qa-review.md`](./.claude/skills/dev-protocol/qa-review.md).
 - Git workflow + pre-commit → [`git-workflow.md`](./.claude/skills/dev-protocol/git-workflow.md).
-- Doc-sync (manifest/spec/CONTEXT, §4) → [`documentation.md`](./.claude/skills/dev-protocol/documentation.md).
+- Doc-sync **condicional** (manifest/CHANGELOG/spec/README/CONTEXT) → [`documentation.md`](./.claude/skills/dev-protocol/documentation.md).
 
 ## Cómo usar / instalar (incluye otros IDEs e IAs)
 

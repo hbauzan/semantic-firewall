@@ -1,6 +1,6 @@
 # CONTEXT — Domain Glossary
 
-> Ubiquitous language for the Three-Headed Semantic Firewall. Definitions are tight: they say what a concept **is**, not how it is implemented. For low-level design see [`architecture_spec.md`](./architecture_spec.md); for the feature/version ledger see [`manifest.json`](./manifest.json).
+> Ubiquitous language for the Three-Headed Semantic Firewall. Definitions are tight: they say what a concept **is**, not how it is implemented. For low-level design see [`architecture_spec.md`](./architecture_spec.md); for current version and config contract see [`manifest.json`](./manifest.json); for notable releases see [`CHANGELOG.md`](./CHANGELOG.md).
 >
 > _Not to be confused with_ `context.txt` — a generated full-source bundle produced by `run_pack.sh` for sharing the codebase with an AI. It is git-ignored and is not part of the domain model.
 

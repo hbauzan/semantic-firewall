@@ -42,5 +42,12 @@ backend/logs/
 .claude/skills/
 skills-lock.json
 
-# Generated
+# Local archive (exports, historical plans, marketing — not part of the working tree)
+_archive/
+
+# Seals / snapshots (not source)
+*.ots
+*.zip
+
+# Generated agent handoff bundle (./run_pack.sh)
 context.txt

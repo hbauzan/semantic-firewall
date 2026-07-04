@@ -1,130 +1,234 @@
-import os
+#!/usr/bin/env python3
+"""Bundle central project context into a single file for external LLMs/agents.
+
+Default (brain + core): briefing header, central docs, runtime source, tests, ops scripts.
+Use --all to also include roadmap/*.md.
+"""
+from __future__ import annotations
+
+import json
 import sys
+from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent
+OUTPUT = ROOT / "context.txt"
 
-# --- Files that matter for understanding the latest changes (FPI evolution) ---
-FOCUS_FILES = [
-    # Backend — RTSS/FPI core (sniffer model + update_trace)
-    "backend/app/modules/sniffer.py",
-    # Backend — Proxy route (stream_wrapper, full message capture)
-    "backend/app/api/routes.py",
-    "backend/app/main.py",
-    # Backend — Provider abstraction (stream_chat wrapped by FPI)
-    "backend/app/modules/providers/base.py",
-    "backend/app/modules/providers/ollama.py",
-    "backend/app/modules/providers/google.py",
-    # Backend — Profiles (named config persistence)
-    "backend/app/modules/profiles.py",
-    # Backend — context (firewall engine, models, state)
-    "backend/app/core/firewall.py",
-    "backend/app/core/models.py",
-    "backend/app/core/state.py",
-    "backend/app/core/settings.py",
-    # Backend — tests (includes FPI reconstruction tests)
-    "backend/perform_tests.py",
-    # Frontend — FPI expandable sniffer UI + Firewall Mode Controls
-    "frontend/src/components/SnifferTab.tsx",
-    "frontend/src/components/ControlPanel.tsx",
-    "frontend/src/App.tsx",
-    "frontend/src/store.ts",
-    "frontend/src/index.css",
-    "frontend/src/config.ts",
-    # Documentation
-    "architecture_spec.md",
+# Central docs — order matters (domain → state → history → LLD → ops)
+DOC_FILES = [
+    "CONTEXT.md",
     "manifest.json",
-    "backend/app/api/endpoints/chat.py",
-    "backend/scripts/augment_corpus.py",
-    "backend/app/api/router_main.py",
-    "backend/app/api/endpoints/config.py",
-    "backend/app/api/endpoints/corpus.py",
-    "backend/app/api/endpoints/system.py",
+    "CHANGELOG.md",
+    "architecture_spec.md",
+    "README.md",
 ]
 
+SKIP_DIR_NAMES = {
+    "_archive",
+    "node_modules",
+    ".venv",
+    "sg_env",
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".next",
+    "lancedb_data",
+    "lancedb_stress_test",
+    "Claude Exports",
+    "Gemini Exports",
+    "logs",
+    "data",
+}
 
-def bundle():
-    all_mode = "--all" in sys.argv
-    output = "context.txt"
-    extensions = (".py", ".tsx", ".ts", ".json", ".md", ".sh")
-    skip_dirs = {"node_modules", ".venv", ".git", "__pycache__", ".next", "Claude Exports", "Gemini Exports"}
+SKIP_FILE_NAMES = {
+    "context.txt",
+    "skills-lock.json",
+}
 
-    # 1. Si existe, lo borramos para generar uno nuevo limpio
-    if os.path.exists(output):
-        os.remove(output)
 
-    # Normalizar focus files a paths absolutos para comparación
-    focus_abs = {os.path.normpath(os.path.join(".", f)) for f in FOCUS_FILES} if not all_mode else None
+def _read_version() -> str:
+    manifest = ROOT / "manifest.json"
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+        return str(data.get("version", "unknown"))
+    except (OSError, json.JSONDecodeError):
+        return "unknown"
+
+
+def _collect_tree(rel_dir: str, suffixes: tuple[str, ...]) -> list[Path]:
+    base = ROOT / rel_dir
+    if not base.is_dir():
+        return []
+    found: list[Path] = []
+    for path in sorted(base.rglob("*")):
+        if not path.is_file():
+            continue
+        if any(part in SKIP_DIR_NAMES for part in path.parts):
+            continue
+        if path.name in SKIP_FILE_NAMES or path.name.endswith(".ots"):
+            continue
+        if path.suffix in suffixes:
+            found.append(path)
+    return found
+
+
+def _build_file_list(include_roadmap: bool) -> list[Path]:
+    files: list[Path] = []
+
+    for rel in DOC_FILES:
+        files.append(ROOT / rel)
+
+    files.append(ROOT / "backend" / "pyproject.toml")
+    files.extend(_collect_tree("backend/app", (".py",)))
+    files.append(ROOT / "frontend" / "package.json")
+    files.extend(_collect_tree("frontend/src", (".ts", ".tsx", ".css")))
+    files.extend(_collect_tree("backend/tests", (".py",)))
+
+    for rel in (
+        "run_server.sh",
+        "run_ui.sh",
+        "run_tests.sh",
+        "run_commander.sh",
+        "run_pack.sh",
+        ".env.example",
+    ):
+        files.append(ROOT / rel)
+
+    if include_roadmap:
+        files.extend(_collect_tree("roadmap", (".md",)))
+
+    # De-dupe while preserving order
+    seen: set[Path] = set()
+    ordered: list[Path] = []
+    for path in files:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        ordered.append(path)
+    return ordered
+
+
+def _header(version: str, include_roadmap: bool) -> str:
+    mode = "brain+core+roadmap" if include_roadmap else "brain+core"
+    return f"""# Three-Headed Semantic Firewall — Agent Handoff Bundle
+# Generated by semantic_guardtrails_packager.py (mode: {mode})
+# Version: {version}
+#
+# WHAT THIS IS
+#   A local-first RAG security layer that validates query-to-corpus geometric
+#   alignment (1024D embeddings) before routing to an LLM. Three filters
+#   (Noise / Cosine / Excitation) run in a user-defined order; any failure
+#   is a BREACH and the prompt never reaches the provider.
+#
+# STACK
+#   Backend: Python 3.14+, FastAPI, LanceDB, BAAI/bge-m3 — managed with uv
+#   Frontend: React 19, Vite, Zustand — managed with pnpm
+#   Providers: Ollama (default), OpenAI, Anthropic, Google Gemini, Groq
+#
+# HOW TO RUN
+#   ./run_server.sh          # backend (uv run python -m app.main)
+#   ./run_ui.sh              # frontend (pnpm run dev)
+#   ./run_tests.sh           # pytest via uv
+#   ./run_commander.sh       # simple TUI menu
+#
+# MODULE MAP
+#   backend/app/core/firewall.py     — pure geometric engine (no FastAPI)
+#   backend/app/core/models.py       — ConfigState and request schemas
+#   backend/app/core/state.py        — atomic config state
+#   backend/app/core/settings.py     — env-driven settings
+#   backend/app/api/endpoints/       — chat, corpus, config, system
+#   backend/app/modules/providers/   — LLM adapters (BaseProvider)
+#   backend/app/modules/embedder.py  — shared embedding model
+#   backend/app/modules/storage.py   — LanceDB corpus
+#   backend/app/modules/sniffer.py   — forensic interception / SSE
+#   frontend/src/                    — HUD (chat, sniffer, control panel)
+#
+# INSTRUCTIONS FOR THE AGENT
+#   1. Read CONTEXT.md first for domain language; use those terms.
+#   2. Treat manifest.json state_schema as the live config contract.
+#   3. Propose concrete, minimal changes; prefer deep modules over sprawl.
+#   4. Do not invent files that are not in this bundle.
+#   5. Runtime data, secrets, and _archive/ are intentionally excluded.
+#
+# Sections below are delimited by: === relative/path ===
+
+"""
+
+
+def bundle(include_roadmap: bool = False) -> int:
+    version = _read_version()
+    paths = _build_file_list(include_roadmap)
+
+    missing = [p for p in paths if not p.is_file()]
+    # Critical docs must exist
+    critical = [ROOT / d for d in DOC_FILES]
+    critical_missing = [p for p in critical if not p.is_file()]
+    if critical_missing:
+        for p in critical_missing:
+            print(f"ERROR: missing critical file: {p.relative_to(ROOT)}", file=sys.stderr)
+        return 1
+
+    if OUTPUT.exists():
+        OUTPUT.unlink()
 
     file_count = 0
     error_count = 0
     total_bytes = 0
-    print_count = 0
+    mode_label = "brain+core+roadmap" if include_roadmap else "brain+core"
 
-    mode_label = "ALL FILES" if all_mode else f"FOCUS MODE ({len(FOCUS_FILES)} files)"
-
-    print("Vamo' a empaquetar todo paqueteadito carajo!!!\n")
-    print(f"🔧 Semantic GuardRails Packager")
-    print(f"   Mode: {mode_label}")
-    print(f"   Output: {output}")
-    print(f"   Dumpeando extensiones: {', '.join(extensions)}")
-    print(f"   Skipeando directorios: {', '.join(skip_dirs)}")
-    print(f"   Scanning from: {os.path.abspath('.')}")
-    if not all_mode:
-        print(f"   💡 Use --all para exportar todo el codigo")
+    print("Semantic Firewall Packager")
+    print(f"  Mode:   {mode_label}")
+    print(f"  Output: {OUTPUT.relative_to(ROOT)}")
+    print(f"  Files:  {len(paths) - len(missing)} to pack"
+          + (f" ({len(missing)} missing, skipped)" if missing else ""))
     print()
 
-    with open(output, "w") as out:
-        for root, dirs, files in os.walk("."):
-            # Skip unwanted directories
-            dirs[:] = [d for d in dirs if d not in skip_dirs]
+    with OUTPUT.open("w", encoding="utf-8") as out:
+        header = _header(version, include_roadmap)
+        out.write(header)
+        total_bytes += len(header.encode("utf-8"))
 
-            for file in files:
-                if file.endswith(extensions) and file != output:
-                    filepath = os.path.join(root, file)
-                    norm_path = os.path.normpath(filepath)
+        for path in paths:
+            rel = path.relative_to(ROOT).as_posix()
+            if not path.is_file():
+                print(f"  skip (missing): {rel}")
+                error_count += 1
+                continue
+            try:
+                content = path.read_text(encoding="utf-8")
+            except OSError as exc:
+                out.write(f"=== {rel} ===\n")
+                out.write(f"Error reading {rel}: {exc}\n\n")
+                print(f"  error: {rel}")
+                error_count += 1
+                continue
 
-                    # En focus mode, solo incluir archivos de la lista
-                    if focus_abs is not None and norm_path not in focus_abs:
-                        continue
-
-                    try:
-                        with open(filepath, "r") as f:
-                            content = f.read()
-                        out.write(f"=== {filepath} ===\n")
-                        out.write(content)
-                        out.write("\n\n")
-                        file_count += 1
-                        total_bytes += len(content)
-                        
-                        status = f"✅ {filepath}"
-                        if len(status) > 33:
-                            status = status[:30] + "..."
-                        print(f"{status:<35}", end="\n" if print_count % 3 == 2 else " ")
-                        print_count += 1
-                    except Exception as e:
-                        out.write(f"=== {filepath} ===\n")
-                        out.write(f"Error reading {filepath}: {e}")
-                        out.write("\n\n")
-                        error_count += 1
-                        
-                        status = f"❌ {filepath}"
-                        if len(status) > 33:
-                            status = status[:30] + "..."
-                        print(f"{status:<35}", end="\n" if print_count % 3 == 2 else " ")
-                        print_count += 1
-
-    if print_count % 3 != 0:
-        print()
+            block = f"=== {rel} ===\n{content}"
+            if not content.endswith("\n"):
+                block += "\n"
+            block += "\n"
+            out.write(block)
+            file_count += 1
+            total_bytes += len(block.encode("utf-8"))
+            print(f"  + {rel}")
 
     print()
-    print(f"{'=' * 40}")
+    print("=" * 40)
     if error_count == 0:
-        print(f"✅ OK — {file_count} files packed ({total_bytes:,} bytes) → {output}")
-    else:
-        print(f"⚠️  DONE with errors — {file_count} files packed, {error_count} errors → {output}")
-    print(f"{'=' * 40}")
+        print(f"OK — {file_count} files packed ({total_bytes:,} bytes) -> {OUTPUT.name}")
+        return 0
+    # Missing optional ops files are warnings; critical already failed above
+    print(
+        f"DONE with warnings — {file_count} files packed, "
+        f"{error_count} missing/errors -> {OUTPUT.name}"
+    )
+    return 0 if file_count > 0 else 1
 
-    return 1 if error_count > 0 else 0
+
+def main() -> int:
+    include_roadmap = "--all" in sys.argv
+    return bundle(include_roadmap=include_roadmap)
 
 
 if __name__ == "__main__":
-    sys.exit(bundle())
+    sys.exit(main())
