@@ -653,6 +653,15 @@
   color: #ff8888;
 }
 
+.pack-cal-na {
+  font-size: 0.6rem;
+  opacity: 0.45;
+  letter-spacing: 0.03em;
+  cursor: help;
+  padding: 0.15rem 0.25rem;
+  user-select: none;
+}
+
 .bypass-warning {
   margin-bottom: 0.75rem;
   padding: 0.5rem;

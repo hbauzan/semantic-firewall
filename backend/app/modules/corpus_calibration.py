@@ -121,6 +121,11 @@ def resolve_dataset_for_pack(filename: str) -> dict | None:
     return None
 
 
+def calibratable_filenames() -> set[str]:
+    """Filenames that have a labeled positive-mode calibration dataset."""
+    return {d["corpus_file"] for d in list_dataset_index() if d.get("corpus_file")}
+
+
 def _evaluate_prompt_positive(
     prompt: str,
     cfg: ConfigState,
@@ -227,9 +232,10 @@ def calibrate_positive_for_pack(filename: str) -> PositiveCalibrationResult:
 
     dataset = resolve_dataset_for_pack(filename)
     if dataset is None:
+        known = sorted(calibratable_filenames())
         raise CalibrationError(
-            f"No labeled calibration dataset for '{filename}'. "
-            f"Known corpora: {[d.get('corpus_file') for d in list_dataset_index()]}"
+            f"'{filename}' has no labeled calibration dataset. "
+            f"Cal is only available for: {', '.join(known)}."
         )
 
     base_cfg = ConfigState(firewall_mode="positive")
