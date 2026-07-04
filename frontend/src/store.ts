@@ -133,7 +133,7 @@ const createFirewallSlice: StateCreator<StoreState, [], [], FirewallSlice> = (se
   excitationOrder: 3,
   noiseOrder: 1,
   adaptiveFactor: 0.85,
-  ragTopK: 3,
+  ragTopK: 12,
   noiseEnabled: true,
   cosineEnabled: true,
   excitationEnabled: true,

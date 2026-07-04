@@ -161,7 +161,7 @@ cp .env.example .env
 | `CHUNK_SIZE` | `2048` | PDF chunking size in characters (100–10000). |
 | `CHUNK_OVERLAP` | `200` | Overlap between consecutive chunks (0–2000). |
 | `EMBEDDING_BATCH_SIZE` | `10` | Embeddings per batch during ingestion (1–100). |
-| `RAG_TOP_K` | `3` | Number of corpus chunks retrieved for RAG context (1–10). |
+| `RAG_TOP_K` | `12` | Corpus chunks retrieved per clause for RAG context (1–32). |
 | `RATE_LIMIT_CHAT` | `30/minute` | Rate limit for `/chat` and `/audit` endpoints per client IP. |
 | `RATE_LIMIT_DEFAULT` | `60/minute` | Rate limit for all other endpoints per client IP. |
 | `RATE_LIMIT_UPLOAD` | `10/minute` | Rate limit for `/corpus/upload-pdf` per client IP. |

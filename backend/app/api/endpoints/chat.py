@@ -27,6 +27,7 @@ from app.modules.providers.anthropic import AnthropicProvider
 from app.modules.providers.groq import GroqProvider
 from app.api.endpoints._shared import verify_api_key, limiter
 from app.modules.persistence import persist_interaction
+from app.modules.rag_context import accumulate_rag_chunks, join_rag_context
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +77,11 @@ async def chat_endpoint(request: Request, req: ChatRequest):
     # Segment prompt via the engine (language-agnostic + overflow chunking)
     clauses = SemanticFirewall.segment(clean_prompt)
 
-    # Evaluate each clause through the ordered pipeline
-    context = ""
+    # Evaluate each clause through the ordered pipeline.
+    # RAG context = union of top-K texts per clause (deduped); firewall uses top-1 only.
+    context_chunks: list[str] = []
+    seen_chunk_ids: set = set()
+    clauses_with_hits = 0
     failed_clause = None
     block_reason = ""
     block_details = {}
@@ -103,10 +107,10 @@ async def chat_endpoint(request: Request, req: ChatRequest):
                 all_traces.append({"stage": "no_context", "passed": False})
                 break
 
+        clauses_with_hits += 1
+        accumulate_rag_chunks(results, context_chunks, seen_chunk_ids)
+        # Firewall geometry: top-1 nearest vector only
         db_vec = results[0]["vector"]
-        if not context:
-            # Concatenate text from all top-K chunks for richer RAG context
-            context = "\n---\n".join(r["text"] for r in results)
         q_arr = np.array(cl_vec, dtype=np.float32)
         c_arr = np.array(db_vec, dtype=np.float32)
         word_count = len(clause.split())
@@ -121,6 +125,9 @@ async def chat_endpoint(request: Request, req: ChatRequest):
             block_reason = result["breach_reason"]
             block_details = result["breach_details"]
             break
+
+    context = join_rag_context(context_chunks)
+    rag_chunk_count = len(context_chunks)
 
     # --- Telemetry Formatting & Response ---
     if fw_on:
@@ -144,16 +151,20 @@ async def chat_endpoint(request: Request, req: ChatRequest):
                 yield json.dumps({"type": "content", "text": block_msg}).encode("utf-8") + b"\n"
             return StreamingResponse(breach_stream(), media_type="application/x-ndjson")
 
-        stage_summary = " → ".join(
-            f'{r["stage"]}:{"OK" if r["passed"] else "MISS"}' for r in all_traces
-        )
-        
         entropy = 0.0
         for t in all_traces:
             if t.get("stage") == "noise":
                 entropy = t.get("value", 0.0)
                 break
-                
+
+        all_traces.append({
+            "stage": "rag_context",
+            "passed": True,
+            "chunk_count": rag_chunk_count,
+            "k": cfg.rag_top_k,
+            "clauses_with_hits": clauses_with_hits,
+        })
+
         trace_id = emit_trace(
             model=model_id,
             last_message=req.prompt,
@@ -169,6 +180,8 @@ async def chat_endpoint(request: Request, req: ChatRequest):
             f"Engine: {cfg.upstream_provider.upper()} | {model_id}\n"
             f"Mode: {cfg.firewall_mode.upper()}\n"
             f"Metrics: Entropy({entropy:.2f}) | Cosine({last_cosine:.3f}) | Resonance({last_activations})\n"
+            f"RAG: {rag_chunk_count} chunks injected "
+            f"(k={cfg.rag_top_k}, clauses={clauses_with_hits}, unique={rag_chunk_count})\n"
             f"{'-' * 40}\n"
             f"[LLM_RESPONSE]:\n\n"
         )

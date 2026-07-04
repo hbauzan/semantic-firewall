@@ -105,8 +105,8 @@ class Settings(BaseSettings):
 
     # --- RAG ---
     rag_top_k: int = Field(
-        default=3, ge=1, le=10,
-        description="Number of corpus chunks retrieved for RAG context (1–10).",
+        default=12, ge=1, le=32,
+        description="Number of corpus chunks retrieved per clause for RAG context (1–32).",
     )
 
     # --- PDF Ingestion ---

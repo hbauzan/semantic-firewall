@@ -138,11 +138,11 @@ If **any single clause or sub-chunk** fails any stage of the pipeline, the entir
 As a secondary defense layer, `stream_ollama` injects a strict system instruction constraining the LLM to respond **exclusively** from the provided RAG context. If a query or sub-instruction cannot be answered from the context (e.g. recipes, jokes, unrelated code), the LLM is instructed to refuse that portion. This provides defense-in-depth even if the segmentation firewall is bypassed.
 
 ### 6.3 Configurable RAG Context Depth (Top-K)
-The number of corpus chunks retrieved for RAG context is controlled by `rag_top_k` (default 3, range 1–10). Configurable via:
-- **Environment variable:** `RAG_TOP_K` in `.env` (boot-time default).
+The number of corpus chunks retrieved **per clause** for RAG context is controlled by `rag_top_k` (default 12, range 1–32). Configurable via:
+- **Environment variable:** `RAG_TOP_K` in `.env` (boot-time default for settings; runtime uses `ConfigState`).
 - **Runtime HUD:** "RAG Context Depth" slider in the ControlPanel (synced via `POST /galaxy/config`).
 
-When `rag_top_k > 1`, the `chat_endpoint` retrieves the top-K nearest chunks from LanceDB and concatenates their text separated by `\n---\n` to form a richer context window for the LLM. The firewall evaluation still runs against the **top-1 nearest vector only** — additional chunks affect LLM quality but not security math. The `audit_query` endpoint mirrors this behavior for consistency.
+For each clause that has LanceDB hits, the `chat_endpoint` retrieves the top-K nearest chunks and **unions** their texts across all clauses (deduplicated by chunk `id`, first-seen order), joined with `\n---\n`. The firewall evaluation still runs against the **top-1 nearest vector only** — additional chunks affect LLM quality but not security math. PASS telemetry reports `RAG: N chunks injected (k=…, clauses=…, unique=…)`. The `audit_query` endpoint returns the joined `context` and `rag_chunk_count` for consistency.
 
 ## 7. API Security Hardening
 

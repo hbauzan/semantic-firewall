@@ -63,7 +63,7 @@
 
 **Profile** — A named, saved snapshot of the full configuration state, persisted and reloadable via `ProfileManager`.
 
-**RAG Context** — The corpus chunks (count = `rag_top_k`) attached to a **PASS**ed prompt as grounding before it reaches the **Provider**.
+**RAG Context** — The union of up to `rag_top_k` corpus chunks **per clause** (deduplicated) attached to a **PASS**ed prompt as grounding before it reaches the **Provider**. Firewall geometry still uses the top-1 vector per clause.
 
 ---
 

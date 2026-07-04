@@ -175,17 +175,17 @@ def test_health_endpoint():
     assert "corpus_chunks" not in data
 
 def test_config_sync_includes_rag_top_k():
-    """POST /galaxy/config must accept and persist rag_top_k."""
+    """POST /galaxy/config must accept and persist rag_top_k in the expanded range."""
     import app.core.state as state_mod
     res = client.post("/galaxy/config", json={
         "excitation_threshold": 150,
         "noise_tolerance": 0.005,
         "cosine_threshold": 0.50,
-        "rag_top_k": 5
+        "rag_top_k": 20
     })
     assert res.status_code == 200
     cfg = state_mod.config_state
-    assert cfg.rag_top_k == 5
+    assert cfg.rag_top_k == 20
 
 def test_config_sync_includes_firewall_mode():
     """POST /galaxy/config must accept and persist firewall_mode."""

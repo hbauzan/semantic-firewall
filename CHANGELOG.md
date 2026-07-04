@@ -26,6 +26,10 @@ Current release.
 - HUD chat endpoint with NDJSON streaming and inline telemetry
 - Strict RAG context on PASS (`rag_top_k`)
 
+### RAG
+
+- Richer per-request grounding: default `rag_top_k` 12 (range 1–32), multi-clause chunk union with deduplication, PASS telemetry reports injected chunk counts
+
 ### Operations and UI
 
 - Real-time semantic sniffer (full payload interception, SSE, export/clear)

@@ -84,6 +84,8 @@ class SnifferTrace(BaseModel):
             "excitation_value": None,
             "excitation_threshold": None,
             "no_context_passed": None,
+            "rag_chunk_count": None,
+            "rag_top_k": None,
         }
 
         for stage in self.firewall.pipeline_trace:
@@ -102,6 +104,9 @@ class SnifferTrace(BaseModel):
                 event["excitation_threshold"] = stage.threshold
             elif s_name == "no_context":
                 event["no_context_passed"] = stage.passed
+            elif s_name == "rag_context":
+                event["rag_chunk_count"] = int(stage.value)
+                event["rag_top_k"] = int(stage.threshold)
 
         return event
 
@@ -231,6 +236,10 @@ def emit_trace(
             threshold = 0.0
             # Force passed to False for no_context breaches to satisfy test_api.py
             t["passed"] = False
+        elif stage_name == "rag_context":
+            # Counts only — not a security filter. value=unique chunks, threshold=k.
+            value = float(t.get("chunk_count", 0))
+            threshold = float(t.get("k", 0))
         stages.append(PipelineStageTrace(
             stage=stage_name,
             passed=t.get("passed", False),

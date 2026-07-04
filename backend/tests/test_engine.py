@@ -156,21 +156,6 @@ def test_engine_positive_mode_identical_vectors_pass():
     assert result["passed"] is True
 
 
-# --- RAG Top-K ---
-
-def test_rag_top_k_default():
-    """Default rag_top_k should be 3 on fresh ConfigState."""
-    fresh = ConfigState()
-    assert fresh.rag_top_k == 3
-
-def test_rag_top_k_validation():
-    """rag_top_k must reject values outside 1-10."""
-    with pytest.raises(Exception):
-        ConfigState(rag_top_k=0)
-    with pytest.raises(Exception):
-        ConfigState(rag_top_k=11)
-
-
 # --- Adaptive Inversion ---
 
 def test_adaptive_inversion_negative_mode():

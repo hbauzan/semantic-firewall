@@ -4,9 +4,10 @@
 
 **Estado (2026-07-04):** etapas **1 y 2 hechas**.
 
-**Trabajo de código activo ahora:** opción A (RAG más rico) en [`../../roadmap.md`](../../roadmap.md).  
+**Opción A (RAG más rico):** hecha.  
 **Pendiente de producto y opciones B/C:** [`../../roadmap-backlog.md`](../../roadmap-backlog.md).  
-Tras A, el siguiente foco de producto del Nivel 1 sigue siendo la **etapa 3 (UX)**, salvo que se priorice B.
+**Tareas del momento:** [`../../roadmap.md`](../../roadmap.md).  
+Siguiente foco de producto del Nivel 1: **etapa 3 (UX)**, salvo que se priorice B.
 
 ---
 
