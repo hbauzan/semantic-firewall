@@ -428,6 +428,46 @@
 .api-status--ok .api-status-dot { background: #00cc88; box-shadow: 0 0 6px #00cc8866; }
 .api-status--ok .api-status-value { color: #00cc88; }
 
+.api-status--working {
+  background: #00cc4411;
+  border: 1px solid #00cc4433;
+  animation: api-panel-beacon 2.4s ease-in-out infinite;
+}
+.api-status--working .api-status-dot {
+  animation: api-dot-beacon 2.4s ease-in-out infinite;
+}
+.api-status--working .api-status-value {
+  color: #00cc88;
+  animation: api-text-beacon 2.4s ease-in-out infinite;
+}
+
+@keyframes api-dot-beacon {
+  0%, 100% {
+    background: #00cc88;
+    box-shadow: 0 0 4px #00cc88, 0 0 10px #00cc8866;
+  }
+  50% {
+    background: #e8a020;
+    box-shadow: 0 0 4px #e8a020, 0 0 12px #e8a02088;
+  }
+}
+
+@keyframes api-panel-beacon {
+  0%, 100% {
+    background: #00cc4411;
+    border-color: #00cc4433;
+  }
+  50% {
+    background: #e8a02014;
+    border-color: #e8a02044;
+  }
+}
+
+@keyframes api-text-beacon {
+  0%, 100% { color: #00cc88; }
+  50% { color: #e8a020; }
+}
+
 .api-status--offline {
   background: #ff444411;
   border: 1px solid #ff444433;

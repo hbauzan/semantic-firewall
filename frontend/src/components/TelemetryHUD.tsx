@@ -32,8 +32,9 @@ const MonkeyHead: React.FC<MonkeyHeadProps> = ({ alive, label, frameIdx }) => {
   );
 };
 
-function apiStatusLabel(status: string, stalled: boolean): string {
+function apiStatusLabel(status: string, stalled: boolean, working: boolean): string {
   if (stalled) return 'STALLED';
+  if (working) return 'WORKING';
   if (status === 'ok') return 'ONLINE';
   if (status === 'offline') return 'OFFLINE';
   return 'CHECKING';
@@ -98,12 +99,20 @@ export const TelemetryHUD: React.FC = () => {
     return () => clearInterval(tick);
   }, []);
 
-  const apiLabel = apiStatusLabel(backendHealth.status, Boolean(activeTask?.stalled));
+  const apiWorking =
+    backendHealth.status === 'ok' && activeTask !== null && !activeTask.stalled;
+
+  const apiLabel = apiStatusLabel(
+    backendHealth.status,
+    Boolean(activeTask?.stalled),
+    apiWorking,
+  );
   const apiClass =
     activeTask?.stalled ? 'api-status--stalled'
-      : backendHealth.status === 'ok' ? 'api-status--ok'
-        : backendHealth.status === 'offline' ? 'api-status--offline'
-          : 'api-status--checking';
+      : apiWorking ? 'api-status--working'
+        : backendHealth.status === 'ok' ? 'api-status--ok'
+          : backendHealth.status === 'offline' ? 'api-status--offline'
+            : 'api-status--checking';
 
   const sysDisplay = activeTask
     ? `${activeTask.title} · ${activeTask.phase}${activeTask.progress !== null ? ` (${Math.round(activeTask.progress)}%)` : ''}`
