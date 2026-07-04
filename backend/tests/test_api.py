@@ -28,6 +28,11 @@ def test_async_pdf_upload_and_status():
     assert status_res.status_code == 200
     assert "status" in status_res.json()
 
+def test_calibrate_pack_not_loaded():
+    res = client.post("/corpus/packs/nonexistent_calibration_pack.pdf/calibrate-positive")
+    assert res.status_code == 404
+
+
 def test_dimensional_excitation_math():
     set_config(excitation_threshold=150, noise_tolerance=0.005)
     res = client.post("/audit", json={"query": "Safe hello world"})

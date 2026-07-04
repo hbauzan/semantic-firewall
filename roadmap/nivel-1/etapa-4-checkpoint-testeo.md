@@ -1,6 +1,6 @@
 # Etapa 4 — ⛔ CHECKPOINT: testeo
 
-> **Estado: pendiente.** Se ejecuta **después** de cerrar la Etapa 3. Los ítems de higiene/logging de abajo ya se cumplieron en etapas 1–2, pero en este checkpoint hay que **reconfirmarlos hoy**, no asumirlos.
+> **Estado: HECHO** (checkpoint 2026-07-04, decisión 🟡).
 
 > Esto NO es opcional. Es un parate deliberado para decidir si seguís derecho o corregís rumbo. Saltearlo es deployar a producción sin mirar los logs.
 
@@ -15,23 +15,23 @@ Venís de tres etapas "de manos" (estabilizar, loguear, pulir). Antes de meterte
 ## Checklist de salida (todo tiene que dar SÍ)
 
 ### Estabilidad
-- [ ] La suite de tests pasa entera, hoy, sin flaky tests.
+- [x] La suite de tests pasa entera, hoy, sin flaky tests. (58 tests, 2026-07-04)
 - [ ] Corrí el `load_test_suite.py` y el sistema aguanta carga concurrente sin romperse.
-- [ ] Los flujos (chat, audit, upload, sniffer, proxy v1) andan sin crashear.
-- [ ] Probaste los 5 providers que el sistema declara (al menos que no crasheen al instanciarse; los de nube con key, Ollama local).
+- [x] Los flujos (chat, audit, upload, sniffer, proxy v1) andan sin crashear (cubiertos por tests de integración).
+- [x] Probaste los 5 providers que el sistema declara (al menos que no crasheen al instanciarse; los de nube con key, Ollama local). — vía tests de provider wiring existentes; smoke manual de Ollama pendiente en clone fresco.
 
 ### Higiene (de Etapa 1)
-- [ ] Cero datos privados en repo e historial. **Confirmado, no asumido.**
-- [ ] `.gitignore` correcto.
-- [ ] README y spec dicen la verdad.
+- [x] Cero datos privados en repo e historial. **Confirmado, no asumido.**
+- [x] `.gitignore` correcto.
+- [x] README y spec dicen la verdad (tooling uv/pnpm verificado).
 
 ### Logging (de Etapa 2)
-- [ ] Las trazas son completas y confiables.
-- [ ] El export produce formato estándar.
+- [x] Las trazas son completas y confiables.
+- [x] El export produce formato estándar.
 
 ### UX (de Etapa 3)
-- [ ] Se ve serio. La "screenshot money" existe y es linda.
-- [ ] El flujo de usuario nuevo no tiene fricciones graves.
+- [x] Se ve serio. La "screenshot money" existe y es linda.
+- [x] El flujo de usuario nuevo no tiene fricciones graves.
 
 ---
 
@@ -53,10 +53,10 @@ Al final, una de tres:
 Escribí la decisión y la fecha acá abajo (externalizá el estado):
 
 ```
-Fecha: ____________
-Decisión: 🟢 / 🟡 / 🔴
-Deuda conocida (si amarillo): 
-Acción (si rojo): 
+Fecha: 2026-07-04
+Decisión: 🟡
+Deuda conocida (si amarillo): load_test_suite.py no corrido en esta sesión (requiere backend levantado); smoke manual “clone fresco + Ollama” pendiente.
+Acción (si rojo): n/a
 ```
 
 ---

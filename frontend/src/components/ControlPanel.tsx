@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import { API_BASE_URL } from '../config';
 import { TOOLTIP_REGISTRY, type TooltipEntry } from '../locales/tooltips';
+import { NEGATIVE_RECOMMENDED, POSITIVE_RECOMMENDED, THRESHOLD_SLIDERS } from '../thresholdBounds';
 import '../styles/ControlPanel.css';
 
 // Reusable slider with - / + step buttons
@@ -57,6 +58,25 @@ export const ControlPanel: React.FC = () => {
   const [selectedProfile, setSelectedProfile] = useState<string>('');
   const [newProfileName, setNewProfileName] = useState<string>('');
   const [configHydrated, setConfigHydrated] = useState(false);
+  const [calibratingPack, setCalibratingPack] = useState<string | null>(null);
+
+  const applyConfigToStore = (c: Record<string, unknown>) => {
+    setExcitationThreshold(c.excitation_threshold as number);
+    setNoiseTolerance(c.noise_tolerance as number);
+    setCosineThreshold(c.cosine_threshold as number);
+    setGlobalNoiseLimit(c.global_noise_limit as number);
+    setCosineOrder(c.cosine_order as number);
+    setExcitationOrder(c.excitation_order as number);
+    setNoiseOrder(c.noise_order as number);
+    setAdaptiveFactor(c.adaptive_factor as number);
+    setRagTopK(c.rag_top_k as number);
+    setNoiseEnabled(c.noise_enabled as boolean);
+    setCosineEnabled(c.cosine_enabled as boolean);
+    setExcitationEnabled(c.excitation_enabled as boolean);
+    setFirewallMode(c.firewall_mode as 'positive' | 'negative');
+    if (c.sniffer_view_limit) setSnifferViewLimit(c.sniffer_view_limit as number);
+    if (c.upstream_provider) setUpstreamProvider(c.upstream_provider as typeof upstreamProvider);
+  };
 
   const handleOrderChange = (filterName: 'noise' | 'cosine' | 'excitation', newOrder: number) => {
     const currentOrders = {
@@ -94,21 +114,7 @@ export const ControlPanel: React.FC = () => {
       })
       .then(data => {
         const c = data.config;
-        setExcitationThreshold(c.excitation_threshold);
-        setNoiseTolerance(c.noise_tolerance);
-        setCosineThreshold(c.cosine_threshold);
-        setGlobalNoiseLimit(c.global_noise_limit);
-        setCosineOrder(c.cosine_order);
-        setExcitationOrder(c.excitation_order);
-        setNoiseOrder(c.noise_order);
-        setAdaptiveFactor(c.adaptive_factor);
-        setRagTopK(c.rag_top_k);
-        setNoiseEnabled(c.noise_enabled);
-        setCosineEnabled(c.cosine_enabled);
-        setExcitationEnabled(c.excitation_enabled);
-        setFirewallMode(c.firewall_mode);
-        if (c.sniffer_view_limit) setSnifferViewLimit(c.sniffer_view_limit);
-        if (c.upstream_provider) setUpstreamProvider(c.upstream_provider);
+        applyConfigToStore(c);
         setConfigHydrated(true);
       })
       .catch(err => {
@@ -165,21 +171,7 @@ export const ControlPanel: React.FC = () => {
       const data = await res.json();
       // Hydrate store from profile response instead of full page reload (Finding F6)
       const c = data.config;
-      setExcitationThreshold(c.excitation_threshold);
-      setNoiseTolerance(c.noise_tolerance);
-      setCosineThreshold(c.cosine_threshold);
-      setGlobalNoiseLimit(c.global_noise_limit);
-      setCosineOrder(c.cosine_order);
-      setExcitationOrder(c.excitation_order);
-      setNoiseOrder(c.noise_order);
-      setAdaptiveFactor(c.adaptive_factor);
-      setRagTopK(c.rag_top_k);
-      setNoiseEnabled(c.noise_enabled);
-      setCosineEnabled(c.cosine_enabled);
-      setExcitationEnabled(c.excitation_enabled);
-      setFirewallMode(c.firewall_mode);
-      if (c.sniffer_view_limit) setSnifferViewLimit(c.sniffer_view_limit);
-      if (c.upstream_provider) setUpstreamProvider(c.upstream_provider);
+      applyConfigToStore(c);
     } catch (err) {
       console.error("Failed to load profile:", err);
     }
@@ -289,6 +281,31 @@ export const ControlPanel: React.FC = () => {
     }
   };
 
+  const handleCalibratePack = async (filename: string) => {
+    setCalibratingPack(filename);
+    setSystemAction(`CALIBRATING_${filename}...`);
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/corpus/packs/${encodeURIComponent(filename)}/calibrate-positive`,
+        { method: 'POST' },
+      );
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText);
+      }
+      const data = await res.json();
+      applyConfigToStore(data.config);
+      setSystemAction(`CALIBRATED ${data.corpus_id} (${Math.round(data.accuracy * 100)}%)`);
+      setTimeout(() => setSystemAction('SYSTEM IDLE'), 4000);
+    } catch (err) {
+      console.error('Calibration failed', err);
+      setSystemAction('CALIBRATION_FAILED');
+      setTimeout(() => setSystemAction('SYSTEM IDLE'), 4000);
+    } finally {
+      setCalibratingPack(null);
+    }
+  };
+
   const handleDeletePack = async (filename: string) => {
     setSystemAction("DELETING_PACK...");
     try {
@@ -305,15 +322,10 @@ export const ControlPanel: React.FC = () => {
   const isNeg = firewallMode === 'negative';
 
   const handleResetToRecommended = () => {
-    if (firewallMode === 'positive') {
-      setCosineThreshold(0.5315);
-      setExcitationThreshold(150);
-      setGlobalNoiseLimit(4.5);
-    } else {
-      setCosineThreshold(0.6197);
-      setExcitationThreshold(170);
-      setGlobalNoiseLimit(4.5);
-    }
+    const rec = isNeg ? NEGATIVE_RECOMMENDED : POSITIVE_RECOMMENDED;
+    setCosineThreshold(rec.cosine);
+    setExcitationThreshold(rec.excitation);
+    setGlobalNoiseLimit(rec.globalNoise);
   };
 
   return (
@@ -329,7 +341,7 @@ export const ControlPanel: React.FC = () => {
         <select
           value={upstreamProvider}
           onChange={(e) => setUpstreamProvider(e.target.value as any)}
-          style={{ width: '100%', padding: '0.4rem', marginTop: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+          className="upstream-select"
         >
           <option value="ollama">Ollama (Local)</option>
           <option value="google">Google Gemini</option>
@@ -358,8 +370,14 @@ export const ControlPanel: React.FC = () => {
         </button>
       </div>
 
-      <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
-        <button onClick={handleResetToRecommended} className="reset-btn" style={{ padding: '0.4rem 1rem', cursor: 'pointer', borderRadius: '4px', backgroundColor: 'var(--bg-light)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>Reset to Recommended</button>
+      {!noiseEnabled && !cosineEnabled && !excitationEnabled && (
+        <div className="bypass-warning">
+          All filters are OFF — queries bypass the firewall and go straight to the LLM.
+        </div>
+      )}
+
+      <div className="reset-row">
+        <button type="button" onClick={handleResetToRecommended} className="reset-btn">Reset to Recommended</button>
       </div>
 
       {/* --- Noise Pre-Filter --- */}
@@ -373,7 +391,7 @@ export const ControlPanel: React.FC = () => {
             Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong>
             <InfoTooltip entry={TOOLTIP_REGISTRY[lang].noise} />
           </div>
-          <StepSlider value={globalNoiseLimit} min={0.10} max={2.00} step={0.01} onChange={setGlobalNoiseLimit} />
+          <StepSlider value={globalNoiseLimit} min={THRESHOLD_SLIDERS.globalNoise.min} max={THRESHOLD_SLIDERS.globalNoise.max} step={THRESHOLD_SLIDERS.globalNoise.step} onChange={setGlobalNoiseLimit} />
         </div>
         <div className="seq-column">
           <div className="seq-label">Seq</div>
@@ -393,7 +411,7 @@ export const ControlPanel: React.FC = () => {
             Cosine Gate: <strong>{cosineThreshold.toFixed(2)}</strong>
             <InfoTooltip entry={TOOLTIP_REGISTRY[lang].cosine} />
           </div>
-          <StepSlider value={cosineThreshold} min={0.00} max={1.00} step={0.01} onChange={setCosineThreshold} />
+          <StepSlider value={cosineThreshold} min={THRESHOLD_SLIDERS.cosine.min} max={THRESHOLD_SLIDERS.cosine.max} step={THRESHOLD_SLIDERS.cosine.step} onChange={setCosineThreshold} />
           <div className="slider-hint">
             <span>0 LAX</span><span>STRICT 1</span>
           </div>
@@ -416,7 +434,7 @@ export const ControlPanel: React.FC = () => {
             Excitation: <strong>{excitationThreshold}</strong>
             <InfoTooltip entry={TOOLTIP_REGISTRY[lang].excitation} />
           </div>
-          <StepSlider value={excitationThreshold} min={0} max={1024} step={1} onChange={setExcitationThreshold} />
+          <StepSlider value={excitationThreshold} min={THRESHOLD_SLIDERS.excitation.min} max={THRESHOLD_SLIDERS.excitation.max} step={THRESHOLD_SLIDERS.excitation.step} onChange={setExcitationThreshold} />
           <div className="noise-tolerance-label">
             Noise Tolerance: {noiseTolerance.toFixed(3)}
             <InfoTooltip entry={TOOLTIP_REGISTRY[lang].tolerance} />
@@ -509,10 +527,18 @@ export const ControlPanel: React.FC = () => {
 
       {/* --- Corpus Upload --- */}
       <div className="corpus-section">
-        <div className="section-title" style={{ marginBottom: '0.4rem' }}>
+        <div className="section-title corpus-section-title">
           Document Corpus
           <InfoTooltip entry={TOOLTIP_REGISTRY[lang].corpus} />
         </div>
+
+        {packs.length === 0 && !ingestionStatus.taskId && (
+          <div className="empty-state-card">
+            <p>No corpus loaded. Positive mode needs a PDF to verify queries.</p>
+            <p className="empty-state-hint">Upload a PDF below to get started.</p>
+          </div>
+        )}
+
         <input type="file" accept="application/pdf" ref={fileInputRef}
           onChange={handleFileUpload} className="file-input" />
         <button onClick={() => fileInputRef.current?.click()} className="corpus-upload-btn">
@@ -525,7 +551,18 @@ export const ControlPanel: React.FC = () => {
             {packs.map((p) => (
               <div key={p.filename} className="pack-item">
                 <span className="pack-name" title={p.filename}>{p.filename} ({p.chunks})</span>
-                <button onClick={() => handleDeletePack(p.filename)} className="pack-delete-btn">X</button>
+                <div className="pack-actions">
+                  <button
+                    type="button"
+                    onClick={() => handleCalibratePack(p.filename)}
+                    className="pack-calibrate-btn"
+                    disabled={calibratingPack !== null}
+                    title="Calibrate thresholds for positive mode (labeled dataset required)"
+                  >
+                    {calibratingPack === p.filename ? '…' : 'Cal'}
+                  </button>
+                  <button type="button" onClick={() => handleDeletePack(p.filename)} className="pack-delete-btn">X</button>
+                </div>
               </div>
             ))}
           </div>

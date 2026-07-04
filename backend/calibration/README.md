@@ -1,0 +1,63 @@
+# Calibration datasets and harness
+
+Versioned labeled query sets for threshold calibration and claim measurement (Nivel 1, Etapa 5).
+
+## Datasets
+
+| File | Corpus PDF | Domain | Queries |
+|------|------------|--------|---------|
+| `datasets/automotive_v1.json` | `demo_corpus/automotive_maintenance.pdf` | Automotive maintenance | 25 |
+| `datasets/medical_v1.json` | `demo_corpus/medical_hypertension.pdf` | Hypertension clinical guide | 25 |
+
+### Labels
+
+- **on_corpus** — legitimate question about the loaded PDF domain → `expected: pass` (positive allowlist mode).
+- **off_topic** — unrelated domain → `expected: block`.
+- **piggybacking** — benign clause + malicious/off-topic clause → `expected: block` (segmentation claim).
+- **adversarial** — jailbreak-style prompts → `expected: block`.
+
+On-corpus queries are paraphrased questions, **not** verbatim PDF sentences (avoids retrieval leakage).
+
+## Harness
+
+From `backend/`:
+
+```bash
+# Evaluate / sweep (CLI — isolated temp DB + demo PDF)
+uv run python tests/calibration_suite.py evaluate --dataset calibration/datasets/automotive_v1.json
+uv run python tests/calibration_suite.py sweep --dataset calibration/datasets/automotive_v1.json
+uv run python tests/calibration_suite.py excitation-compare --dataset calibration/datasets/automotive_v1.json
+```
+
+### In-product (positive mode)
+
+With the pack **loaded** in LanceDB (upload the matching PDF), click **Cal** next to the pack in the Control Panel, or:
+
+```bash
+curl -X POST http://localhost:8000/corpus/packs/automotive_maintenance.pdf/calibrate-positive
+```
+
+Applies Youden-optimal thresholds for **positive mode** using the labeled dataset for that filename:
+
+1. **2D joint sweep** — `cosine_threshold` × `excitation_threshold`, with `global_noise_limit` fixed at the positive recommended value (`4.5`).
+2. **1D noise sweep** — `global_noise_limit` with the winning cosine/excitation held.
+
+Full 3D grid search is deferred. Unknown PDFs without a dataset return 404.
+
+Sweep grids are centered on positive Youden defaults (`0.5315` / `150` / `4.5`) — see `app/core/recommended_thresholds.py`. HUD sliders use the same center (`frontend/src/thresholdBounds.ts`).
+
+## Latest sweep results (v1 datasets, 2D grid 2026-07-04)
+
+| Corpus | cosine | excitation | noise | F1 | Note |
+|--------|--------|------------|-------|-----|------|
+| automotive | 0.38 | 125 | 1.5 | 1.00 | 2D joint at noise=4.5; noise 1D still hits grid lower bound |
+| medical | 0.43 | 25 | 1.5 | 1.00 | excitation at grid lower bound |
+
+Recommended HUD defaults (slider midpoint): **0.5315 / 150 / 4.5**. Corpus **Cal** may apply different Youden optima per pack.
+
+## Methodology notes
+
+1. **Manual first:** datasets were hand-authored before automation.
+2. **Isolated DB:** harness never touches production `lancedb_data/`.
+3. **Positive mode:** evaluations use `firewall_mode=positive` unless noted.
+4. **Segmentation:** multi-clause prompts use the same `SemanticFirewall.segment()` path as `/chat`.

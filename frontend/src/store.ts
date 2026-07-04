@@ -127,8 +127,8 @@ export type StoreState = FirewallSlice & ChatSlice & SystemSlice & SnifferSlice;
 const createFirewallSlice: StateCreator<StoreState, [], [], FirewallSlice> = (set) => ({
   excitationThreshold: 150,
   noiseTolerance: 0.005,
-  cosineThreshold: 0.50,
-  globalNoiseLimit: 0.50,
+  cosineThreshold: 0.5315,
+  globalNoiseLimit: 4.5,
   cosineOrder: 2,
   excitationOrder: 3,
   noiseOrder: 1,
