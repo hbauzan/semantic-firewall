@@ -2,7 +2,11 @@
 
 > El foco real. Todo lo de esta carpeta es para llevar el firewall de "anda en mi máquina" a "lanzado públicamente con evidencia que se defiende sola".
 
-**Estado (2026-07-04):** etapas **1 y 2 hechas**. Siguiente: **etapa 3 (UX)**.
+**Estado (2026-07-04):** etapas **1 y 2 hechas**.
+
+**Trabajo de código activo ahora:** opción A (RAG más rico) en [`../../roadmap.md`](../../roadmap.md).  
+**Pendiente de producto y opciones B/C:** [`../../roadmap-backlog.md`](../../roadmap-backlog.md).  
+Tras A, el siguiente foco de producto del Nivel 1 sigue siendo la **etapa 3 (UX)**, salvo que se priorice B.
 
 ---
 

@@ -1,6 +1,6 @@
 # Etapa 3 — UX y flujo de usuario
 
-> **Estado: SIGUIENTE (en curso / pendiente).** Etapas 1–2 cerradas. Acá se retoma el trabajo de manos antes del checkpoint de la Etapa 4.
+> **Estado: pendiente (en backlog).** Etapas 1–2 cerradas. El código activo ahora es la opción A ([`roadmap.md`](../../roadmap.md)); esta etapa vuelve al frente de producto después (ver [`roadmap-backlog.md`](../../roadmap-backlog.md)).
 
 > Objetivo: embellecer y pulir el flujo. Que la herramienta se **vea** tan seria como la matemática que tiene adentro. Una herramienta de seguridad que se ve descuidada se desconfía.
 
