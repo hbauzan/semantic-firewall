@@ -3,6 +3,8 @@ import { useStore } from '../store';
 import { API_BASE_URL } from '../config';
 import { TOOLTIP_REGISTRY, type TooltipEntry } from '../locales/tooltips';
 import { NEGATIVE_RECOMMENDED, POSITIVE_RECOMMENDED, THRESHOLD_SLIDERS } from '../thresholdBounds';
+import { useBackendHealth } from '../hooks/useBackendHealth';
+import { TaskProgressBar } from './TaskProgressBar';
 import '../styles/ControlPanel.css';
 
 // Reusable slider with - / + step buttons
@@ -47,8 +49,11 @@ export const ControlPanel: React.FC = () => {
     setCosineOrder, setExcitationOrder, setNoiseOrder, setAdaptiveFactor,
     setNoiseEnabled, setCosineEnabled, setExcitationEnabled, setRagTopK, setFirewallMode,
     setUpstreamProvider, setSnifferViewLimit,
-    ingestionStatus, setIngestionStatus, setSystemAction
+    ingestionStatus, setIngestionStatus, setSystemAction,
+    backendHealth, activeTask, startTask, updateTask, finishTask,
   } = useStore();
+
+  useBackendHealth();
 
   const [packs, setPacks] = useState<{ filename: string, chunks: number }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -59,6 +64,7 @@ export const ControlPanel: React.FC = () => {
   const [newProfileName, setNewProfileName] = useState<string>('');
   const [configHydrated, setConfigHydrated] = useState(false);
   const [calibratingPack, setCalibratingPack] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const applyConfigToStore = (c: Record<string, unknown>) => {
     setExcitationThreshold(c.excitation_threshold as number);
@@ -233,23 +239,36 @@ export const ControlPanel: React.FC = () => {
             return;
           }
           const data = await res.json();
+          const phase = data.message || data.status;
           setIngestionStatus({
+            taskId: ingestionStatus.taskId,
             status: data.status,
             progress: data.progress,
             message: data.message
           });
-          setSystemAction(`INGESTING_CORPUS: ${Math.round(data.progress)}%`);
-          if (data.status === 'completed' || data.status === 'failed') {
-            setSystemAction('SYSTEM IDLE');
+          updateTask({
+            phase,
+            progress: data.progress,
+            stalled: false,
+          });
+          if (data.status === 'completed') {
+            finishTask('success', `INGESTED ${Math.round(data.progress)}%`);
+            setUploadError(null);
+            setIngestionStatus({ taskId: null, status: 'idle', progress: 0, message: '' });
             fetchPacks();
+          } else if (data.status === 'failed') {
+            finishTask('error', 'INGESTION_FAILED');
+            setUploadError(data.message || 'Ingestion failed');
+            setIngestionStatus({ taskId: null, status: 'idle', progress: 0, message: '' });
           }
         } catch (err) {
           console.error("Failed to fetch task status", err);
+          updateTask({ phase: 'Waiting for backend task status…', stalled: true });
         }
       }, 1000);
     }
     return () => { if (interval) clearInterval(interval); }
-  }, [ingestionStatus.taskId, ingestionStatus.status, setIngestionStatus, setSystemAction, fetchPacks]);
+  }, [ingestionStatus.taskId, ingestionStatus.status, setIngestionStatus, updateTask, finishTask, fetchPacks]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -262,7 +281,13 @@ export const ControlPanel: React.FC = () => {
 
     const formData = new FormData();
     formData.append('file', file);
-    setSystemAction("UPLOADING_PDF...");
+    setUploadError(null);
+    startTask({
+      kind: 'upload',
+      title: 'PDF upload',
+      phase: 'Sending file to backend…',
+      progress: 0,
+    });
     try {
       const res = await fetch(`${API_BASE_URL}/corpus/upload-pdf`, {
         method: 'POST',
@@ -273,17 +298,39 @@ export const ControlPanel: React.FC = () => {
         throw new Error(`Upload failed (${res.status}): ${errText}`);
       }
       const data = await res.json();
-      setIngestionStatus({ taskId: data.task_id, status: 'pending', progress: 0, message: 'Upload started...' });
+      setIngestionStatus({ taskId: data.task_id, status: 'pending', progress: 0, message: 'Upload started…' });
+      updateTask({ phase: 'Queued for ingestion', progress: 0 });
     } catch (err) {
       console.error("Upload failed", err);
-      setSystemAction("UPLOAD_FAILED");
-      setTimeout(() => setSystemAction("SYSTEM IDLE"), 3000);
+      const online = backendHealth.status === 'ok';
+      setUploadError(
+        online
+          ? (err instanceof Error ? err.message : 'Upload failed')
+          : 'Backend is not running on port 8000. Start it with: ./run_server.sh'
+      );
+      finishTask('error', 'UPLOAD_FAILED');
     }
   };
 
   const handleCalibratePack = async (filename: string) => {
     setCalibratingPack(filename);
-    setSystemAction(`CALIBRATING_${filename}...`);
+    setUploadError(null);
+    startTask({
+      kind: 'calibrate',
+      title: `Calibrate ${filename}`,
+      phase: '2D sweep: cosine × excitation…',
+      progress: null,
+    });
+
+    const phaseTimer = setInterval(() => {
+      const elapsed = Date.now() - (useStore.getState().activeTask?.startedAt ?? Date.now());
+      if (elapsed > 60_000) {
+        updateTask({ phase: 'Tuning noise threshold…' });
+      } else if (elapsed > 20_000) {
+        updateTask({ phase: 'Evaluating labeled queries (embedder)…' });
+      }
+    }, 5000);
+
     try {
       const res = await fetch(
         `${API_BASE_URL}/corpus/packs/${encodeURIComponent(filename)}/calibrate-positive`,
@@ -295,13 +342,14 @@ export const ControlPanel: React.FC = () => {
       }
       const data = await res.json();
       applyConfigToStore(data.config);
-      setSystemAction(`CALIBRATED ${data.corpus_id} (${Math.round(data.accuracy * 100)}%)`);
-      setTimeout(() => setSystemAction('SYSTEM IDLE'), 4000);
+      finishTask('success', `CALIBRATED ${data.corpus_id} (${Math.round(data.accuracy * 100)}%)`);
     } catch (err) {
       console.error('Calibration failed', err);
-      setSystemAction('CALIBRATION_FAILED');
-      setTimeout(() => setSystemAction('SYSTEM IDLE'), 4000);
+      const msg = err instanceof Error ? err.message : 'Calibration failed';
+      setUploadError(msg);
+      finishTask('error', 'CALIBRATION_FAILED');
     } finally {
+      clearInterval(phaseTimer);
       setCalibratingPack(null);
     }
   };
@@ -539,9 +587,37 @@ export const ControlPanel: React.FC = () => {
           </div>
         )}
 
+        {backendHealth.status === 'offline' && (
+          <div className="corpus-alert corpus-alert--offline">
+            Backend offline — PDF upload needs the API on port 8000 (`./run_server.sh`).
+          </div>
+        )}
+
+        {uploadError && (
+          <div className="corpus-alert corpus-alert--error" role="alert">
+            {uploadError}
+          </div>
+        )}
+
+        {activeTask && (activeTask.kind === 'upload' || activeTask.kind === 'calibrate') && (
+          <div className="corpus-task-status">
+            <div className="corpus-task-label">
+              <span className="status-label">{activeTask.kind}</span>
+              {' '}{activeTask.phase}
+              {activeTask.progress !== null ? ` (${Math.round(activeTask.progress)}%)` : ''}
+              {activeTask.stalled ? ' — stalled, check backend logs' : ''}
+            </div>
+            <TaskProgressBar progress={activeTask.progress} stalled={activeTask.stalled} />
+          </div>
+        )}
+
         <input type="file" accept="application/pdf" ref={fileInputRef}
           onChange={handleFileUpload} className="file-input" />
-        <button onClick={() => fileInputRef.current?.click()} className="corpus-upload-btn">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="corpus-upload-btn"
+          disabled={activeTask?.kind === 'upload' || activeTask?.kind === 'calibrate'}
+        >
           Upload PDF Corpus
         </button>
 
@@ -556,7 +632,7 @@ export const ControlPanel: React.FC = () => {
                     type="button"
                     onClick={() => handleCalibratePack(p.filename)}
                     className="pack-calibrate-btn"
-                    disabled={calibratingPack !== null}
+                    disabled={calibratingPack !== null || activeTask?.kind === 'upload'}
                     title="Calibrate thresholds for positive mode (labeled dataset required)"
                   >
                     {calibratingPack === p.filename ? '…' : 'Cal'}
@@ -568,14 +644,6 @@ export const ControlPanel: React.FC = () => {
           </div>
         )}
 
-        {ingestionStatus.taskId && ingestionStatus.status !== 'completed' && (
-          <div className="ingestion-status">
-            <span className="status-label">{ingestionStatus.status}</span> {ingestionStatus.message}
-            <div className="progress-bar">
-              <div className="progress-bar-fill" style={{ width: `${ingestionStatus.progress}%` }}></div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

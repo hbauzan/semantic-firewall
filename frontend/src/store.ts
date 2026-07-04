@@ -90,6 +90,28 @@ export interface ChatSlice {
 }
 
 // --- System Slice (telemetry, ingestion, global status) ---
+
+export type BackendHealthStatus = 'checking' | 'ok' | 'offline';
+
+export interface BackendHealth {
+  status: BackendHealthStatus;
+  hint: string;
+  checkedAt: number;
+}
+
+export type ActiveTaskKind = 'upload' | 'calibrate';
+
+export interface ActiveTask {
+  kind: ActiveTaskKind;
+  title: string;
+  phase: string;
+  /** 0–100, or null for indeterminate (e.g. calibration sweep). */
+  progress: number | null;
+  startedAt: number;
+  lastUpdateAt: number;
+  stalled: boolean;
+}
+
 export interface SystemSlice {
   telemetry: TelemetryData;
   setTelemetry: (data: TelemetryData) => void;
@@ -102,6 +124,18 @@ export interface SystemSlice {
     message: string;
   };
   setIngestionStatus: (status: Partial<SystemSlice['ingestionStatus']>) => void;
+  backendHealth: BackendHealth;
+  setBackendHealth: (health: BackendHealth) => void;
+  activeTask: ActiveTask | null;
+  startTask: (task: {
+    kind: ActiveTaskKind;
+    title: string;
+    phase: string;
+    progress?: number | null;
+  }) => void;
+  updateTask: (patch: Partial<Pick<ActiveTask, 'phase' | 'progress' | 'stalled'>>) => void;
+  finishTask: (outcome: 'success' | 'error', message: string) => void;
+  clearTask: () => void;
 }
 
 // --- Sniffer Slice ---
@@ -174,6 +208,50 @@ const createSystemSlice: StateCreator<StoreState, [], [], SystemSlice> = (set) =
   setIngestionStatus: (status) => set((state) => ({
     ingestionStatus: { ...state.ingestionStatus, ...status }
   })),
+  backendHealth: {
+    status: 'checking',
+    hint: 'Checking backend…',
+    checkedAt: 0,
+  },
+  setBackendHealth: (health) => set({ backendHealth: health }),
+  activeTask: null,
+  startTask: (task) => {
+    const now = Date.now();
+    set({
+      activeTask: {
+        kind: task.kind,
+        title: task.title,
+        phase: task.phase,
+        progress: task.progress ?? null,
+        startedAt: now,
+        lastUpdateAt: now,
+        stalled: false,
+      },
+    });
+  },
+  updateTask: (patch) => set((state) => {
+    if (!state.activeTask) return state;
+    const now = Date.now();
+    return {
+      activeTask: {
+        ...state.activeTask,
+        ...patch,
+        lastUpdateAt: now,
+      },
+    };
+  }),
+  finishTask: (outcome, message) => {
+    set({
+      activeTask: null,
+      systemAction: message,
+    });
+    if (outcome === 'error') {
+      setTimeout(() => set({ systemAction: 'SYSTEM IDLE' }), 5000);
+    } else {
+      setTimeout(() => set({ systemAction: 'SYSTEM IDLE' }), 4000);
+    }
+  },
+  clearTask: () => set({ activeTask: null }),
 });
 
 const createSnifferSlice: StateCreator<StoreState, [], [], SnifferSlice> = (set) => ({
