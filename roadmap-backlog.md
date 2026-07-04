@@ -1,7 +1,7 @@
 # Roadmap backlog — trabajo diferido
 
 > Todo lo que **no** es el trabajo activo de ahora.
-> Activo: [`roadmap.md`](./roadmap.md) (lista de tareas del momento).
+> Activo: [`roadmap.md`](./roadmap.md) (benchmark suite / Youden — no es etapa 7 completa; solo harness geométrico offline).
 > Detalle histórico del Nivel 1: carpeta [`roadmap/`](./roadmap/).
 
 Última alineación de estado: **2026-07-04**. Etapas 1–2 del Nivel 1: **hechas**.
