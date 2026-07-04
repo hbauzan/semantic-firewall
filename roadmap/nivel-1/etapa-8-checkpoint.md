@@ -1,5 +1,7 @@
 # Etapa 8 — ⛔ CHECKPOINT: ¿los números cuentan una historia honesta?
 
+> **Estado: pendiente** (después de etapas 5–7).
+
 > Segundo parate obligatorio. Antes de gastar energía en redactar y publicar, verificás que tenés algo que valga la pena publicar.
 
 ---

@@ -1,5 +1,7 @@
 # Etapa 6 — Auditoría y generación de evidencia
 
+> **Estado: pendiente** (después de la Etapa 5).
+
 > Objetivo: usar el harness validado en la Etapa 5 para **generar reportes reproducibles** de la performance del firewall. Acá convertís "anda" en "acá están los números, reproducilos vos mismo".
 
 ---
