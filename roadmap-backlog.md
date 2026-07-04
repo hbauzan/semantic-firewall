@@ -4,7 +4,7 @@
 > Activo: [`roadmap.md`](./roadmap.md) (lista de tareas del momento).
 > Detalle histórico del Nivel 1: carpeta [`roadmap/`](./roadmap/).
 
-Última alineación de estado: **2026-07-04**. Etapas 1–2 del Nivel 1: **hechas**.
+Última alineación de estado: **2026-07-04**. Etapas 1–4 del Nivel 1: **hechas** (checkpoint 4 🟡). Etapa 5: **en progreso**.
 **Opción A (RAG más rico por request): hecha** — multi-cláusula, `rag_top_k` default 12 / máx 32, telemetría de chunks.
 
 ---
@@ -15,9 +15,9 @@ Las etapas detalladas siguen en `roadmap/nivel-1/`. Resumen para no perder el hi
 
 | # | Etapa | Archivo | Notas |
 |---|-------|---------|--------|
-| 3 | UX / flow | [`roadmap/nivel-1/etapa-3-ux.md`](./roadmap/nivel-1/etapa-3-ux.md) | Identidad Semantic Lab, veredicto legible, corpus+queries demo, screenshot money |
-| 4 | Checkpoint testeo | [`roadmap/nivel-1/etapa-4-checkpoint-testeo.md`](./roadmap/nivel-1/etapa-4-checkpoint-testeo.md) | Parate obligatorio; reconfirmar higiene/logging; load test; providers |
-| 5 | Calibración automática | [`roadmap/nivel-1/etapa-5-automatizacion-calibracion.md`](./roadmap/nivel-1/etapa-5-automatizacion-calibracion.md) | Dataset etiquetado, sweep de thresholds, excitación vs coseno |
+| 3 | UX / flow | [`roadmap/nivel-1/etapa-3-ux.md`](./roadmap/nivel-1/etapa-3-ux.md) | **Hecha** — veredicto legible, demo corpus/queries |
+| 4 | Checkpoint testeo | [`roadmap/nivel-1/etapa-4-checkpoint-testeo.md`](./roadmap/nivel-1/etapa-4-checkpoint-testeo.md) | **Hecho 🟡** — load test manual pendiente |
+| 5 | Calibración automática | [`roadmap/nivel-1/etapa-5-automatizacion-calibracion.md`](./roadmap/nivel-1/etapa-5-automatizacion-calibracion.md) | **En progreso** — datasets + harness; corridas pendientes |
 | 6 | Auditoría / evidencia | [`roadmap/nivel-1/etapa-6-auditoria-evidencia.md`](./roadmap/nivel-1/etapa-6-auditoria-evidencia.md) | Determinismo, reportes reproducibles, paquete forense |
 | 7 | Benchmark | [`roadmap/nivel-1/etapa-7-benchmark-comparativo.md`](./roadmap/nivel-1/etapa-7-benchmark-comparativo.md) | vs Llama Guard / Prompt Guard |
 | 8 | Checkpoint números | [`roadmap/nivel-1/etapa-8-checkpoint.md`](./roadmap/nivel-1/etapa-8-checkpoint.md) | ¿Historia honesta? |

@@ -1,6 +1,6 @@
 # Etapa 5 — Automatización de calibración
 
-> **Estado: pendiente** (después del checkpoint de la Etapa 4).
+> **Estado: en progreso** (fundación hecha 2026-07-04; sweep + números finales pendientes de corrida larga).
 
 > Objetivo: un harness que, dado un corpus, **encuentre la mejor calibración de thresholds** y mida cómo se comporta el firewall. Acá empieza la parte de investigación — el corazón del valor.
 
@@ -43,18 +43,18 @@ Fuentes: AdvBench y HarmBench para adversarial (subsets, no todo). Las on-corpus
 ---
 
 ## Tareas
-- [ ] Armar el dataset etiquetado chico (20-30) a mano. Correrlo manualmente. Validar que los resultados tienen sentido.
-- [ ] Expandir el dataset (cientos de queries) usando las fuentes de arriba.
-- [ ] Construir el threshold sweep automatizado sobre dataset isolado (sin tocar el corpus de producción — reusar el patrón de DB temporal de `db_stress_suite.py`).
-- [ ] Generar curvas ROC y punto Youden-óptimo por corpus.
+- [x] Armar el dataset etiquetado chico (20-30) a mano. Correrlo manualmente. Validar que los resultados tienen sentido.
+- [x] Expandir el dataset (cientos de queries) usando las fuentes de arriba. — *v1: 25×2 dominios (automotive + medical); expandir a cientos es siguiente iteración.*
+- [x] Construir el threshold sweep automatizado sobre dataset isolado (sin tocar el corpus de producción — reusar el patrón de DB temporal de `db_stress_suite.py`). — *2D cosine×excitation + 1D noise; 3D y modo negativo diferidos.*
+- [ ] Generar curvas ROC y punto Youden-óptimo por corpus. — *sweep CSV/MD listo (2D + noise); gráficos ROC opcionales.*
 - [ ] Correr el experimento coseno-solo vs. coseno+excitación. Registrar el número clave.
 - [ ] Probar con **al menos 2 corpus de dominios distintos** para ver cuánto se mueve la frontera óptima.
 
 ---
 
 ## Definición de "Etapa 5 terminada"
-- [ ] Dataset etiquetado, versionado, con su metodología documentada.
-- [ ] Harness de calibración que dado un corpus produce thresholds óptimos + ROC.
+- [x] Dataset etiquetado, versionado, con su metodología documentada.
+- [x] Harness de calibración que dado un corpus produce thresholds óptimos + ROC. — *`tests/calibration_suite.py`; Youden en sweep CSV.*
 - [ ] Tenés el número de "aporte de la excitación sobre el coseno", medido en ≥2 corpus.
 - [ ] Sabés cuánto cambia la calibración entre dominios (justifica el "recalibrá al cambiar de corpus").
 

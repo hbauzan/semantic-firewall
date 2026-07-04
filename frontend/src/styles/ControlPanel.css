@@ -271,6 +271,29 @@
   font-size: 0.7rem;
 }
 
+.pack-actions {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.pack-calibrate-btn {
+  padding: 0 0.35rem;
+  font-size: 0.6rem;
+  color: var(--accent, #00ffcc);
+  border: 1px solid var(--accent, #00ffcc);
+  background: rgba(0, 255, 204, 0.08);
+  border-radius: 2px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.pack-calibrate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .pack-delete-btn {
   padding: 0 0.25rem;
   font-size: 0.6rem;
@@ -424,4 +447,65 @@
 .info-icon:hover .tooltip-box {
   visibility: visible;
   opacity: 1;
+}
+
+.empty-state-card {
+  padding: 0.6rem;
+  margin-bottom: 0.5rem;
+  border: 1px dashed var(--border, #333);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted, #00ccaa77);
+  line-height: 1.4;
+}
+
+.empty-state-card p {
+  margin: 0 0 0.35rem;
+}
+
+.empty-state-hint {
+  font-size: 0.75rem;
+}
+
+.corpus-section-title {
+  margin-bottom: 0.4rem;
+}
+
+.bypass-warning {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--danger, #ff3366);
+  background: rgba(255, 51, 102, 0.12);
+  color: #ff99aa;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.reset-row {
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.reset-btn {
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  background-color: var(--panel-bg, #121212);
+  color: var(--text-main, #00ffcc);
+  border: 1px solid var(--border, #333);
+}
+
+.reset-btn:hover {
+  border-color: var(--accent, #00ffcc);
+}
+
+.upstream-select {
+  width: 100%;
+  padding: 0.4rem;
+  margin-top: 0.3rem;
+  border-radius: 4px;
+  border: 1px solid var(--border, #333);
+  background-color: var(--panel-bg, #121212);
+  color: var(--text-main, #00ffcc);
 }

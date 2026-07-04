@@ -2,12 +2,12 @@
 
 > El foco real. Todo lo de esta carpeta es para llevar el firewall de "anda en mi máquina" a "lanzado públicamente con evidencia que se defiende sola".
 
-**Estado (2026-07-04):** etapas **1 y 2 hechas**.
+**Estado (2026-07-04):** etapas **1–4 hechas** (checkpoint 🟡). Etapa **5 en progreso** (datasets + harness).
 
 **Opción A (RAG más rico):** hecha.  
 **Pendiente de producto y opciones B/C:** [`../../roadmap-backlog.md`](../../roadmap-backlog.md).  
 **Tareas del momento:** [`../../roadmap.md`](../../roadmap.md).  
-Siguiente foco de producto del Nivel 1: **etapa 3 (UX)**, salvo que se priorice B.
+Siguiente foco: **cerrar Etapa 5** (corridas de sweep + excitación en 2 dominios), luego evidencia (6–7).
 
 ---
 
@@ -17,9 +17,9 @@ Siguiente foco de producto del Nivel 1: **etapa 3 (UX)**, salvo que se priorice 
 |---|-------|-----------|--------|
 | 1 | [Estabilización](etapa-1-estabilizacion.md) | Anda sin crashes + higiene de repo (incl. **limpiar datos privados**) | Hecha |
 | 2 | [Logging](etapa-2-logging.md) | Trazas confiables, exportables a Graylog/Datadog/estándar | Hecha |
-| 3 | [UX / flow](etapa-3-ux.md) | Embellecer y pulir el flujo de usuario | **Siguiente** |
-| 4 | [**CHECKPOINT: testeo**](etapa-4-checkpoint-testeo.md) | Parate. ¿Anda sólido? ¿Se ve serio? | Pendiente (⛔ obligatorio) |
-| 5 | [Automatización de calibración](etapa-5-automatizacion-calibracion.md) | Harness que encuentra la mejor calibración por corpus | Pendiente |
+| 3 | [UX / flow](etapa-3-ux.md) | Embellecer y pulir el flujo de usuario | Hecha |
+| 4 | [**CHECKPOINT: testeo**](etapa-4-checkpoint-testeo.md) | Parate. ¿Anda sólido? ¿Se ve serio? | Hecho 🟡 |
+| 5 | [Automatización de calibración](etapa-5-automatizacion-calibracion.md) | Harness que encuentra la mejor calibración por corpus | **En progreso** |
 | 6 | [Auditoría y evidencia](etapa-6-auditoria-evidencia.md) | Usar el harness para generar reportes reproducibles | Pendiente |
 | 7 | [Benchmark comparativo](etapa-7-benchmark-comparativo.md) | Mismo dataset vs. Llama Guard / Prompt Guard | Pendiente |
 | 8 | [**CHECKPOINT**](etapa-8-checkpoint.md) | Parate. ¿Los números cuentan una historia honesta? | Pendiente (⛔ obligatorio) |

@@ -74,8 +74,9 @@ export const TelemetryHUD: React.FC = () => {
   }, [setTelemetry]);
 
   return (
-    <div className="panel" style={{ paddingBottom: '0.6rem' }}>
-      <h2 style={{ fontSize: '1rem', marginBottom: '0.4rem', paddingBottom: '0.3rem' }}>Three-headed Semantic Firewall</h2>
+    <div className="panel hud-panel">
+      <h2 className="hud-title">Three-Headed Semantic Firewall</h2>
+      <p className="hud-subtitle">Geometric prompt gate · local-first</p>
 
       {/* --- Three Monkey Heads --- */}
       <div className="monkey-row">
