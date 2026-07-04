@@ -19,6 +19,9 @@ lancedb_stress_test/
 # Test artifacts
 backend/tests/metrics_report.csv
 backend/tests/db_scaling_metrics.md
+backend/tests/benchmark_roc.png
+backend/tests/decision_boundary.png
+backend/tests/benchmark_metrics.csv
 
 # IDE
 .vscode/
