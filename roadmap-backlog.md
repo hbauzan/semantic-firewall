@@ -1,10 +1,11 @@
 # Roadmap backlog — trabajo diferido
 
 > Todo lo que **no** es el trabajo activo de ahora.
-> Activo: [`roadmap.md`](./roadmap.md) (opción A — RAG más rico por request).
+> Activo: [`roadmap.md`](./roadmap.md) (lista de tareas del momento).
 > Detalle histórico del Nivel 1: carpeta [`roadmap/`](./roadmap/).
 
 Última alineación de estado: **2026-07-04**. Etapas 1–2 del Nivel 1: **hechas**.
+**Opción A (RAG más rico por request): hecha** — multi-cláusula, `rag_top_k` default 12 / máx 32, telemetría de chunks.
 
 ---
 
@@ -94,12 +95,11 @@ El firewall **no cambia** en B/C: sigue evaluando cada prompt con embeddings loc
 
 ## Orden sugerido cuando se retome el backlog
 
-1. Terminar opción A ([`roadmap.md`](./roadmap.md)) si aún no está mergeada.
-2. Etapa 3 UX (o B si el dolor de “no conoce el corpus” sigue siendo crítico tras A).
-3. Checkpoint etapa 4.
-4. Evidencia 5–7, checkpoint 8, lanzamiento 9.
-5. B y/o C según necesidad de corpus completo vs costo cloud.
-6. Nivel 2/3 solo como visión post-lanzamiento.
+1. Etapa 3 UX (o B si el dolor de "no conoce el corpus" sigue siendo critico tras A).
+2. Checkpoint etapa 4.
+3. Evidencia 5–7, checkpoint 8, lanzamiento 9.
+4. B y/o C según necesidad de corpus completo vs costo cloud.
+5. Nivel 2/3 solo como visión post-lanzamiento.
 
 ---
 

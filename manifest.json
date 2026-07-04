@@ -56,8 +56,8 @@
         },
         "rag_top_k": {
             "type": "int",
-            "default": 3,
-            "range": [1, 10]
+            "default": 12,
+            "range": [1, 32]
         },
         "firewall_mode": {
             "type": "str",

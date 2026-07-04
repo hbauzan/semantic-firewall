@@ -452,7 +452,7 @@ export const ControlPanel: React.FC = () => {
           RAG Context Depth: <strong>{ragTopK}</strong> chunk{ragTopK > 1 ? 's' : ''}
           <InfoTooltip entry={TOOLTIP_REGISTRY[lang].rag} />
         </div>
-        <StepSlider value={ragTopK} min={1} max={10} step={1} onChange={setRagTopK} />
+        <StepSlider value={ragTopK} min={1} max={32} step={1} onChange={setRagTopK} />
         <div className="slider-sublabel">
           <span>1 (fast)</span>
           <span>10 (deep)</span>

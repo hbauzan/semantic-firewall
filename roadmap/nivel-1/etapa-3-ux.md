@@ -1,6 +1,6 @@
 # Etapa 3 — UX y flujo de usuario
 
-> **Estado: pendiente (en backlog).** Etapas 1–2 cerradas. El código activo ahora es la opción A ([`roadmap.md`](../../roadmap.md)); esta etapa vuelve al frente de producto después (ver [`roadmap-backlog.md`](../../roadmap-backlog.md)).
+> **Estado: pendiente (en backlog).** Etapas 1–2 y opción A (RAG) cerradas. Siguiente foco de producto del Nivel 1 (ver [`roadmap-backlog.md`](../../roadmap-backlog.md)).
 
 > Objetivo: embellecer y pulir el flujo. Que la herramienta se **vea** tan seria como la matemática que tiene adentro. Una herramienta de seguridad que se ve descuidada se desconfía.
 

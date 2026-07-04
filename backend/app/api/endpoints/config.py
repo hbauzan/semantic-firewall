@@ -19,6 +19,7 @@ from app.core.state import _config_lock
 from app.core.firewall import SemanticFirewall
 from app.core.settings import settings
 from app.api.endpoints._shared import verify_api_key, limiter
+from app.modules.rag_context import accumulate_rag_chunks, join_rag_context
 
 logger = logging.getLogger(__name__)
 
@@ -130,16 +131,31 @@ async def audit_query(request: Request, req: AuditRequest):
     if not results:
         return {"passed": False, "breach_reason": "no_context", "trace": [], "activations": 0, "text": "Empty Database."}
 
+    context_chunks: list[str] = []
+    seen: set = set()
+    accumulate_rag_chunks(results, context_chunks, seen)
+    context = join_rag_context(context_chunks)
+
     c_vec = results[0]["vector"]
     q_arr = np.array(q_vec, dtype=np.float32)
     c_arr = np.array(c_vec, dtype=np.float32)
     word_count = len(req.query.split())
 
     result = SemanticFirewall.evaluate_clause(q_arr, c_arr, cfg, word_count)
+    trace = list(result["trace"])
+    trace.append({
+        "stage": "rag_context",
+        "passed": True,
+        "chunk_count": len(context_chunks),
+        "k": cfg.rag_top_k,
+        "clauses_with_hits": 1,
+    })
     return {
         "passed": result["passed"],
         "breach_reason": result["breach_reason"],
-        "trace": result["trace"],
+        "trace": trace,
         "activations": result["last_activations"],  # backward compat
         "text": results[0]["text"],
+        "context": context,
+        "rag_chunk_count": len(context_chunks),
     }
