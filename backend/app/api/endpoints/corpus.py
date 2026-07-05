@@ -2,6 +2,7 @@
 
 Extracted from routes.py as part of Router Decomposition (Finding A1).
 """
+import asyncio
 import os
 import re
 import logging
@@ -11,6 +12,14 @@ from slowapi.util import get_remote_address
 
 from app.modules.ingestor import process_pdf_async, get_task_status
 from app.modules.storage import storage
+from app.modules.profiles import ProfileManager
+from app.modules.corpus_calibration import (
+    calibrate_positive_for_pack,
+    calibratable_filenames,
+    CalibrationError,
+)
+from app.core.models import ConfigState
+from app.core.state import _config_lock
 from app.core.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -64,7 +73,14 @@ async def task_status(task_id: str):
 
 @router.get("/corpus/packs", dependencies=[Depends(verify_api_key)])
 def list_packs():
-    return {"packs": storage.get_summary()}
+    calibratable = calibratable_filenames()
+    packs = []
+    for pack in storage.get_summary():
+        packs.append({
+            **pack,
+            "calibratable": pack["filename"] in calibratable,
+        })
+    return {"packs": packs, "calibratable_corpora": sorted(calibratable)}
 
 @router.delete("/corpus/packs/{filename}", dependencies=[Depends(verify_api_key)])
 def delete_pack(filename: str):
@@ -73,3 +89,37 @@ def delete_pack(filename: str):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid filename: contains disallowed characters")
     return {"status": "deleted", "filename": filename}
+
+
+@router.post("/corpus/packs/{filename}/calibrate-positive", dependencies=[Depends(verify_api_key)])
+@limiter.limit(settings.rate_limit_upload)
+async def calibrate_pack_positive(request: Request, filename: str):
+    """Run Youden threshold sweep for a loaded pack and apply positive-mode optima."""
+    from app.core import state as state_mod
+
+    try:
+        result = await asyncio.to_thread(calibrate_positive_for_pack, filename)
+    except CalibrationError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    async with _config_lock:
+        current = state_mod.config_state
+        new_state = current.model_copy(update={
+            "firewall_mode": "positive",
+            "cosine_threshold": result.cosine_threshold,
+            "excitation_threshold": result.excitation_threshold,
+            "global_noise_limit": result.global_noise_limit,
+        })
+        state_mod.config_state = new_state
+
+    ProfileManager.save_profile("_last_used", new_state)
+
+    return {
+        "status": "calibrated",
+        "filename": filename,
+        "corpus_id": result.corpus_id,
+        "dataset": result.dataset_file,
+        "accuracy": round(result.accuracy, 4),
+        "sweep": result.sweep_summary,
+        "config": new_state.model_dump(),
+    }

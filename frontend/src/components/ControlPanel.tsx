@@ -2,6 +2,10 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import { API_BASE_URL } from '../config';
 import { TOOLTIP_REGISTRY, type TooltipEntry } from '../locales/tooltips';
+import { NEGATIVE_RECOMMENDED, POSITIVE_RECOMMENDED, THRESHOLD_SLIDERS } from '../thresholdBounds';
+import { useBackendHealth } from '../hooks/useBackendHealth';
+import { TaskProgressBar } from './TaskProgressBar';
+import { parseApiError } from '../lib/parseApiError';
 import '../styles/ControlPanel.css';
 
 // Reusable slider with - / + step buttons
@@ -46,10 +50,14 @@ export const ControlPanel: React.FC = () => {
     setCosineOrder, setExcitationOrder, setNoiseOrder, setAdaptiveFactor,
     setNoiseEnabled, setCosineEnabled, setExcitationEnabled, setRagTopK, setFirewallMode,
     setUpstreamProvider, setSnifferViewLimit,
-    ingestionStatus, setIngestionStatus, setSystemAction
+    ingestionStatus, setIngestionStatus, setSystemAction,
+    backendHealth, activeTask, startTask, updateTask, finishTask,
   } = useStore();
 
-  const [packs, setPacks] = useState<{ filename: string, chunks: number }[]>([]);
+  useBackendHealth();
+
+  const [packs, setPacks] = useState<{ filename: string; chunks: number; calibratable?: boolean }[]>([]);
+  const [calibratableCorpora, setCalibratableCorpora] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Profile state ---
@@ -57,6 +65,26 @@ export const ControlPanel: React.FC = () => {
   const [selectedProfile, setSelectedProfile] = useState<string>('');
   const [newProfileName, setNewProfileName] = useState<string>('');
   const [configHydrated, setConfigHydrated] = useState(false);
+  const [calibratingPack, setCalibratingPack] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const applyConfigToStore = (c: Record<string, unknown>) => {
+    setExcitationThreshold(c.excitation_threshold as number);
+    setNoiseTolerance(c.noise_tolerance as number);
+    setCosineThreshold(c.cosine_threshold as number);
+    setGlobalNoiseLimit(c.global_noise_limit as number);
+    setCosineOrder(c.cosine_order as number);
+    setExcitationOrder(c.excitation_order as number);
+    setNoiseOrder(c.noise_order as number);
+    setAdaptiveFactor(c.adaptive_factor as number);
+    setRagTopK(c.rag_top_k as number);
+    setNoiseEnabled(c.noise_enabled as boolean);
+    setCosineEnabled(c.cosine_enabled as boolean);
+    setExcitationEnabled(c.excitation_enabled as boolean);
+    setFirewallMode(c.firewall_mode as 'positive' | 'negative');
+    if (c.sniffer_view_limit) setSnifferViewLimit(c.sniffer_view_limit as number);
+    if (c.upstream_provider) setUpstreamProvider(c.upstream_provider as typeof upstreamProvider);
+  };
 
   const handleOrderChange = (filterName: 'noise' | 'cosine' | 'excitation', newOrder: number) => {
     const currentOrders = {
@@ -94,21 +122,7 @@ export const ControlPanel: React.FC = () => {
       })
       .then(data => {
         const c = data.config;
-        setExcitationThreshold(c.excitation_threshold);
-        setNoiseTolerance(c.noise_tolerance);
-        setCosineThreshold(c.cosine_threshold);
-        setGlobalNoiseLimit(c.global_noise_limit);
-        setCosineOrder(c.cosine_order);
-        setExcitationOrder(c.excitation_order);
-        setNoiseOrder(c.noise_order);
-        setAdaptiveFactor(c.adaptive_factor);
-        setRagTopK(c.rag_top_k);
-        setNoiseEnabled(c.noise_enabled);
-        setCosineEnabled(c.cosine_enabled);
-        setExcitationEnabled(c.excitation_enabled);
-        setFirewallMode(c.firewall_mode);
-        if (c.sniffer_view_limit) setSnifferViewLimit(c.sniffer_view_limit);
-        if (c.upstream_provider) setUpstreamProvider(c.upstream_provider);
+        applyConfigToStore(c);
         setConfigHydrated(true);
       })
       .catch(err => {
@@ -126,6 +140,7 @@ export const ControlPanel: React.FC = () => {
       }
       const data = await res.json();
       setPacks(data.packs || []);
+      setCalibratableCorpora(data.calibratable_corpora || []);
     } catch (err) {
       console.error("Failed to fetch packs:", err);
     }
@@ -165,21 +180,7 @@ export const ControlPanel: React.FC = () => {
       const data = await res.json();
       // Hydrate store from profile response instead of full page reload (Finding F6)
       const c = data.config;
-      setExcitationThreshold(c.excitation_threshold);
-      setNoiseTolerance(c.noise_tolerance);
-      setCosineThreshold(c.cosine_threshold);
-      setGlobalNoiseLimit(c.global_noise_limit);
-      setCosineOrder(c.cosine_order);
-      setExcitationOrder(c.excitation_order);
-      setNoiseOrder(c.noise_order);
-      setAdaptiveFactor(c.adaptive_factor);
-      setRagTopK(c.rag_top_k);
-      setNoiseEnabled(c.noise_enabled);
-      setCosineEnabled(c.cosine_enabled);
-      setExcitationEnabled(c.excitation_enabled);
-      setFirewallMode(c.firewall_mode);
-      if (c.sniffer_view_limit) setSnifferViewLimit(c.sniffer_view_limit);
-      if (c.upstream_provider) setUpstreamProvider(c.upstream_provider);
+      applyConfigToStore(c);
     } catch (err) {
       console.error("Failed to load profile:", err);
     }
@@ -241,23 +242,36 @@ export const ControlPanel: React.FC = () => {
             return;
           }
           const data = await res.json();
+          const phase = data.message || data.status;
           setIngestionStatus({
+            taskId: ingestionStatus.taskId,
             status: data.status,
             progress: data.progress,
             message: data.message
           });
-          setSystemAction(`INGESTING_CORPUS: ${Math.round(data.progress)}%`);
-          if (data.status === 'completed' || data.status === 'failed') {
-            setSystemAction('SYSTEM IDLE');
+          updateTask({
+            phase,
+            progress: data.progress,
+            stalled: false,
+          });
+          if (data.status === 'completed') {
+            finishTask('success', `INGESTED ${Math.round(data.progress)}%`);
+            setUploadError(null);
+            setIngestionStatus({ taskId: null, status: 'idle', progress: 0, message: '' });
             fetchPacks();
+          } else if (data.status === 'failed') {
+            finishTask('error', 'INGESTION_FAILED');
+            setUploadError(data.message || 'Ingestion failed');
+            setIngestionStatus({ taskId: null, status: 'idle', progress: 0, message: '' });
           }
         } catch (err) {
           console.error("Failed to fetch task status", err);
+          updateTask({ phase: 'Waiting for backend task status…', stalled: true });
         }
       }, 1000);
     }
     return () => { if (interval) clearInterval(interval); }
-  }, [ingestionStatus.taskId, ingestionStatus.status, setIngestionStatus, setSystemAction, fetchPacks]);
+  }, [ingestionStatus.taskId, ingestionStatus.status, setIngestionStatus, updateTask, finishTask, fetchPacks]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -270,7 +284,13 @@ export const ControlPanel: React.FC = () => {
 
     const formData = new FormData();
     formData.append('file', file);
-    setSystemAction("UPLOADING_PDF...");
+    setUploadError(null);
+    startTask({
+      kind: 'upload',
+      title: 'PDF upload',
+      phase: 'Sending file to backend…',
+      progress: 0,
+    });
     try {
       const res = await fetch(`${API_BASE_URL}/corpus/upload-pdf`, {
         method: 'POST',
@@ -278,14 +298,62 @@ export const ControlPanel: React.FC = () => {
       });
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`Upload failed (${res.status}): ${errText}`);
+        throw new Error(parseApiError(errText));
       }
       const data = await res.json();
-      setIngestionStatus({ taskId: data.task_id, status: 'pending', progress: 0, message: 'Upload started...' });
+      setIngestionStatus({ taskId: data.task_id, status: 'pending', progress: 0, message: 'Upload started…' });
+      updateTask({ phase: 'Queued for ingestion', progress: 0 });
     } catch (err) {
       console.error("Upload failed", err);
-      setSystemAction("UPLOAD_FAILED");
-      setTimeout(() => setSystemAction("SYSTEM IDLE"), 3000);
+      const online = backendHealth.status === 'ok';
+      setUploadError(
+        online
+          ? (err instanceof Error ? err.message : 'Upload failed')
+          : 'Backend is not running on port 8000. Start it with: ./run_server.sh'
+      );
+      finishTask('error', 'UPLOAD_FAILED');
+    }
+  };
+
+  const handleCalibratePack = async (filename: string) => {
+    setCalibratingPack(filename);
+    setUploadError(null);
+    startTask({
+      kind: 'calibrate',
+      title: `Calibrate ${filename}`,
+      phase: '2D sweep: cosine × excitation…',
+      progress: null,
+    });
+
+    const phaseTimer = setInterval(() => {
+      const elapsed = Date.now() - (useStore.getState().activeTask?.startedAt ?? Date.now());
+      if (elapsed > 60_000) {
+        updateTask({ phase: 'Tuning noise threshold…' });
+      } else if (elapsed > 20_000) {
+        updateTask({ phase: 'Evaluating labeled queries (embedder)…' });
+      }
+    }, 5000);
+
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/corpus/packs/${encodeURIComponent(filename)}/calibrate-positive`,
+        { method: 'POST' },
+      );
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(parseApiError(errText));
+      }
+      const data = await res.json();
+      applyConfigToStore(data.config);
+      finishTask('success', `CALIBRATED ${data.corpus_id} (${Math.round(data.accuracy * 100)}%)`);
+    } catch (err) {
+      console.error('Calibration failed', err);
+      const msg = err instanceof Error ? err.message : 'Calibration failed';
+      setUploadError(msg);
+      finishTask('error', 'CALIBRATION_FAILED');
+    } finally {
+      clearInterval(phaseTimer);
+      setCalibratingPack(null);
     }
   };
 
@@ -305,15 +373,10 @@ export const ControlPanel: React.FC = () => {
   const isNeg = firewallMode === 'negative';
 
   const handleResetToRecommended = () => {
-    if (firewallMode === 'positive') {
-      setCosineThreshold(0.5315);
-      setExcitationThreshold(150);
-      setGlobalNoiseLimit(4.5);
-    } else {
-      setCosineThreshold(0.6197);
-      setExcitationThreshold(170);
-      setGlobalNoiseLimit(4.5);
-    }
+    const rec = isNeg ? NEGATIVE_RECOMMENDED : POSITIVE_RECOMMENDED;
+    setCosineThreshold(rec.cosine);
+    setExcitationThreshold(rec.excitation);
+    setGlobalNoiseLimit(rec.globalNoise);
   };
 
   return (
@@ -329,7 +392,7 @@ export const ControlPanel: React.FC = () => {
         <select
           value={upstreamProvider}
           onChange={(e) => setUpstreamProvider(e.target.value as any)}
-          style={{ width: '100%', padding: '0.4rem', marginTop: '0.3rem', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+          className="upstream-select"
         >
           <option value="ollama">Ollama (Local)</option>
           <option value="google">Google Gemini</option>
@@ -358,8 +421,14 @@ export const ControlPanel: React.FC = () => {
         </button>
       </div>
 
-      <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
-        <button onClick={handleResetToRecommended} className="reset-btn" style={{ padding: '0.4rem 1rem', cursor: 'pointer', borderRadius: '4px', backgroundColor: 'var(--bg-light)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>Reset to Recommended</button>
+      {!noiseEnabled && !cosineEnabled && !excitationEnabled && (
+        <div className="bypass-warning">
+          All filters are OFF — queries bypass the firewall and go straight to the LLM.
+        </div>
+      )}
+
+      <div className="reset-row">
+        <button type="button" onClick={handleResetToRecommended} className="reset-btn">Reset to Recommended</button>
       </div>
 
       {/* --- Noise Pre-Filter --- */}
@@ -373,7 +442,7 @@ export const ControlPanel: React.FC = () => {
             Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong>
             <InfoTooltip entry={TOOLTIP_REGISTRY[lang].noise} />
           </div>
-          <StepSlider value={globalNoiseLimit} min={0.10} max={2.00} step={0.01} onChange={setGlobalNoiseLimit} />
+          <StepSlider value={globalNoiseLimit} min={THRESHOLD_SLIDERS.globalNoise.min} max={THRESHOLD_SLIDERS.globalNoise.max} step={THRESHOLD_SLIDERS.globalNoise.step} onChange={setGlobalNoiseLimit} />
         </div>
         <div className="seq-column">
           <div className="seq-label">Seq</div>
@@ -393,7 +462,7 @@ export const ControlPanel: React.FC = () => {
             Cosine Gate: <strong>{cosineThreshold.toFixed(2)}</strong>
             <InfoTooltip entry={TOOLTIP_REGISTRY[lang].cosine} />
           </div>
-          <StepSlider value={cosineThreshold} min={0.00} max={1.00} step={0.01} onChange={setCosineThreshold} />
+          <StepSlider value={cosineThreshold} min={THRESHOLD_SLIDERS.cosine.min} max={THRESHOLD_SLIDERS.cosine.max} step={THRESHOLD_SLIDERS.cosine.step} onChange={setCosineThreshold} />
           <div className="slider-hint">
             <span>0 LAX</span><span>STRICT 1</span>
           </div>
@@ -416,7 +485,7 @@ export const ControlPanel: React.FC = () => {
             Excitation: <strong>{excitationThreshold}</strong>
             <InfoTooltip entry={TOOLTIP_REGISTRY[lang].excitation} />
           </div>
-          <StepSlider value={excitationThreshold} min={0} max={1024} step={1} onChange={setExcitationThreshold} />
+          <StepSlider value={excitationThreshold} min={THRESHOLD_SLIDERS.excitation.min} max={THRESHOLD_SLIDERS.excitation.max} step={THRESHOLD_SLIDERS.excitation.step} onChange={setExcitationThreshold} />
           <div className="noise-tolerance-label">
             Noise Tolerance: {noiseTolerance.toFixed(3)}
             <InfoTooltip entry={TOOLTIP_REGISTRY[lang].tolerance} />
@@ -509,13 +578,49 @@ export const ControlPanel: React.FC = () => {
 
       {/* --- Corpus Upload --- */}
       <div className="corpus-section">
-        <div className="section-title" style={{ marginBottom: '0.4rem' }}>
+        <div className="section-title corpus-section-title">
           Document Corpus
           <InfoTooltip entry={TOOLTIP_REGISTRY[lang].corpus} />
         </div>
+
+        {packs.length === 0 && !ingestionStatus.taskId && (
+          <div className="empty-state-card">
+            <p>No corpus loaded. Positive mode needs a PDF to verify queries.</p>
+            <p className="empty-state-hint">Upload a PDF below to get started.</p>
+          </div>
+        )}
+
+        {backendHealth.status === 'offline' && (
+          <div className="corpus-alert corpus-alert--offline">
+            Backend offline — PDF upload needs the API on port 8000 (`./run_server.sh`).
+          </div>
+        )}
+
+        {uploadError && (
+          <div className="corpus-alert corpus-alert--error" role="alert">
+            {uploadError}
+          </div>
+        )}
+
+        {activeTask && (activeTask.kind === 'upload' || activeTask.kind === 'calibrate') && (
+          <div className="corpus-task-status">
+            <div className="corpus-task-label">
+              <span className="status-label">{activeTask.kind}</span>
+              {' '}{activeTask.phase}
+              {activeTask.progress !== null ? ` (${Math.round(activeTask.progress)}%)` : ''}
+              {activeTask.stalled ? ' — stalled, check backend logs' : ''}
+            </div>
+            <TaskProgressBar progress={activeTask.progress} stalled={activeTask.stalled} />
+          </div>
+        )}
+
         <input type="file" accept="application/pdf" ref={fileInputRef}
           onChange={handleFileUpload} className="file-input" />
-        <button onClick={() => fileInputRef.current?.click()} className="corpus-upload-btn">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="corpus-upload-btn"
+          disabled={activeTask?.kind === 'upload' || activeTask?.kind === 'calibrate'}
+        >
           Upload PDF Corpus
         </button>
 
@@ -525,20 +630,32 @@ export const ControlPanel: React.FC = () => {
             {packs.map((p) => (
               <div key={p.filename} className="pack-item">
                 <span className="pack-name" title={p.filename}>{p.filename} ({p.chunks})</span>
-                <button onClick={() => handleDeletePack(p.filename)} className="pack-delete-btn">X</button>
+                <div className="pack-actions">
+                  {p.calibratable ? (
+                    <button
+                      type="button"
+                      onClick={() => handleCalibratePack(p.filename)}
+                      className="pack-calibrate-btn"
+                      disabled={calibratingPack !== null || activeTask?.kind === 'upload'}
+                      title="Calibrate thresholds for positive mode (labeled dataset)"
+                    >
+                      {calibratingPack === p.filename ? '…' : 'Cal'}
+                    </button>
+                  ) : (
+                    <span
+                      className="pack-cal-na"
+                      title={`No calibration dataset for this PDF. Cal works for: ${calibratableCorpora.join(', ') || 'none'}`}
+                    >
+                      Cal N/A
+                    </span>
+                  )}
+                  <button type="button" onClick={() => handleDeletePack(p.filename)} className="pack-delete-btn">X</button>
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        {ingestionStatus.taskId && ingestionStatus.status !== 'completed' && (
-          <div className="ingestion-status">
-            <span className="status-label">{ingestionStatus.status}</span> {ingestionStatus.message}
-            <div className="progress-bar">
-              <div className="progress-bar-fill" style={{ width: `${ingestionStatus.progress}%` }}></div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

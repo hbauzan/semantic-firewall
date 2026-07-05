@@ -15,13 +15,15 @@ node_modules/
 # Vector database (local data, not code)
 lancedb_data/
 lancedb_stress_test/
+lancedb_calibration_test/
 
 # Test artifacts
 backend/tests/metrics_report.csv
-backend/tests/db_scaling_metrics.md
+backend/tests/benchmark_metrics.csv
 backend/tests/benchmark_roc.png
 backend/tests/decision_boundary.png
-backend/tests/benchmark_metrics.csv
+backend/tests/db_scaling_metrics.md
+backend/calibration/reports/
 
 # IDE
 .vscode/
