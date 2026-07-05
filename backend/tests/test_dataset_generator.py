@@ -75,8 +75,7 @@ def test_build_queries_count():
 
 def test_calibrate_any_loaded_pack(monkeypatch):
     from app.modules.corpus_calibration import (
-        JointSweepPoint,
-        SweepPoint,
+        TripleSweepPoint,
         calibrate_positive_for_pack,
     )
 
@@ -87,18 +86,17 @@ def test_calibrate_any_loaded_pack(monkeypatch):
         "generation_method": "template_fallback",
         "queries": [{"id": "q1", "text": "What about diesel?", "expected": "pass"}],
     }
-    joint_winner = JointSweepPoint(0.48, 100, tp=18, fp=2, tn=4, fn=1)
-    noise_winner = SweepPoint("global_noise_limit", 4.5, tp=20, fp=1, tn=4, fn=0)
+    winner = TripleSweepPoint(0.48, 100, 4.5, tp=18, fp=2, tn=4, fn=1)
 
     with (
         patch("app.modules.corpus_calibration.storage.get_summary", return_value=[{"filename": "random_manual.pdf"}]),
         patch("app.modules.corpus_calibration.resolve_dataset_for_pack", return_value=None),
         patch("app.modules.dataset_generator.generate_dataset_for_pack", return_value=generated),
+        patch("app.modules.corpus_calibration._measure_calibration_dataset", return_value=[]),
         patch(
-            "app.modules.corpus_calibration._sweep_cosine_excitation_2d",
-            return_value=[joint_winner],
+            "app.modules.corpus_calibration._sweep_thresholds_3d",
+            return_value=[winner],
         ),
-        patch("app.modules.corpus_calibration._sweep_1d", return_value=[noise_winner]),
         patch(
             "app.modules.corpus_calibration._run_evaluation",
             return_value=[("q1", "pass", "pass", True)],
@@ -112,8 +110,7 @@ def test_calibrate_any_loaded_pack(monkeypatch):
 
 def test_calibrate_task_progress():
     from app.modules.corpus_calibration import (
-        JointSweepPoint,
-        SweepPoint,
+        TripleSweepPoint,
         calibrate_positive_for_pack,
     )
 
@@ -129,19 +126,16 @@ def test_calibrate_task_progress():
         "queries": [{"id": "q1", "text": "t", "expected": "pass"}],
     }
 
-    def fake_2d(*_args, progress_cb=None, **_kwargs):
+    def fake_3d(*_args, progress_cb=None, **_kwargs):
         if progress_cb:
-            progress_cb(40.0, "2D sweep… (1/99)")
-        return [JointSweepPoint(0.5, 150, tp=1, fp=0, tn=0, fn=0)]
+            progress_cb(40.0, "3D sweep… (1/1287)")
+        return [TripleSweepPoint(0.5, 150, 4.5, tp=1, fp=0, tn=0, fn=0)]
 
     with (
         patch("app.modules.corpus_calibration.storage.get_summary", return_value=[{"filename": "pack.pdf"}]),
         patch("app.modules.corpus_calibration.resolve_dataset_for_pack", return_value=dataset),
-        patch("app.modules.corpus_calibration._sweep_cosine_excitation_2d", side_effect=fake_2d),
-        patch(
-            "app.modules.corpus_calibration._sweep_1d",
-            return_value=[SweepPoint("global_noise_limit", 4.5, tp=1, fp=0, tn=0, fn=0)],
-        ),
+        patch("app.modules.corpus_calibration._measure_calibration_dataset", return_value=[]),
+        patch("app.modules.corpus_calibration._sweep_thresholds_3d", side_effect=fake_3d),
         patch(
             "app.modules.corpus_calibration._run_evaluation",
             return_value=[("q1", "pass", "pass", True)],

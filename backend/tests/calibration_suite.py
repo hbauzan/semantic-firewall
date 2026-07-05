@@ -31,7 +31,7 @@ from lancedb.pydantic import LanceModel, Vector
 
 from app.core.firewall import SemanticFirewall
 from app.core.models import ConfigState
-from app.core.recommended_thresholds import POSITIVE_RECOMMENDED, SWEEP_GRIDS
+from app.core.recommended_thresholds import SWEEP_GRIDS, threshold_3d_grid_size
 
 
 class KnowledgeNode(LanceModel):
@@ -118,6 +118,38 @@ class JointSweepPoint:
         return self.recall - self.fpr
 
 
+@dataclass
+class TripleSweepPoint:
+    cosine_threshold: float
+    excitation_threshold: int
+    global_noise_limit: float
+    tp: int
+    fp: int
+    tn: int
+    fn: int
+
+    @property
+    def precision(self) -> float:
+        return self.tp / (self.tp + self.fp) if (self.tp + self.fp) else 0.0
+
+    @property
+    def recall(self) -> float:
+        return self.tp / (self.tp + self.fn) if (self.tp + self.fn) else 0.0
+
+    @property
+    def f1(self) -> float:
+        p, r = self.precision, self.recall
+        return 2 * p * r / (p + r) if (p + r) else 0.0
+
+    @property
+    def fpr(self) -> float:
+        return self.fp / (self.fp + self.tn) if (self.fp + self.tn) else 0.0
+
+    @property
+    def youden(self) -> float:
+        return self.recall - self.fpr
+
+
 def load_dataset(path: Path) -> dict:
     with path.open(encoding="utf-8") as f:
         return json.load(f)
@@ -153,6 +185,106 @@ def ingest_pdf_to_table(pdf_path: Path, table, embedder, filename: str) -> int:
     if nodes:
         table.add(nodes)
     return len(nodes)
+
+
+def _effective_excitation_threshold(
+    excitation_threshold: float,
+    word_count: int,
+    adaptive_factor: float,
+) -> float:
+    if word_count < 6:
+        return float(excitation_threshold) * adaptive_factor
+    return float(excitation_threshold)
+
+
+def measure_calibration_clause(
+    clause: str,
+    table,
+    embedder,
+    cfg_probe: ConfigState,
+) -> dict:
+    cl_vec = embedder.embed(clause)
+    q = np.asarray(cl_vec, dtype=np.float32)
+    word_count = len(clause.split())
+    results = table.search(cl_vec).limit(cfg_probe.rag_top_k).to_list()
+    if not results:
+        return {
+            "has_context": False,
+            "entropy": float("nan"),
+            "cosine_sim": 0.0,
+            "activations": 0,
+            "word_count": word_count,
+        }
+
+    c = np.asarray(results[0]["vector"], dtype=np.float32).reshape(-1)
+    _, _, noise_details = SemanticFirewall.run_noise_filter(q, c, cfg_probe)
+    _, _, cosine_details = SemanticFirewall.run_cosine_filter(q, c, cfg_probe)
+    _, _, excitation_details = SemanticFirewall.run_excitation_filter(
+        q, c, cfg_probe, word_count=word_count
+    )
+    return {
+        "has_context": True,
+        "entropy": float(noise_details["entropy"]),
+        "cosine_sim": float(cosine_details["cosine_sim"]),
+        "activations": int(excitation_details["activations"]),
+        "word_count": word_count,
+    }
+
+
+def measure_calibration_dataset(
+    dataset: dict,
+    table,
+    embedder,
+    cfg_probe: ConfigState,
+) -> list[dict]:
+    rows: list[dict] = []
+    for q in dataset["queries"]:
+        clauses = SemanticFirewall.segment(q["text"].strip())
+        clause_rows = [
+            measure_calibration_clause(cl, table, embedder, cfg_probe) for cl in clauses
+        ]
+        rows.append({
+            "id": q["id"],
+            "expected": q["expected"],
+            "clauses": clause_rows,
+        })
+    return rows
+
+
+def _clause_blocked_from_cache(clause: dict, cfg: ConfigState) -> bool:
+    if not clause["has_context"]:
+        return True
+    if cfg.noise_enabled and clause["entropy"] < cfg.global_noise_limit:
+        return True
+    if cfg.cosine_enabled and clause["cosine_sim"] < cfg.cosine_threshold:
+        return True
+    if cfg.excitation_enabled:
+        exc_th = _effective_excitation_threshold(
+            cfg.excitation_threshold, clause["word_count"], cfg.adaptive_factor
+        )
+        if clause["activations"] < exc_th:
+            return True
+    return False
+
+
+def _prompt_blocked_from_cache(row: dict, cfg: ConfigState) -> bool:
+    return any(_clause_blocked_from_cache(cl, cfg) for cl in row["clauses"])
+
+
+def confusion_from_cache(cached_rows: list[dict], cfg: ConfigState) -> tuple[int, int, int, int]:
+    tp = fp = tn = fn = 0
+    for row in cached_rows:
+        blocked = _prompt_blocked_from_cache(row, cfg)
+        true_block = row["expected"] == "block"
+        if blocked and true_block:
+            tp += 1
+        elif blocked and not true_block:
+            fp += 1
+        elif not blocked and not true_block:
+            tn += 1
+        else:
+            fn += 1
+    return tp, fp, tn, fn
 
 
 def evaluate_prompt(
@@ -286,56 +418,30 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     return 0 if not wrong else 2
 
 
-def sweep_1d(
-    param: str,
-    values: list[float],
+def sweep_thresholds_3d(
     base_cfg: ConfigState,
-    dataset: dict,
-    table,
-    embedder,
-) -> list[SweepPoint]:
-    points: list[SweepPoint] = []
-    for val in values:
-        overrides = {param: val}
-        if param == "excitation_threshold":
-            overrides[param] = int(val)
-        cfg = base_cfg.model_copy(update=overrides)
-        results = run_evaluation(dataset, cfg, table, embedder)
-        tp, fp, tn, fn = confusion(results)
-        points.append(SweepPoint(param=param, value=val, tp=tp, fp=fp, tn=tn, fn=fn))
-    return points
-
-
-def sweep_cosine_excitation_2d(
-    base_cfg: ConfigState,
-    dataset: dict,
-    table,
-    embedder,
-    noise_fixed: float,
-) -> list[JointSweepPoint]:
-    points: list[JointSweepPoint] = []
+    cached_rows: list[dict],
+) -> list[TripleSweepPoint]:
+    points: list[TripleSweepPoint] = []
     for cos in SWEEP_GRIDS["cosine_threshold"]:
         for exc in SWEEP_GRIDS["excitation_threshold"]:
-            cfg = base_cfg.model_copy(update={
-                "cosine_threshold": cos,
-                "excitation_threshold": int(exc),
-                "global_noise_limit": noise_fixed,
-            })
-            results = run_evaluation(dataset, cfg, table, embedder)
-            tp, fp, tn, fn = confusion(results)
-            points.append(JointSweepPoint(
-                cosine_threshold=cos,
-                excitation_threshold=int(exc),
-                tp=tp, fp=fp, tn=tn, fn=fn,
-            ))
+            for noise in SWEEP_GRIDS["global_noise_limit"]:
+                cfg = base_cfg.model_copy(update={
+                    "cosine_threshold": cos,
+                    "excitation_threshold": int(exc),
+                    "global_noise_limit": noise,
+                })
+                tp, fp, tn, fn = confusion_from_cache(cached_rows, cfg)
+                points.append(TripleSweepPoint(
+                    cosine_threshold=cos,
+                    excitation_threshold=int(exc),
+                    global_noise_limit=noise,
+                    tp=tp, fp=fp, tn=tn, fn=fn,
+                ))
     return points
 
 
-def _pick_youden(points: list[SweepPoint]) -> SweepPoint:
-    return max(points, key=lambda p: (p.youden, p.f1, -p.fn))
-
-
-def _pick_joint_youden(points: list[JointSweepPoint]) -> JointSweepPoint:
+def _pick_triple_youden(points: list[TripleSweepPoint]) -> TripleSweepPoint:
     return max(points, key=lambda p: (p.youden, p.f1, -p.fn))
 
 
@@ -353,63 +459,38 @@ def cmd_sweep(args: argparse.Namespace) -> int:
     embedder = Embedder()
     table, test_db_path = setup_isolated_db(pdf_path, embedder)
     base_cfg = ConfigState(firewall_mode="positive")
-    noise_fixed = POSITIVE_RECOMMENDED["global_noise_limit"]
 
     report_dir = BACKEND_DIR / "calibration" / "reports"
     report_dir.mkdir(parents=True, exist_ok=True)
     stem = dataset_path.stem
-    out_2d = report_dir / f"{stem}_sweep_2d.csv"
-    out_noise = report_dir / f"{stem}_sweep_noise.csv"
+    out_3d = report_dir / f"{stem}_sweep_3d.csv"
 
-    n_cos = len(SWEEP_GRIDS["cosine_threshold"])
-    n_exc = len(SWEEP_GRIDS["excitation_threshold"])
-    print(f"2D sweep cosine×excitation ({n_cos}×{n_exc}={n_cos * n_exc} pairs, noise={noise_fixed})...")
-    joint_points = sweep_cosine_excitation_2d(base_cfg, dataset, table, embedder, noise_fixed)
-    joint_winner = _pick_joint_youden(joint_points)
+    n_cos, n_exc, n_noise = threshold_3d_grid_size()
+    total = n_cos * n_exc * n_noise
+    print(f"3D sweep cosine×excitation×noise ({n_cos}×{n_exc}×{n_noise}={total})...")
+    print("Measuring clause metrics (embed once per clause)...")
+    cached_rows = measure_calibration_dataset(dataset, table, embedder, base_cfg)
+    triple_points = sweep_thresholds_3d(base_cfg, cached_rows)
+    winner = _pick_triple_youden(triple_points)
 
-    with out_2d.open("w", newline="", encoding="utf-8") as f:
+    with out_3d.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow([
-            "cosine_threshold", "excitation_threshold", "tp", "fp", "tn", "fn",
-            "precision", "recall", "f1", "fpr", "youden",
+            "cosine_threshold", "excitation_threshold", "global_noise_limit",
+            "tp", "fp", "tn", "fn", "precision", "recall", "f1", "fpr", "youden",
         ])
-        for p in joint_points:
+        for p in triple_points:
             w.writerow([
-                p.cosine_threshold, p.excitation_threshold, p.tp, p.fp, p.tn, p.fn,
+                p.cosine_threshold, p.excitation_threshold, p.global_noise_limit,
+                p.tp, p.fp, p.tn, p.fn,
                 f"{p.precision:.4f}", f"{p.recall:.4f}", f"{p.f1:.4f}", f"{p.fpr:.4f}", f"{p.youden:.4f}",
             ])
 
     print(
-        f"  Youden-optimal 2D: cosine={joint_winner.cosine_threshold} "
-        f"excitation={joint_winner.excitation_threshold}  "
-        f"F1={joint_winner.f1:.3f}  Youden={joint_winner.youden:.3f}"
+        f"  Youden-optimal 3D: cosine={winner.cosine_threshold} "
+        f"excitation={winner.excitation_threshold} noise={winner.global_noise_limit}  "
+        f"F1={winner.f1:.3f}  Youden={winner.youden:.3f}"
     )
-
-    held_cfg = base_cfg.model_copy(update={
-        "cosine_threshold": joint_winner.cosine_threshold,
-        "excitation_threshold": joint_winner.excitation_threshold,
-    })
-    print(f"1D noise sweep ({len(SWEEP_GRIDS['global_noise_limit'])} values, cosine/excitation held)...")
-    noise_points = sweep_1d(
-        "global_noise_limit",
-        SWEEP_GRIDS["global_noise_limit"],
-        held_cfg,
-        dataset,
-        table,
-        embedder,
-    )
-    noise_winner = _pick_youden(noise_points)
-
-    with out_noise.open("w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["param", "value", "tp", "fp", "tn", "fn", "precision", "recall", "f1", "fpr", "youden"])
-        for p in noise_points:
-            w.writerow([
-                p.param, p.value, p.tp, p.fp, p.tn, p.fn,
-                f"{p.precision:.4f}", f"{p.recall:.4f}", f"{p.f1:.4f}", f"{p.fpr:.4f}", f"{p.youden:.4f}",
-            ])
-
-    print(f"  Youden-optimal noise={noise_winner.value}  F1={noise_winner.f1:.3f}  Youden={noise_winner.youden:.3f}")
 
     md_path = report_dir / f"{stem}_sweep.md"
     lines = [
@@ -419,23 +500,21 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         "",
         "## Method",
         "",
-        f"1. **2D joint sweep** — cosine × excitation ({n_cos}×{n_exc} pairs), "
-        f"`global_noise_limit` fixed at recommended `{noise_fixed}`.",
-        "2. **1D noise sweep** — `global_noise_limit` with winning cosine/excitation held.",
+        f"**3D joint sweep** — cosine × excitation × noise ({n_cos}×{n_exc}×{n_noise}={total} configs).",
+        "Clause metrics cached (embed once); grid uses cached confusion only.",
         "",
-        "(Full 3D grid deferred; negative-mode calibration deferred.)",
+        "(Negative-mode calibration deferred.)",
         "",
         "## Youden-optimal",
         "",
-        "| Stage | cosine | excitation | noise | F1 | Youden |",
-        "|-------|--------|------------|-------|-----|--------|",
-        f"| 2D joint | {joint_winner.cosine_threshold} | {joint_winner.excitation_threshold} | {noise_fixed} (fixed) | {joint_winner.f1:.3f} | {joint_winner.youden:.3f} |",
-        f"| Final (after noise 1D) | {joint_winner.cosine_threshold} | {joint_winner.excitation_threshold} | {noise_winner.value} | {noise_winner.f1:.3f} | {noise_winner.youden:.3f} |",
+        "| cosine | excitation | noise | F1 | Youden |",
+        "|--------|------------|-------|-----|--------|",
+        f"| {winner.cosine_threshold} | {winner.excitation_threshold} | {winner.global_noise_limit} | {winner.f1:.3f} | {winner.youden:.3f} |",
         "",
-        f"2D grid: `{out_2d.name}`  |  Noise grid: `{out_noise.name}`",
+        f"3D grid: `{out_3d.name}`",
     ]
     md_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"Wrote {out_2d}, {out_noise}, and {md_path}")
+    print(f"Wrote {out_3d} and {md_path}")
 
     shutil.rmtree(test_db_path, ignore_errors=True)
     return 0

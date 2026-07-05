@@ -66,3 +66,12 @@ SWEEP_GRIDS: dict[str, list[float]] = {
 def cosine_excitation_2d_grid_size() -> tuple[int, int]:
     """Return (n_cosine, n_excitation) for the joint 2D sweep."""
     return len(SWEEP_GRIDS["cosine_threshold"]), len(SWEEP_GRIDS["excitation_threshold"])
+
+
+def threshold_3d_grid_size() -> tuple[int, int, int]:
+    """Return (n_cosine, n_excitation, n_noise) for the joint 3D calibration sweep."""
+    return (
+        len(SWEEP_GRIDS["cosine_threshold"]),
+        len(SWEEP_GRIDS["excitation_threshold"]),
+        len(SWEEP_GRIDS["global_noise_limit"]),
+    )
