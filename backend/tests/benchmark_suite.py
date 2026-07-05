@@ -4,7 +4,9 @@ Prisma-aligned benchmark: pack-scoped retrieval, multi-clause segmentation (/cha
 parity), calibration-first thresholds, Youden grid sweep.
 
 Usage (from backend/):
-    uv run python tests/benchmark_suite.py
+    uv run python tests/benchmark_suite.py                    # Youden grid sweep
+    uv run python tests/benchmark_suite.py --mode battery     # filter battery (4 modes)
+    uv run python tests/benchmark_suite.py --mode all         # battery + sweep
 """
 
 from __future__ import annotations
@@ -16,7 +18,8 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from dataclasses import dataclass
+from typing import Literal
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
@@ -73,6 +76,15 @@ TESTS_DIR = Path(__file__).resolve().parent
 CSV_PATH = TESTS_DIR / "benchmark_metrics.csv"
 ROC_PATH = TESTS_DIR / "benchmark_roc.png"
 BOUNDARY_PATH = TESTS_DIR / "decision_boundary.png"
+FILTER_BATTERY_CSV = TESTS_DIR / "benchmark_filter_battery.csv"
+FILTER_BATTERY_PNG = TESTS_DIR / "benchmark_filter_battery.png"
+
+FilterModeId = Literal[
+    "cosine_only",
+    "noise_only",
+    "excitation_only",
+    "cosine_noise_excitation",
+]
 
 logger = logging.getLogger("benchmark_suite")
 
@@ -737,6 +749,380 @@ def plot_decision_boundary(
 
 
 # ---------------------------------------------------------------------------
+# Filter battery (single-filter baselines + cosine-first full pipeline)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ThresholdProfile:
+    name: str
+    cosine_threshold: float
+    excitation_threshold: int
+    global_noise_limit: float
+
+
+@dataclass(frozen=True)
+class FilterModeSpec:
+    mode_id: FilterModeId
+    label: str
+    description: str
+    cosine_order: int
+    noise_order: int
+    excitation_order: int
+    cosine_enabled: bool
+    noise_enabled: bool
+    excitation_enabled: bool
+
+
+FILTER_MODES: tuple[FilterModeSpec, ...] = (
+    FilterModeSpec(
+        mode_id="cosine_only",
+        label="Cosine only",
+        description="Industry-style single gate (cosine similarity Q↔C)",
+        cosine_order=1,
+        noise_order=2,
+        excitation_order=3,
+        cosine_enabled=True,
+        noise_enabled=False,
+        excitation_enabled=False,
+    ),
+    FilterModeSpec(
+        mode_id="noise_only",
+        label="Noise only",
+        description="Shannon entropy floor on |Q| only",
+        cosine_order=2,
+        noise_order=1,
+        excitation_order=3,
+        cosine_enabled=False,
+        noise_enabled=True,
+        excitation_enabled=False,
+    ),
+    FilterModeSpec(
+        mode_id="excitation_only",
+        label="Excitation only",
+        description="Dimensional resonance / activations only",
+        cosine_order=2,
+        noise_order=3,
+        excitation_order=1,
+        cosine_enabled=False,
+        noise_enabled=False,
+        excitation_enabled=True,
+    ),
+    FilterModeSpec(
+        mode_id="cosine_noise_excitation",
+        label="Cosine → Noise → Excitation",
+        description="Full pipeline; cosine first (short-circuit order 1→2→3)",
+        cosine_order=1,
+        noise_order=2,
+        excitation_order=3,
+        cosine_enabled=True,
+        noise_enabled=True,
+        excitation_enabled=True,
+    ),
+)
+
+THRESHOLD_PROFILES: tuple[ThresholdProfile, ...] = (
+    ThresholdProfile(
+        name="hud_defaults",
+        cosine_threshold=DEFAULT_COSINE_THRESHOLD,
+        excitation_threshold=DEFAULT_EXCITATION_THRESHOLD,
+        global_noise_limit=DEFAULT_GLOBAL_NOISE_LIMIT,
+    ),
+    ThresholdProfile(
+        name="grid_optimal_v2",
+        cosine_threshold=0.51,
+        excitation_threshold=50,
+        global_noise_limit=DEFAULT_GLOBAL_NOISE_LIMIT,
+    ),
+)
+
+
+def build_filter_config(spec: FilterModeSpec, profile: ThresholdProfile) -> ConfigState:
+    return ConfigState(
+        firewall_mode="positive",
+        cosine_threshold=profile.cosine_threshold,
+        excitation_threshold=profile.excitation_threshold,
+        global_noise_limit=profile.global_noise_limit,
+        noise_tolerance=DEFAULT_NOISE_TOLERANCE,
+        adaptive_factor=DEFAULT_ADAPTIVE_FACTOR,
+        cosine_order=spec.cosine_order,
+        noise_order=spec.noise_order,
+        excitation_order=spec.excitation_order,
+        cosine_enabled=spec.cosine_enabled,
+        noise_enabled=spec.noise_enabled,
+        excitation_enabled=spec.excitation_enabled,
+    )
+
+
+def prompt_blocked_with_config(row: dict[str, Any], cfg: ConfigState) -> bool:
+    """Multi-clause /chat parity using evaluate_clause (respects pipeline order)."""
+    for clause in row["clauses"]:
+        if not clause["has_context"]:
+            return True
+        result = SemanticFirewall.evaluate_clause(
+            clause["q"], clause["c"], cfg, word_count=clause["word_count"]
+        )
+        if not result["passed"]:
+            return True
+    return False
+
+
+def compute_metrics_with_config(
+    rows: list[dict[str, Any]],
+    cfg: ConfigState,
+) -> dict[str, float | int | str]:
+    tp = fp = tn = fn = 0
+    for row in rows:
+        blocked = prompt_blocked_with_config(row, cfg)
+        should_block = bool(row["should_block"])
+        if should_block and blocked:
+            tp += 1
+        elif not should_block and blocked:
+            fp += 1
+        elif not should_block and not blocked:
+            tn += 1
+        else:
+            fn += 1
+
+    tpr = _safe_div(tp, tp + fn)
+    fpr = _safe_div(fp, fp + tn)
+    precision = _safe_div(tp, tp + fp)
+    recall = tpr
+    f1 = _safe_div(2 * precision * recall, precision + recall)
+    j_index = tpr - fpr
+
+    return {
+        "cosine_threshold": cfg.cosine_threshold,
+        "excitation_threshold": cfg.excitation_threshold,
+        "global_noise_limit": cfg.global_noise_limit,
+        "tp": tp,
+        "fp": fp,
+        "tn": tn,
+        "fn": fn,
+        "tpr": tpr,
+        "fpr": fpr,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "j_index": j_index,
+    }
+
+
+def compute_metrics_by_class(
+    rows: list[dict[str, Any]],
+    cfg: ConfigState,
+) -> list[dict[str, Any]]:
+    """Per prompt_class confusion counts for one filter mode."""
+    by_class: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        by_class.setdefault(row["prompt_class"], []).append(row)
+
+    records: list[dict[str, Any]] = []
+    for cls, group in sorted(by_class.items()):
+        tp = fp = tn = fn = 0
+        for row in group:
+            blocked = prompt_blocked_with_config(row, cfg)
+            should_block = bool(row["should_block"])
+            if should_block and blocked:
+                tp += 1
+            elif not should_block and blocked:
+                fp += 1
+            elif not should_block and not blocked:
+                tn += 1
+            else:
+                fn += 1
+        records.append({
+            "prompt_class": cls,
+            "n": len(group),
+            "tp": tp,
+            "fp": fp,
+            "tn": tn,
+            "fn": fn,
+            "tpr": _safe_div(tp, tp + fn),
+            "fpr": _safe_div(fp, fp + tn),
+        })
+    return records
+
+
+def run_filter_battery(
+    rows: list[dict[str, Any]],
+    profiles: tuple[ThresholdProfile, ...] = THRESHOLD_PROFILES,
+) -> pd.DataFrame:
+    records: list[dict[str, Any]] = []
+    for profile in profiles:
+        for spec in FILTER_MODES:
+            cfg = build_filter_config(spec, profile)
+            metrics = compute_metrics_with_config(rows, cfg)
+            pipeline = SemanticFirewall.build_pipeline(cfg)
+            order_str = " → ".join(name for _o, name, _fn in pipeline)
+            records.append({
+                "threshold_profile": profile.name,
+                "mode_id": spec.mode_id,
+                "mode_label": spec.label,
+                "pipeline_order": order_str,
+                "cosine_enabled": spec.cosine_enabled,
+                "noise_enabled": spec.noise_enabled,
+                "excitation_enabled": spec.excitation_enabled,
+                **metrics,
+            })
+    return pd.DataFrame.from_records(records)
+
+
+def export_filter_battery_csv(df: pd.DataFrame, path: Path = FILTER_BATTERY_CSV) -> None:
+    df.to_csv(path, index=False)
+    logger.info("Wrote %s (%d rows)", path, len(df))
+
+
+def plot_filter_battery(df: pd.DataFrame, path: Path = FILTER_BATTERY_PNG) -> None:
+    """Grouped bar chart of Youden J per mode (HUD defaults profile)."""
+    hud = df[df["threshold_profile"] == "hud_defaults"].copy()
+    if hud.empty:
+        hud = df[df["threshold_profile"] == df["threshold_profile"].iloc[0]]
+
+    order = [s.mode_id for s in FILTER_MODES]
+    hud["_sort"] = hud["mode_id"].apply(lambda x: order.index(x))
+    hud = hud.sort_values("_sort")
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 5))
+
+    x = np.arange(len(hud))
+    labels = [f"{row['mode_label']}\n({row['pipeline_order']})" for _, row in hud.iterrows()]
+
+    axes[0].bar(x, hud["j_index"], color=["#4c72b0", "#55a868", "#c44e52", "#8172b2"])
+    axes[0].set_xticks(x)
+    axes[0].set_xticklabels(labels, fontsize=7, rotation=15, ha="right")
+    axes[0].set_ylabel("Youden J (TPR − FPR)")
+    axes[0].set_title("Filter battery — Youden J")
+    axes[0].axhline(0, color="gray", linewidth=0.8)
+    axes[0].grid(True, axis="y", alpha=0.3)
+
+    width = 0.35
+    axes[1].bar(x - width / 2, hud["tpr"], width, label="TPR", color="#2ca02c")
+    axes[1].bar(x + width / 2, hud["fpr"], width, label="FPR", color="#d62728")
+    axes[1].set_xticks(x)
+    axes[1].set_xticklabels(labels, fontsize=7, rotation=15, ha="right")
+    axes[1].set_ylim(0, 1.05)
+    axes[1].set_title("TPR vs FPR")
+    axes[1].legend(fontsize=8)
+    axes[1].grid(True, axis="y", alpha=0.3)
+
+    fig.suptitle(
+        f"Filter battery — Prisma pack, n={N_TOTAL}, thresholds: "
+        f"cos={hud['cosine_threshold'].iloc[0]:.4f} "
+        f"exc={int(hud['excitation_threshold'].iloc[0])} "
+        f"noise={hud['global_noise_limit'].iloc[0]:.1f}",
+        fontsize=10,
+    )
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    logger.info("Wrote %s", path)
+
+
+def log_filter_battery_table(df: pd.DataFrame) -> None:
+    for profile_name in df["threshold_profile"].unique():
+        sub = df[df["threshold_profile"] == profile_name]
+        logger.info("=== Filter battery [%s] ===", profile_name)
+        for _, row in sub.iterrows():
+            logger.info(
+                "%s | order=%s | J=%.4f TPR=%.4f FPR=%.4f F1=%.4f | "
+                "TP=%d FP=%d TN=%d FN=%d",
+                row["mode_label"],
+                row["pipeline_order"],
+                row["j_index"],
+                row["tpr"],
+                row["fpr"],
+                row["f1"],
+                int(row["tp"]),
+                int(row["fp"]),
+                int(row["tn"]),
+                int(row["fn"]),
+            )
+
+
+def render_filter_battery_markdown(df: pd.DataFrame) -> str:
+    lines = [
+        "## Batería de filtros (Prisma, 215 prompts)",
+        "",
+        "Multi-cláusula, pack-scoped C, decisión vía `evaluate_clause` (short-circuit).",
+        "",
+    ]
+    for profile_name in df["threshold_profile"].unique():
+        sub = df[df["threshold_profile"] == profile_name]
+        row0 = sub.iloc[0]
+        lines.extend([
+            f"### Perfil `{profile_name}`",
+            "",
+            f"Umbrales: cosine={row0['cosine_threshold']:.4f}, "
+            f"excitation={int(row0['excitation_threshold'])}, "
+            f"global_noise_limit={row0['global_noise_limit']:.1f}",
+            "",
+            "| Modo | Pipeline | TP | FP | TN | FN | TPR | FPR | F1 | J |",
+            "| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ])
+        for _, row in sub.iterrows():
+            lines.append(
+                f"| {row['mode_label']} | {row['pipeline_order']} | "
+                f"{int(row['tp'])} | {int(row['fp'])} | {int(row['tn'])} | {int(row['fn'])} | "
+                f"{row['tpr']:.4f} | {row['fpr']:.4f} | {row['f1']:.4f} | {row['j_index']:.4f} |"
+            )
+        lines.append("")
+
+    cos_only = df[(df["threshold_profile"] == "hud_defaults") & (df["mode_id"] == "cosine_only")]
+    full = df[(df["threshold_profile"] == "hud_defaults") & (df["mode_id"] == "cosine_noise_excitation")]
+    if not cos_only.empty and not full.empty:
+        d_j = float(full.iloc[0]["j_index"]) - float(cos_only.iloc[0]["j_index"])
+        d_tpr = float(full.iloc[0]["tpr"]) - float(cos_only.iloc[0]["tpr"])
+        d_fpr = float(full.iloc[0]["fpr"]) - float(cos_only.iloc[0]["fpr"])
+        lines.extend([
+            "### Delta full pipeline vs cosine-only (HUD)",
+            "",
+            f"- ΔJ = {d_j:+.4f}",
+            f"- ΔTPR = {d_tpr:+.4f} (positive = more attacks caught)",
+            f"- ΔFPR = {d_fpr:+.4f} (positive = more in-domain false blocks)",
+            "",
+        ])
+    return "\n".join(lines)
+
+
+def update_benchmark_report_battery_section(markdown: str) -> None:
+    report_path = _BACKEND_DIR.parent / "benchmark-report.md"
+    if not report_path.is_file():
+        logger.warning("benchmark-report.md not found; skipping report update")
+        return
+    text = report_path.read_text(encoding="utf-8")
+    marker = "## Batería de filtros"
+    if marker in text:
+        text = text[: text.index(marker)]
+    if not text.endswith("\n"):
+        text += "\n"
+    text += "\n---\n\n" + markdown + "\n"
+    report_path.write_text(text, encoding="utf-8")
+    logger.info("Updated %s with filter battery section", report_path)
+
+
+def run_battery_main(skip_calibration: bool = False) -> pd.DataFrame:
+    logger.info("=== Filter battery (cosine / noise / excitation / full) ===")
+    logger.info("Pack scope: %s", PACK_FILENAME)
+
+    if not skip_calibration:
+        run_prisma_calibration()
+
+    dataset = build_dataset()
+    rows = measure_dataset(dataset, PACK_FILENAME)
+    log_class_stats(rows, "Measured")
+
+    battery_df = run_filter_battery(rows)
+    log_filter_battery_table(battery_df)
+    export_filter_battery_csv(battery_df)
+    plot_filter_battery(battery_df)
+    md = render_filter_battery_markdown(battery_df)
+    update_benchmark_report_battery_section(md)
+    logger.info("Artifacts: %s | %s", FILTER_BATTERY_CSV, FILTER_BATTERY_PNG)
+    return battery_df
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -778,12 +1164,22 @@ def _log_metrics_block(name: str, metrics: dict[str, float | int]) -> None:
     )
 
 
-def main(skip_calibration: bool = False) -> None:
+def main(
+    skip_calibration: bool = False,
+    mode: Literal["sweep", "battery", "all"] = "sweep",
+) -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    logger.info("=== Prisma-aligned geometric benchmark suite ===")
+
+    if mode in ("battery", "all"):
+        run_battery_main(skip_calibration=skip_calibration)
+        if mode == "battery":
+            logger.info("Filter battery complete")
+            return
+
+    logger.info("=== Prisma-aligned geometric benchmark suite (grid sweep) ===")
     logger.info("Pack scope: %s", PACK_FILENAME)
     logger.info(
         "HUD defaults: cosine=%s excitation=%s global_noise_limit=%s",
@@ -857,9 +1253,15 @@ def main(skip_calibration: bool = False) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Prisma-aligned geometric benchmark")
     parser.add_argument(
+        "--mode",
+        choices=("sweep", "battery", "all"),
+        default="sweep",
+        help="sweep=Youden grid; battery=4 filter modes; all=both",
+    )
+    parser.add_argument(
         "--skip-calibration",
         action="store_true",
         help="Skip pack calibration step (use HUD default noise limit only)",
     )
     args = parser.parse_args()
-    main(skip_calibration=args.skip_calibration)
+    main(skip_calibration=args.skip_calibration, mode=args.mode)

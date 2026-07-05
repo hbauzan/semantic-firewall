@@ -21,6 +21,8 @@ lancedb_calibration_test/
 backend/tests/metrics_report.csv
 backend/tests/benchmark_metrics.csv
 backend/tests/benchmark_roc.png
+backend/tests/benchmark_filter_battery.csv
+backend/tests/benchmark_filter_battery.png
 backend/tests/decision_boundary.png
 backend/tests/db_scaling_metrics.md
 backend/calibration/reports/
