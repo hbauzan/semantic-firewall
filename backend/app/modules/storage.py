@@ -1,3 +1,5 @@
+import hashlib
+import json
 import lancedb
 from lancedb.pydantic import Vector, LanceModel
 import logging
@@ -103,5 +105,49 @@ class Storage:
         safe_name = filename.replace("'", "''")
         filter_str = f"metadata LIKE '%\"filename\": \"{safe_name}\"%'"
         self.table.delete(filter_str)
+
+    def _pack_rows(self, filename: str) -> list[dict]:
+        """Return all rows whose metadata matches ``filename``."""
+        if self.table.count_rows() == 0:
+            return []
+        if not filename or not _SAFE_FILENAME_RE.match(filename):
+            logger.warning("Rejected unsafe filename for pack read: %r", filename)
+            return []
+
+        safe_name = filename.replace("'", "''")
+        filter_str = f"metadata LIKE '%\"filename\": \"{safe_name}\"%'"
+        try:
+            return self.table.search().where(filter_str).select(["text", "metadata"]).to_list()
+        except Exception as e:
+            logger.warning("Pack row fetch failed for %r: %s", filename, e)
+            return []
+
+    def get_pack_text_sample(self, filename: str, max_chars: int = 8000) -> str:
+        """Concatenate chunk text for a pack, capped at ``max_chars``."""
+        rows = self._pack_rows(filename)
+        if not rows:
+            return ""
+
+        parts: list[str] = []
+        total = 0
+        for row in rows:
+            text = (row.get("text") or "").strip()
+            if not text:
+                continue
+            if total + len(text) > max_chars:
+                parts.append(text[: max_chars - total])
+                break
+            parts.append(text)
+            total += len(text)
+        return "\n".join(parts)
+
+    def get_pack_fingerprint(self, filename: str) -> dict:
+        """Stable fingerprint for cache invalidation of auto-generated datasets."""
+        rows = self._pack_rows(filename)
+        chunk_count = len(rows)
+        hasher = hashlib.sha256()
+        for row in rows:
+            hasher.update((row.get("text") or "").encode("utf-8"))
+        return {"filename": filename, "chunk_count": chunk_count, "text_hash": hasher.hexdigest()}
 
 storage = Storage()

@@ -46,6 +46,53 @@ def test_2d_sweep_fixes_noise_at_recommended():
     assert all(n == noise_fixed for n in seen_noise)
 
 
+def test_calibrate_positive_uses_live_config_snapshot():
+    """Calibration sweep must mirror live seq order, toggles, and rag depth."""
+    from app.core import state as state_mod
+
+    dataset = {
+        "_path": "/fake/auto.json",
+        "corpus_id": "test",
+        "corpus_file": "pack.pdf",
+        "queries": [{"id": "q1", "text": "x", "expected": "pass"}],
+    }
+    live = state_mod.config_state.model_copy(update={
+        "noise_order": 2,
+        "cosine_order": 3,
+        "excitation_order": 1,
+        "rag_top_k": 5,
+        "noise_tolerance": 0.012,
+    })
+    captured: list[ConfigState] = []
+
+    def capture_2d(base_cfg, *_args, **_kwargs):
+        captured.append(base_cfg)
+        return [JointSweepPoint(0.5, 150, tp=1, fp=0, tn=0, fn=0)]
+
+    with (
+        patch.object(state_mod, "config_state", live),
+        patch("app.modules.corpus_calibration.storage.get_summary", return_value=[{"filename": "pack.pdf"}]),
+        patch("app.modules.corpus_calibration.resolve_dataset_for_pack", return_value=dataset),
+        patch("app.modules.corpus_calibration._sweep_cosine_excitation_2d", side_effect=capture_2d),
+        patch(
+            "app.modules.corpus_calibration._sweep_1d",
+            return_value=[SweepPoint("global_noise_limit", 3.0, tp=1, fp=0, tn=0, fn=0)],
+        ),
+        patch(
+            "app.modules.corpus_calibration._run_evaluation",
+            return_value=[("q1", "pass", "pass", True)],
+        ),
+    ):
+        calibrate_positive_for_pack("pack.pdf")
+
+    assert len(captured) == 1
+    cfg = captured[0]
+    assert cfg.firewall_mode == "positive"
+    assert (cfg.cosine_order, cfg.excitation_order, cfg.noise_order) == (3, 1, 2)
+    assert cfg.rag_top_k == 5
+    assert cfg.noise_tolerance == 0.012
+
+
 def test_calibrate_positive_orchestrates_2d_then_noise():
     dataset = {
         "_path": "/fake/automotive_v1.json",
