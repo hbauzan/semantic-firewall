@@ -28,6 +28,8 @@ const StepSlider: React.FC<{
 
 const lang = 'en';
 
+type PackInfo = { filename: string; chunks: number; calibratable?: boolean; has_auto_dataset?: boolean };
+
 const InfoTooltip: React.FC<{ entry: TooltipEntry }> = ({ entry }) => (
   <span className="info-icon">
     i
@@ -56,8 +58,7 @@ export const ControlPanel: React.FC = () => {
 
   useBackendHealth();
 
-  const [packs, setPacks] = useState<{ filename: string; chunks: number; calibratable?: boolean }[]>([]);
-  const [calibratableCorpora, setCalibratableCorpora] = useState<string[]>([]);
+  const [packs, setPacks] = useState<PackInfo[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Profile state ---
@@ -66,7 +67,12 @@ export const ControlPanel: React.FC = () => {
   const [newProfileName, setNewProfileName] = useState<string>('');
   const [configHydrated, setConfigHydrated] = useState(false);
   const [calibratingPack, setCalibratingPack] = useState<string | null>(null);
+  const [calibrationTaskId, setCalibrationTaskId] = useState<string | null>(null);
+  const [calibratedThisSession, setCalibratedThisSession] = useState<Set<string>>(() => new Set());
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const packWasCalibratedBefore = (pack: PackInfo) =>
+    pack.has_auto_dataset === true || calibratedThisSession.has(pack.filename);
 
   const applyConfigToStore = (c: Record<string, unknown>) => {
     setExcitationThreshold(c.excitation_threshold as number);
@@ -140,7 +146,6 @@ export const ControlPanel: React.FC = () => {
       }
       const data = await res.json();
       setPacks(data.packs || []);
-      setCalibratableCorpora(data.calibratable_corpora || []);
     } catch (err) {
       console.error("Failed to fetch packs:", err);
     }
@@ -273,6 +278,53 @@ export const ControlPanel: React.FC = () => {
     return () => { if (interval) clearInterval(interval); }
   }, [ingestionStatus.taskId, ingestionStatus.status, setIngestionStatus, updateTask, finishTask, fetchPacks]);
 
+  // Poll calibration task status
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (calibrationTaskId) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/corpus/calibration-task-status/${calibrationTaskId}`);
+          if (!res.ok) {
+            console.warn(`Calibration status poll: ${res.status}`);
+            return;
+          }
+          const data = await res.json();
+          updateTask({
+            phase: data.message || data.status,
+            progress: data.progress,
+            stalled: false,
+          });
+          if (data.status === 'completed' && data.result) {
+            const calibratedFilename = data.result.filename as string;
+            applyConfigToStore(data.result.config);
+            setCalibratedThisSession((prev) => new Set(prev).add(calibratedFilename));
+            const method = data.result.generation_method === 'template_fallback'
+              ? ' (template fallback)'
+              : '';
+            finishTask(
+              'success',
+              `CALIBRATED ${data.result.corpus_id} (${Math.round(data.result.accuracy * 100)}%)${method}`,
+            );
+            setCalibrationTaskId(null);
+            setCalibratingPack(null);
+            setUploadError(null);
+            fetchPacks();
+          } else if (data.status === 'failed') {
+            setUploadError(data.message || 'Calibration failed');
+            finishTask('error', 'CALIBRATION_FAILED');
+            setCalibrationTaskId(null);
+            setCalibratingPack(null);
+          }
+        } catch (err) {
+          console.error('Failed to fetch calibration task status', err);
+          updateTask({ phase: 'Waiting for backend calibration status…', stalled: true });
+        }
+      }, 1000);
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [calibrationTaskId, updateTask, finishTask, fetchPacks]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -315,24 +367,25 @@ export const ControlPanel: React.FC = () => {
     }
   };
 
-  const handleCalibratePack = async (filename: string) => {
+  const handleCalibratePack = async (pack: PackInfo) => {
+    const { filename } = pack;
+
+    if (packWasCalibratedBefore(pack)) {
+      const ok = window.confirm(
+        `"${filename}" was already calibrated.\n\n`
+        + 'Re-run the threshold sweep? This takes several minutes and will overwrite the current slider values.',
+      );
+      if (!ok) return;
+    }
+
     setCalibratingPack(filename);
     setUploadError(null);
     startTask({
       kind: 'calibrate',
       title: `Calibrate ${filename}`,
-      phase: '2D sweep: cosine × excitation…',
-      progress: null,
+      phase: 'Extracting corpus sample…',
+      progress: 0,
     });
-
-    const phaseTimer = setInterval(() => {
-      const elapsed = Date.now() - (useStore.getState().activeTask?.startedAt ?? Date.now());
-      if (elapsed > 60_000) {
-        updateTask({ phase: 'Tuning noise threshold…' });
-      } else if (elapsed > 20_000) {
-        updateTask({ phase: 'Evaluating labeled queries (embedder)…' });
-      }
-    }, 5000);
 
     try {
       const res = await fetch(
@@ -344,15 +397,13 @@ export const ControlPanel: React.FC = () => {
         throw new Error(parseApiError(errText));
       }
       const data = await res.json();
-      applyConfigToStore(data.config);
-      finishTask('success', `CALIBRATED ${data.corpus_id} (${Math.round(data.accuracy * 100)}%)`);
+      setCalibrationTaskId(data.task_id);
+      updateTask({ phase: 'Calibration queued', progress: 0 });
     } catch (err) {
       console.error('Calibration failed', err);
       const msg = err instanceof Error ? err.message : 'Calibration failed';
       setUploadError(msg);
       finishTask('error', 'CALIBRATION_FAILED');
-    } finally {
-      clearInterval(phaseTimer);
       setCalibratingPack(null);
     }
   };
@@ -631,24 +682,21 @@ export const ControlPanel: React.FC = () => {
               <div key={p.filename} className="pack-item">
                 <span className="pack-name" title={p.filename}>{p.filename} ({p.chunks})</span>
                 <div className="pack-actions">
-                  {p.calibratable ? (
-                    <button
-                      type="button"
-                      onClick={() => handleCalibratePack(p.filename)}
-                      className="pack-calibrate-btn"
-                      disabled={calibratingPack !== null || activeTask?.kind === 'upload'}
-                      title="Calibrate thresholds for positive mode (labeled dataset)"
-                    >
-                      {calibratingPack === p.filename ? '…' : 'Cal'}
-                    </button>
-                  ) : (
-                    <span
-                      className="pack-cal-na"
-                      title={`No calibration dataset for this PDF. Cal works for: ${calibratableCorpora.join(', ') || 'none'}`}
-                    >
-                      Cal N/A
-                    </span>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleCalibratePack(p)}
+                    className="pack-calibrate-btn"
+                    disabled={calibratingPack !== null || activeTask?.kind === 'upload' || activeTask?.kind === 'calibrate'}
+                    title={
+                      p.calibratable
+                        ? 'Calibrate thresholds (hand-curated dataset)'
+                        : p.has_auto_dataset
+                          ? 'Calibrate thresholds (cached auto dataset)'
+                          : 'Calibrate thresholds (auto-generate dataset)'
+                    }
+                  >
+                    {calibratingPack === p.filename ? '…' : 'Cal'}
+                  </button>
                   <button type="button" onClick={() => handleDeletePack(p.filename)} className="pack-delete-btn">X</button>
                 </div>
               </div>
