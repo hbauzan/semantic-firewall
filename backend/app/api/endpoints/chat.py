@@ -14,11 +14,12 @@ import uuid
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
-from app.modules.embedder import embedder
 from app.modules.storage import storage
+from app.modules.dispatcher import get_dispatcher
 from app.modules.sniffer import emit_trace, update_trace, subscribe, unsubscribe, stream_sniffer_sse
 from app.core.models import ConfigState, ChatRequest, OpenAIConfig
 from app.core.firewall import SemanticFirewall
+from app.core.exceptions import BurstDetectionBreach
 from app.core.settings import settings
 from app.modules.providers.ollama import OllamaProvider
 from app.modules.providers.google import GoogleGeminiProvider
@@ -32,6 +33,106 @@ from app.modules.rag_context import accumulate_rag_chunks, join_rag_context
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# --- Firewall helpers ---
+
+def _enforce_raw_entropy(clause: str, cfg: ConfigState) -> None:
+    """Phase 1: CPU-only burst detection before embedding."""
+    if not cfg.noise_enabled:
+        return
+    entropy = SemanticFirewall.calculate_raw_entropy(clause)
+    if entropy < cfg.raw_entropy_limit:
+        raise BurstDetectionBreach(clause, entropy, cfg.raw_entropy_limit)
+
+
+async def _embed_clause(clause: str, request: Request | None = None):
+    """Route embedding through the unified inference dispatcher when available."""
+    if request is not None and hasattr(request.app.state, "inference_dispatcher"):
+        return await request.app.state.inference_dispatcher.submit_inference(clause)
+    return await get_dispatcher().submit_inference(clause)
+
+
+async def _evaluate_clauses(
+    clauses: list[str],
+    cfg: ConfigState,
+    *,
+    request: Request | None = None,
+) -> tuple[list[str], set, int, str | None, str, dict, list, int, float]:
+    """Shared firewall loop for /chat and /v1/chat/completions."""
+    context_chunks: list[str] = []
+    seen_chunk_ids: set = set()
+    clauses_with_hits = 0
+    failed_clause = None
+    block_reason = ""
+    block_details: dict = {}
+    all_traces: list[dict] = []
+    last_activations = 0
+    last_cosine = 0.0
+    negative = cfg.firewall_mode == "negative"
+
+    for clause in clauses:
+        _enforce_raw_entropy(clause, cfg)
+        embedding = await _embed_clause(clause, request)
+        cl_vec = embedding.dense
+        results = storage.search_for_firewall(
+            cl_vec, k=cfg.rag_top_k, active_corpus_file=cfg.active_corpus_file,
+        )
+        if not results:
+            if negative:
+                all_traces.append({"stage": "no_context", "passed": True})
+                continue
+            failed_clause = clause
+            block_reason = "no_context"
+            block_details = {"clause": clause}
+            all_traces.append({"stage": "no_context", "passed": False})
+            break
+
+        clauses_with_hits += 1
+        accumulate_rag_chunks(results, context_chunks, seen_chunk_ids)
+        db_vec = results[0]["vector"]
+        q_arr = np.array(cl_vec, dtype=np.float32)
+        c_arr = np.array(db_vec, dtype=np.float32)
+        word_count = len(clause.split())
+        c_sparse = results[0].get("sparse_lexical")
+
+        result = SemanticFirewall.evaluate_clause(
+            q_arr,
+            c_arr,
+            cfg,
+            word_count,
+            query_text=clause,
+            q_sparse=embedding.sparse,
+            c_sparse=c_sparse,
+        )
+        all_traces.extend(result["trace"])
+        last_activations = result["last_activations"]
+        last_cosine = result["last_cosine"]
+
+        if not result["passed"]:
+            failed_clause = clause
+            block_reason = result["breach_reason"]
+            block_details = result["breach_details"] or {}
+            break
+
+    return (
+        context_chunks,
+        seen_chunk_ids,
+        clauses_with_hits,
+        failed_clause,
+        block_reason,
+        block_details,
+        all_traces,
+        last_activations,
+        last_cosine,
+    )
+
+
+def _burst_block_details(exc: BurstDetectionBreach) -> dict:
+    return {
+        "entropy": exc.entropy,
+        "limit": exc.limit,
+        "breach_type": exc.breach_type,
+    }
 
 # --- Provider Abstraction (Lazy Init — Finding A2) ---
 
@@ -69,64 +170,52 @@ async def chat_endpoint(request: Request, req: ChatRequest):
     from app.core import state as state_mod
     cfg = state_mod.config_state  # immutable snapshot — consistent for entire request
     prompt = req.prompt
-    # Firewall is active when at least one filter is enabled in the HUD.
-    # There is NO user-prompt override — bypass is only possible via the HUD toggles.
     fw_on = cfg.noise_enabled or cfg.cosine_enabled or cfg.excitation_enabled
     clean_prompt = prompt.strip()
 
-    # Segment prompt via the engine (language-agnostic + overflow chunking)
     clauses = SemanticFirewall.segment(clean_prompt)
 
-    # Evaluate each clause through the ordered pipeline.
-    # RAG context = union of top-K texts per clause (deduped); firewall uses top-1 only.
     context_chunks: list[str] = []
     seen_chunk_ids: set = set()
     clauses_with_hits = 0
     failed_clause = None
     block_reason = ""
-    block_details = {}
-    all_traces = []
+    block_details: dict = {}
+    all_traces: list[dict] = []
     last_activations = 0
     last_cosine = 0.0
 
-    negative = cfg.firewall_mode == "negative"
-
-    for clause in clauses:
-        cl_vec = embedder.embed(clause)
-        results = storage.search_for_firewall(
-            cl_vec, k=cfg.rag_top_k, active_corpus_file=cfg.active_corpus_file,
-        )
-        if not results:
-            if negative:
-                # Negative mode: no corpus match → nothing to restrict → PASS
-                all_traces.append({"stage": "no_context", "passed": True})
-                continue
-            else:
-                # Positive mode: no corpus match → can't verify alignment → BREACH
-                failed_clause = clause
-                block_reason = "no_context"
-                block_details = {"clause": clause}
-                all_traces.append({"stage": "no_context", "passed": False})
-                break
-
-        clauses_with_hits += 1
-        accumulate_rag_chunks(results, context_chunks, seen_chunk_ids)
-        # Firewall geometry: top-1 nearest vector only
-        db_vec = results[0]["vector"]
-        q_arr = np.array(cl_vec, dtype=np.float32)
-        c_arr = np.array(db_vec, dtype=np.float32)
-        word_count = len(clause.split())
-
-        result = SemanticFirewall.evaluate_clause(q_arr, c_arr, cfg, word_count)
-        all_traces.extend(result["trace"])
-        last_activations = result["last_activations"]
-        last_cosine = result["last_cosine"]
-
-        if not result["passed"]:
-            failed_clause = clause
-            block_reason = result["breach_reason"]
-            block_details = result["breach_details"]
-            break
+    if fw_on:
+        try:
+            (
+                context_chunks,
+                seen_chunk_ids,
+                clauses_with_hits,
+                failed_clause,
+                block_reason,
+                block_details,
+                all_traces,
+                last_activations,
+                last_cosine,
+            ) = await _evaluate_clauses(clauses, cfg, request=request)
+        except BurstDetectionBreach as exc:
+            failed_clause = exc.clause
+            block_reason = "BURST_DETECTION_BREACH"
+            block_details = _burst_block_details(exc)
+            all_traces = [{
+                "stage": "raw_entropy",
+                "passed": False,
+                **block_details,
+            }]
+    else:
+        for clause in clauses:
+            embedding = await _embed_clause(clause, request)
+            results = storage.search_for_firewall(
+                embedding.dense, k=cfg.rag_top_k, active_corpus_file=cfg.active_corpus_file,
+            )
+            if results:
+                clauses_with_hits += 1
+                accumulate_rag_chunks(results, context_chunks, seen_chunk_ids)
 
     context = join_rag_context(context_chunks)
     rag_chunk_count = len(context_chunks)
@@ -316,6 +405,9 @@ def _format_block_message(
     elif bare_reason == "noise":
         val = details.get("entropy", 0)
         metric_line = f'Metrics: Entropy({val:.4f}) | Limit: {cfg.global_noise_limit:.3f}'
+    elif bare_reason == "BURST_DETECTION_BREACH":
+        val = details.get("entropy", 0)
+        metric_line = f'Metrics: RawEntropy({val:.4f}) | Limit: {details.get("limit", cfg.raw_entropy_limit):.3f}'
     elif bare_reason == "no_context":
         metric_line = f'Reason: no_context'
     elif bare_reason == "excitation":
@@ -348,56 +440,26 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
     from fastapi.responses import Response
     cfg = state_mod.config_state
 
-    # 1. Capture full message history for FPI
     request_history = [m.model_dump() for m in config.messages]
     last_msg = config.messages[-1].content
     clauses = SemanticFirewall.segment(last_msg)
 
-    # 2. Firewall Evaluation
     fw_on = cfg.noise_enabled or cfg.cosine_enabled or cfg.excitation_enabled
-    proxy_negative = cfg.firewall_mode == "negative"
     all_traces: list[dict] = []
     if fw_on:
-        for clause in clauses:
-            cl_vec = embedder.embed(clause)
-            results = storage.search_for_firewall(
-            cl_vec, k=cfg.rag_top_k, active_corpus_file=cfg.active_corpus_file,
-        )
-            if not results:
-                if proxy_negative:
-                    # Negative mode: no corpus match → nothing to restrict → skip
-                    all_traces.append({"stage": "no_context", "passed": True, "value": 0, "threshold": 0})
-                    continue
-                no_ctx_trace = [{"stage": "no_context", "passed": False, "value": 0, "threshold": 0}]
-                emit_trace(
-                    model=config.model,
-                    last_message=last_msg,
-                    decision="BREACH",
-                    pipeline_trace=no_ctx_trace,
-                    response_preview="",
-                    request_history=request_history,
-                    status="BREACH",
-                )
-                return Response(
-                    content=json.dumps({
-                        "error": {
-                            "message": f"[FW_BLOCK] Segment violation: no context match for \"{clause}\"",
-                            "type": "security_breach",
-                            "code": "403"
-                        }
-                    }),
-                    status_code=403,
-                    media_type="application/json"
-                )
-
-            db_vec = results[0]["vector"]
-            q_arr = np.array(cl_vec, dtype=np.float32)
-            c_arr = np.array(db_vec, dtype=np.float32)
-            word_count = len(clause.split())
-
-            res = SemanticFirewall.evaluate_clause(q_arr, c_arr, cfg, word_count)
-            all_traces.extend(res["trace"])
-            if not res["passed"]:
+        try:
+            (
+                _context_chunks,
+                _seen,
+                _clauses_with_hits,
+                failed_clause,
+                block_reason,
+                block_details,
+                all_traces,
+                _last_act,
+                _last_cos,
+            ) = await _evaluate_clauses(clauses, cfg, request=request)
+            if failed_clause is not None:
                 emit_trace(
                     model=config.model,
                     last_message=last_msg,
@@ -407,17 +469,50 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
                     request_history=request_history,
                     status="BREACH",
                 )
+                message = (
+                    f"[FW_BLOCK] Segment violation: {block_reason}"
+                    if block_reason != "BURST_DETECTION_BREACH"
+                    else f"[FW_BLOCK] Burst detection breach on \"{failed_clause}\""
+                )
                 return Response(
                     content=json.dumps({
                         "error": {
-                            "message": f"[FW_BLOCK] Segment violation: {res['breach_reason']}",
+                            "message": message,
                             "type": "security_breach",
-                            "code": "403"
+                            "code": "403",
+                            "breach_type": block_reason,
                         }
                     }),
                     status_code=403,
-                    media_type="application/json"
+                    media_type="application/json",
                 )
+        except BurstDetectionBreach as exc:
+            breach_trace = [{
+                "stage": "raw_entropy",
+                "passed": False,
+                **_burst_block_details(exc),
+            }]
+            emit_trace(
+                model=config.model,
+                last_message=last_msg,
+                decision="BREACH",
+                pipeline_trace=breach_trace,
+                response_preview="",
+                request_history=request_history,
+                status="BREACH",
+            )
+            return Response(
+                content=json.dumps({
+                    "error": {
+                        "message": f"[FW_BLOCK] Burst detection breach on \"{exc.clause}\"",
+                        "type": "security_breach",
+                        "code": "403",
+                        "breach_type": "BURST_DETECTION_BREACH",
+                    }
+                }),
+                status_code=403,
+                media_type="application/json",
+            )
 
     # 3. Emit PASS trace with trace_id for stream correlation
     trace_id = str(uuid.uuid4())

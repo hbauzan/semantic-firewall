@@ -10,8 +10,13 @@ from app.core.models import ConfigState
 from app.core.state import set_config_sync as set_config
 
 
-# --- Shared TestClient ---
-client = TestClient(app)
+# --- Shared TestClient (lifespan starts inference dispatcher) ---
+_client_cm = TestClient(app)
+client = _client_cm.__enter__()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    _client_cm.__exit__(None, None, None)
 
 
 @pytest.fixture
@@ -42,6 +47,7 @@ def reset_config_after_test():
         noise_tolerance=0.005,
         cosine_threshold=0.5315,
         global_noise_limit=4.5,
+        raw_entropy_limit=3.0,
         cosine_order=2,
         excitation_order=3,
         noise_order=1,

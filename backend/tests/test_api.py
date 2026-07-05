@@ -359,7 +359,7 @@ async def test_rtss_telemetry_flow():
     assert trace.firewall.decision == "BREACH"
     assert len(trace.firewall.pipeline_trace) >= 1
     for stage in trace.firewall.pipeline_trace:
-        assert stage.stage in ("noise", "cosine", "excitation", "no_context")
+        assert stage.stage in ("noise", "cosine", "excitation", "no_context", "raw_entropy", "sparse")
         assert isinstance(stage.passed, bool)
         assert isinstance(stage.value, (int, float))
         assert isinstance(stage.threshold, (int, float))
@@ -616,7 +616,7 @@ async def test_upstream_error_mapped_to_trace_status_error(monkeypatch):
     
     set_config(
         excitation_threshold=0, noise_tolerance=1.0, cosine_threshold=0.0,
-        global_noise_limit=0.0,
+        global_noise_limit=0.0, raw_entropy_limit=0.0,
         noise_enabled=True, cosine_enabled=False, excitation_enabled=False
     )
     
