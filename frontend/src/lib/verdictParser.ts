@@ -1,0 +1,91 @@
+/** Parse firewall audit blocks into human-readable verdict cards. */
+
+export type VerdictDecision = 'pass' | 'block' | 'raw';
+
+export interface ParsedVerdict {
+  decision: VerdictDecision;
+  headline: string;
+  summary: string;
+  metrics: string;
+  pipeline: string;
+  segment: string;
+  body: string;
+}
+
+const REASON_LABELS: Record<string, string> = {
+  cosine: 'Query is not similar enough to your document corpus.',
+  excitation: 'Dimensional resonance did not match the corpus fingerprint.',
+  noise: 'Prompt entropy looks like an adversarial burst pattern.',
+  no_context: 'No corpus loaded — cannot verify this query.',
+};
+
+function humanReason(bareReason: string): string {
+  return REASON_LABELS[bareReason] ?? `Blocked by filter: ${bareReason}`;
+}
+
+export function parseFirewallMessage(content: string): ParsedVerdict | null {
+  if (!content.includes('[FIREWALL_AUDIT]')) {
+    return null;
+  }
+
+  const isBlock = content.includes('[FW_BLOCK]');
+  const isPass = content.includes('[FW_PASS]');
+
+  let segment = '';
+  const segMatch = content.match(/Segment:\s*"([^"]*)"/);
+  if (segMatch) segment = segMatch[1];
+
+  let metrics = '';
+  const metricsMatch = content.match(/Metrics:([^\n]+)/);
+  if (metricsMatch) metrics = metricsMatch[1].trim();
+
+  let pipeline = '';
+  const pipeMatch = content.match(/Pipeline:\s*\[([^\]]*)\]/);
+  if (pipeMatch) pipeline = pipeMatch[1];
+
+  let body = '';
+  const llmIdx = content.indexOf('[LLM_RESPONSE]:');
+  if (llmIdx >= 0) {
+    body = content.slice(llmIdx + '[LLM_RESPONSE]:'.length).trim();
+  }
+
+  if (isBlock) {
+    let bareReason = 'unknown';
+    if (metrics.toLowerCase().includes('cosine')) bareReason = 'cosine';
+    else if (metrics.toLowerCase().includes('entropy')) bareReason = 'noise';
+    else if (metrics.toLowerCase().includes('resonance')) bareReason = 'excitation';
+    else if (metrics.toLowerCase().includes('no_context')) bareReason = 'no_context';
+
+    return {
+      decision: 'block',
+      headline: 'Query blocked',
+      summary: humanReason(bareReason),
+      metrics,
+      pipeline,
+      segment,
+      body: '',
+    };
+  }
+
+  if (isPass) {
+    return {
+      decision: 'pass',
+      headline: 'Query allowed',
+      summary: 'All firewall filters passed. The LLM answered below.',
+      metrics,
+      pipeline,
+      segment: '',
+      body,
+    };
+  }
+
+  return {
+    decision: 'raw',
+    headline: 'Firewall audit',
+    summary: '',
+    metrics,
+    pipeline,
+    segment,
+    body: content,
+  };
+}

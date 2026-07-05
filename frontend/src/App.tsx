@@ -41,14 +41,14 @@ function App() {
             className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
             onClick={() => setActiveTab('chat')}
           >
-            CHAT
+            Chat
           </button>
           <button
             id="tab-sniffer"
             className={`tab-btn ${activeTab === 'sniffer' ? 'active' : ''}`}
             onClick={() => setActiveTab('sniffer')}
           >
-            SNIFFER
+            Sniffer
           </button>
         </div>
         {activeTab === 'chat' ? (

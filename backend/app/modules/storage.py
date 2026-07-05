@@ -51,6 +51,23 @@ class Storage:
         results = self.table.search(query_vector).limit(k).to_list()
         return results
 
+    def search_nearest_for_pack(self, query_vector: list[float], filename: str, k: int = 1):
+        """Nearest-neighbor search limited to vectors from a single pack."""
+        if self.table.count_rows() == 0:
+            return []
+
+        if not filename or not _SAFE_FILENAME_RE.match(filename):
+            logger.warning("Rejected unsafe filename for pack search: %r", filename)
+            return []
+
+        safe_name = filename.replace("'", "''")
+        filter_str = f"metadata LIKE '%\"filename\": \"{safe_name}\"%'"
+        try:
+            return self.table.search(query_vector).where(filter_str).limit(k).to_list()
+        except Exception as e:
+            logger.warning("Pack-scoped search failed, falling back to global: %s", e)
+            return self.search_nearest(query_vector, k=k)
+
     def count_rows(self) -> int:
         return self.table.count_rows()
 
