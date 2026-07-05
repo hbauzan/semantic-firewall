@@ -45,9 +45,9 @@ Fuentes: AdvBench y HarmBench para adversarial (subsets, no todo). Las on-corpus
 ## Tareas
 - [x] Armar el dataset etiquetado chico (20-30) a mano. Correrlo manualmente. Validar que los resultados tienen sentido.
 - [x] Expandir el dataset (cientos de queries) usando las fuentes de arriba. — *v1: 25×2 dominios (automotive + medical); expandir a cientos es siguiente iteración.*
-- [x] Construir el threshold sweep automatizado sobre dataset isolado (sin tocar el corpus de producción — reusar el patrón de DB temporal de `db_stress_suite.py`). — *2D cosine×excitation + 1D noise; 3D y modo negativo diferidos.*
+- [x] Construir el threshold sweep automatizado sobre dataset isolado (sin tocar el corpus de producción — reusar el patrón de DB temporal de `db_stress_suite.py`). — *3D cosine×excitation×noise conjunto; modo negativo diferido.*
 - [x] **Cal auto para cualquier PDF ingestado** — `dataset_generator.py` genera dataset v1 (~25 queries), sweep Youden async con progreso en HUD; hand-curated tiene prioridad.
-- [ ] Generar curvas ROC y punto Youden-óptimo por corpus. — *sweep CSV/MD listo (2D + noise); gráficos ROC opcionales.*
+- [ ] Generar curvas ROC y punto Youden-óptimo por corpus. — *sweep CSV/MD listo (3D); gráficos ROC opcionales.*
 - [ ] Correr el experimento coseno-solo vs. coseno+excitación. Registrar el número clave.
 - [ ] Probar con **al menos 2 corpus de dominios distintos** para ver cuánto se mueve la frontera óptima.
 

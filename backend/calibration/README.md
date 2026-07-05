@@ -42,8 +42,7 @@ curl http://localhost:8000/corpus/calibration-task-status/{task_id}
 Applies Youden-optimal thresholds for **positive mode**:
 
 1. **Auto dataset** (if needed) — ~25 queries: on-corpus (LLM or template fallback), off-topic/adversarial from static pools, piggybacking templates. Saved to `datasets/auto_<slug>.json`.
-2. **2D joint sweep** — `cosine_threshold` × `excitation_threshold`, with `global_noise_limit` held at the **current** value from config (not reset to defaults).
-3. **1D noise sweep** — `global_noise_limit` with the winning cosine/excitation held.
+2. **3D joint sweep** — `cosine_threshold` × `excitation_threshold` × `global_noise_limit` (~1.287 configs). Clause metrics are embedded once and cached; the grid evaluates confusion from cache only.
 
 Evaluation uses the **live pipeline snapshot**: filter seq order (Noise/Cosine/Excitation), ON/OFF toggles, `rag_top_k`, `noise_tolerance`, and `adaptive_factor` from config at Cal time. Only the three threshold sliders are overwritten on completion.
 
@@ -51,11 +50,11 @@ Hand-curated datasets (`automotive_v1.json`, `medical_v1.json`) are reused witho
 
 Sweep grids are centered on positive Youden defaults (`0.5315` / `150` / `4.5`) — see `app/core/recommended_thresholds.py`. HUD sliders use the same center (`frontend/src/thresholdBounds.ts`).
 
-## Latest sweep results (v1 datasets, 2D grid 2026-07-04)
+## Latest sweep results (v1 datasets, 3D grid 2026-07-04)
 
 | Corpus | cosine | excitation | noise | F1 | Note |
 |--------|--------|------------|-------|-----|------|
-| automotive | 0.38 | 125 | 1.5 | 1.00 | 2D joint at noise=4.5; noise 1D still hits grid lower bound |
+| automotive | 0.38 | 125 | 1.5 | 1.00 | prior 2D+1D run; re-run sweep CLI for 3D optima |
 | medical | 0.43 | 25 | 1.5 | 1.00 | excitation at grid lower bound |
 
 Recommended HUD defaults (slider midpoint): **0.5315 / 150 / 4.5**. Corpus **Cal** may apply different Youden optima per pack.

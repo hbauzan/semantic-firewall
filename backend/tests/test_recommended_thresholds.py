@@ -30,8 +30,12 @@ def test_excitation_sweep_extends_below_old_minimum():
     assert POSITIVE_RECOMMENDED["excitation_threshold"] in grid
 
 
-def test_2d_grid_pair_count():
-    from app.core.recommended_thresholds import cosine_excitation_2d_grid_size
+def test_3d_grid_triple_count():
+    from app.core.recommended_thresholds import threshold_3d_grid_size
 
-    n_cos, n_exc = cosine_excitation_2d_grid_size()
-    assert n_cos * n_exc == len(SWEEP_GRIDS["cosine_threshold"]) * len(SWEEP_GRIDS["excitation_threshold"])
+    n_cos, n_exc, n_noise = threshold_3d_grid_size()
+    assert n_cos * n_exc * n_noise == (
+        len(SWEEP_GRIDS["cosine_threshold"])
+        * len(SWEEP_GRIDS["excitation_threshold"])
+        * len(SWEEP_GRIDS["global_noise_limit"])
+    )

@@ -8,7 +8,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 
@@ -61,6 +61,38 @@ class SweepPoint:
 class JointSweepPoint:
     cosine_threshold: float
     excitation_threshold: int
+    tp: int
+    fp: int
+    tn: int
+    fn: int
+
+    @property
+    def precision(self) -> float:
+        return self.tp / (self.tp + self.fp) if (self.tp + self.fp) else 0.0
+
+    @property
+    def recall(self) -> float:
+        return self.tp / (self.tp + self.fn) if (self.tp + self.fn) else 0.0
+
+    @property
+    def f1(self) -> float:
+        p, r = self.precision, self.recall
+        return 2 * p * r / (p + r) if (p + r) else 0.0
+
+    @property
+    def fpr(self) -> float:
+        return self.fp / (self.fp + self.tn) if (self.fp + self.tn) else 0.0
+
+    @property
+    def youden(self) -> float:
+        return self.recall - self.fpr
+
+
+@dataclass(frozen=True)
+class TripleSweepPoint:
+    cosine_threshold: float
+    excitation_threshold: int
+    global_noise_limit: float
     tp: int
     fp: int
     tn: int
@@ -168,6 +200,110 @@ def _calibration_base_cfg() -> ConfigState:
     return state_mod.config_state.model_copy(update={"firewall_mode": "positive"})
 
 
+def _effective_excitation_threshold(
+    excitation_threshold: float,
+    word_count: int,
+    adaptive_factor: float,
+) -> float:
+    if word_count < 6:
+        return float(excitation_threshold) * adaptive_factor
+    return float(excitation_threshold)
+
+
+def _measure_calibration_clause(
+    clause: str,
+    pack_filename: str,
+    cfg_probe: ConfigState,
+) -> dict[str, Any]:
+    cl_vec = embedder.embed(clause)
+    q = np.asarray(cl_vec, dtype=np.float32)
+    word_count = len(clause.split())
+    results = storage.search_nearest_for_pack(cl_vec, pack_filename, k=cfg_probe.rag_top_k)
+    if not results:
+        return {
+            "clause_text": clause,
+            "has_context": False,
+            "entropy": float("nan"),
+            "cosine_sim": 0.0,
+            "activations": 0,
+            "word_count": word_count,
+        }
+
+    c = np.asarray(results[0]["vector"], dtype=np.float32).reshape(-1)
+    _, _, noise_details = SemanticFirewall.run_noise_filter(q, c, cfg_probe)
+    _, _, cosine_details = SemanticFirewall.run_cosine_filter(q, c, cfg_probe)
+    _, _, excitation_details = SemanticFirewall.run_excitation_filter(
+        q, c, cfg_probe, word_count=word_count
+    )
+    return {
+        "clause_text": clause,
+        "has_context": True,
+        "entropy": float(noise_details["entropy"]),
+        "cosine_sim": float(cosine_details["cosine_sim"]),
+        "activations": int(excitation_details["activations"]),
+        "word_count": word_count,
+    }
+
+
+def _measure_calibration_dataset(
+    dataset: dict,
+    pack_filename: str,
+    cfg_probe: ConfigState,
+) -> list[dict[str, Any]]:
+    """Embed once per clause; cache metrics for grid sweeps."""
+    rows: list[dict[str, Any]] = []
+    for q in dataset["queries"]:
+        clauses = SemanticFirewall.segment(q["text"].strip())
+        clause_rows = [
+            _measure_calibration_clause(cl, pack_filename, cfg_probe) for cl in clauses
+        ]
+        rows.append({
+            "id": q["id"],
+            "expected": q["expected"],
+            "clauses": clause_rows,
+        })
+    return rows
+
+
+def _clause_blocked_from_cache(clause: dict[str, Any], cfg: ConfigState) -> bool:
+    if not clause["has_context"]:
+        return True
+    if cfg.noise_enabled and clause["entropy"] < cfg.global_noise_limit:
+        return True
+    if cfg.cosine_enabled and clause["cosine_sim"] < cfg.cosine_threshold:
+        return True
+    if cfg.excitation_enabled:
+        exc_th = _effective_excitation_threshold(
+            cfg.excitation_threshold, clause["word_count"], cfg.adaptive_factor
+        )
+        if clause["activations"] < exc_th:
+            return True
+    return False
+
+
+def _prompt_blocked_from_cache(row: dict[str, Any], cfg: ConfigState) -> bool:
+    return any(_clause_blocked_from_cache(cl, cfg) for cl in row["clauses"])
+
+
+def _confusion_from_cache(
+    cached_rows: list[dict[str, Any]],
+    cfg: ConfigState,
+) -> tuple[int, int, int, int]:
+    tp = fp = tn = fn = 0
+    for row in cached_rows:
+        blocked = _prompt_blocked_from_cache(row, cfg)
+        true_block = row["expected"] == "block"
+        if blocked and true_block:
+            tp += 1
+        elif blocked and not true_block:
+            fp += 1
+        elif not blocked and not true_block:
+            tn += 1
+        else:
+            fn += 1
+    return tp, fp, tn, fn
+
+
 def _evaluate_prompt_positive(
     prompt: str,
     cfg: ConfigState,
@@ -214,70 +350,47 @@ def _confusion(rows: list[tuple[str, str, str, bool]]) -> tuple[int, int, int, i
     return tp, fp, tn, fn
 
 
-def _sweep_1d(
-    param: str,
-    values: list[float],
-    base_cfg: ConfigState,
-    dataset: dict,
-    pack_filename: str,
-) -> list[SweepPoint]:
-    points: list[SweepPoint] = []
-    for val in values:
-        overrides: dict = {param: val}
-        if param == "excitation_threshold":
-            overrides[param] = int(val)
-        cfg = base_cfg.model_copy(update=overrides)
-        rows = _run_evaluation(dataset, cfg, pack_filename)
-        tp, fp, tn, fn = _confusion(rows)
-        points.append(SweepPoint(param=param, value=val, tp=tp, fp=fp, tn=tn, fn=fn))
-    return points
-
-
-def _pick_youden_winner(points: list[SweepPoint]) -> SweepPoint:
+def _pick_triple_youden_winner(points: list[TripleSweepPoint]) -> TripleSweepPoint:
     return max(points, key=lambda p: (p.youden, p.f1, -p.fn))
 
 
-def _pick_joint_youden_winner(points: list[JointSweepPoint]) -> JointSweepPoint:
-    return max(points, key=lambda p: (p.youden, p.f1, -p.fn))
-
-
-def _sweep_cosine_excitation_2d(
+def _sweep_thresholds_3d(
     base_cfg: ConfigState,
-    dataset: dict,
-    pack_filename: str,
-    noise_fixed: float,
+    cached_rows: list[dict[str, Any]],
     progress_cb: ProgressCallback = None,
     progress_start: float = 35.0,
-    progress_end: float = 85.0,
-) -> list[JointSweepPoint]:
-    """Joint grid over cosine × excitation; noise held at ``noise_fixed``."""
-    points: list[JointSweepPoint] = []
-    grid = list(SWEEP_GRIDS["cosine_threshold"])
+    progress_end: float = 90.0,
+) -> list[TripleSweepPoint]:
+    """Joint grid over cosine × excitation × global_noise_limit."""
+    cos_grid = list(SWEEP_GRIDS["cosine_threshold"])
     exc_grid = list(SWEEP_GRIDS["excitation_threshold"])
-    total_pairs = len(grid) * len(exc_grid)
+    noise_grid = list(SWEEP_GRIDS["global_noise_limit"])
+    total = len(cos_grid) * len(exc_grid) * len(noise_grid)
     done = 0
+    points: list[TripleSweepPoint] = []
 
     if progress_cb:
-        progress_cb(progress_start, f"2D sweep: cosine × excitation (0/{total_pairs})…")
+        progress_cb(progress_start, f"3D sweep: cosine × excitation × noise (0/{total})…")
 
-    for cos in grid:
+    for cos in cos_grid:
         for exc in exc_grid:
-            cfg = base_cfg.model_copy(update={
-                "cosine_threshold": cos,
-                "excitation_threshold": int(exc),
-                "global_noise_limit": noise_fixed,
-            })
-            rows = _run_evaluation(dataset, cfg, pack_filename)
-            tp, fp, tn, fn = _confusion(rows)
-            points.append(JointSweepPoint(
-                cosine_threshold=cos,
-                excitation_threshold=int(exc),
-                tp=tp, fp=fp, tn=tn, fn=fn,
-            ))
-            done += 1
-            if progress_cb and (done == 1 or done == total_pairs or done % 10 == 0):
-                pct = progress_start + (progress_end - progress_start) * done / total_pairs
-                progress_cb(pct, f"2D sweep… ({done}/{total_pairs})")
+            for noise in noise_grid:
+                cfg = base_cfg.model_copy(update={
+                    "cosine_threshold": cos,
+                    "excitation_threshold": int(exc),
+                    "global_noise_limit": noise,
+                })
+                tp, fp, tn, fn = _confusion_from_cache(cached_rows, cfg)
+                points.append(TripleSweepPoint(
+                    cosine_threshold=cos,
+                    excitation_threshold=int(exc),
+                    global_noise_limit=noise,
+                    tp=tp, fp=fp, tn=tn, fn=fn,
+                ))
+                done += 1
+                if progress_cb and (done == 1 or done == total or done % 50 == 0):
+                    pct = progress_start + (progress_end - progress_start) * done / total
+                    progress_cb(pct, f"3D sweep… ({done}/{total})")
     return points
 
 
@@ -285,7 +398,7 @@ def calibrate_positive_for_pack(
     filename: str,
     progress_cb: ProgressCallback = None,
 ) -> PositiveCalibrationResult:
-    """Run 2D cosine×excitation sweep (noise fixed), then 1D noise; return optima."""
+    """Run joint 3D threshold sweep (cosine × excitation × noise); return Youden optima."""
     packs = {p["filename"] for p in storage.get_summary()}
     if filename not in packs:
         raise CalibrationError(f"Pack '{filename}' is not loaded in the corpus.")
@@ -301,65 +414,43 @@ def calibrate_positive_for_pack(
         generation_method = dataset.get("generation_method")
 
     base_cfg = _calibration_base_cfg()
-    noise_fixed = base_cfg.global_noise_limit
-
-    joint_points = _sweep_cosine_excitation_2d(
-        base_cfg, dataset, filename, noise_fixed, progress_cb=progress_cb,
-    )
-    joint_winner = _pick_joint_youden_winner(joint_points)
-    logger.info(
-        "Calibration %s 2D cosine×excitation (noise=%.1f): cos=%.2f exc=%d youden=%.3f",
-        filename, noise_fixed,
-        joint_winner.cosine_threshold, joint_winner.excitation_threshold, joint_winner.youden,
-    )
 
     if progress_cb:
-        progress_cb(85.0, "Tuning noise threshold…")
+        progress_cb(30.0, "Measuring clause metrics…")
 
-    held_cfg = base_cfg.model_copy(update={
-        "cosine_threshold": joint_winner.cosine_threshold,
-        "excitation_threshold": joint_winner.excitation_threshold,
-    })
-    noise_points = _sweep_1d(
-        "global_noise_limit",
-        SWEEP_GRIDS["global_noise_limit"],
-        held_cfg,
-        dataset,
-        filename,
+    cached_rows = _measure_calibration_dataset(dataset, filename, base_cfg)
+
+    triple_points = _sweep_thresholds_3d(
+        base_cfg, cached_rows, progress_cb=progress_cb,
     )
-    noise_winner = _pick_youden_winner(noise_points)
+    winner = _pick_triple_youden_winner(triple_points)
     logger.info(
-        "Calibration %s noise 1D (cos=%.2f exc=%d): optimal=%.1f youden=%.3f",
+        "Calibration %s 3D joint: cos=%.2f exc=%d noise=%.1f youden=%.3f",
         filename,
-        joint_winner.cosine_threshold, joint_winner.excitation_threshold,
-        noise_winner.value, noise_winner.youden,
+        winner.cosine_threshold,
+        winner.excitation_threshold,
+        winner.global_noise_limit,
+        winner.youden,
     )
 
     if progress_cb:
         progress_cb(95.0, "Applying optimal thresholds…")
 
     sweep_summary = {
-        "cosine_excitation_2d": {
-            "cosine_threshold": joint_winner.cosine_threshold,
-            "excitation_threshold": joint_winner.excitation_threshold,
-            "noise_fixed": noise_fixed,
-            "f1": round(joint_winner.f1, 4),
-            "youden": round(joint_winner.youden, 4),
-            "grid_pairs": len(joint_points),
-        },
-        "global_noise_limit_1d": {
-            "optimal": noise_winner.value,
-            "f1": round(noise_winner.f1, 4),
-            "youden": round(noise_winner.youden, 4),
-            "held_cosine": joint_winner.cosine_threshold,
-            "held_excitation": joint_winner.excitation_threshold,
+        "thresholds_3d": {
+            "cosine_threshold": winner.cosine_threshold,
+            "excitation_threshold": winner.excitation_threshold,
+            "global_noise_limit": winner.global_noise_limit,
+            "f1": round(winner.f1, 4),
+            "youden": round(winner.youden, 4),
+            "grid_triples": len(triple_points),
         },
     }
 
     final_cfg = base_cfg.model_copy(update={
-        "cosine_threshold": joint_winner.cosine_threshold,
-        "excitation_threshold": joint_winner.excitation_threshold,
-        "global_noise_limit": noise_winner.value,
+        "cosine_threshold": winner.cosine_threshold,
+        "excitation_threshold": winner.excitation_threshold,
+        "global_noise_limit": winner.global_noise_limit,
     })
     eval_rows = _run_evaluation(dataset, final_cfg, filename)
     accuracy = sum(1 for *_rest, ok in eval_rows if ok) / len(eval_rows)
@@ -369,9 +460,9 @@ def calibrate_positive_for_pack(
         corpus_id=dataset["corpus_id"],
         dataset_file=Path(dataset["_path"]).name,
         generation_method=generation_method,
-        cosine_threshold=joint_winner.cosine_threshold,
-        excitation_threshold=joint_winner.excitation_threshold,
-        global_noise_limit=noise_winner.value,
+        cosine_threshold=winner.cosine_threshold,
+        excitation_threshold=winner.excitation_threshold,
+        global_noise_limit=winner.global_noise_limit,
         accuracy=accuracy,
         sweep_summary=sweep_summary,
     )
