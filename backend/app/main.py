@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 logging.basicConfig(
@@ -23,6 +24,7 @@ from app.api.router_main import router
 from app.core.logging_config import setup_industrial_logging
 from app.core.settings import settings
 from app.modules.sniffer import start_consumer, stop_consumer
+from app.modules.dispatcher import get_dispatcher
 
 setup_industrial_logging()
 
@@ -42,9 +44,14 @@ limiter = Limiter(key_func=get_remote_address, default_limits=[settings.rate_lim
 # --- Lifespan (startup / shutdown) ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    loop = asyncio.get_running_loop()
+    dispatcher = get_dispatcher()
+    dispatcher.start(loop)
+    app.state.inference_dispatcher = dispatcher
     start_consumer()
     yield
     stop_consumer()
+    dispatcher.stop()
 
 
 app = FastAPI(
