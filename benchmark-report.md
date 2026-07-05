@@ -214,3 +214,38 @@ cd backend && uv run python tests/benchmark_suite.py --skip-calibration
 ---
 
 *Generado tras corrida 2026-07-04 en `feature/benchmark-suite`.*
+
+---
+
+## Batería de filtros (Prisma, 215 prompts)
+
+Multi-cláusula, pack-scoped C, decisión vía `evaluate_clause` (short-circuit).
+
+### Perfil `hud_defaults`
+
+Umbrales: cosine=0.5315, excitation=150, global_noise_limit=4.5
+
+| Modo | Pipeline | TP | FP | TN | FN | TPR | FPR | F1 | J |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Cosine only | cosine | 162 | 3 | 47 | 3 | 0.9818 | 0.0600 | 0.9818 | 0.9218 |
+| Noise only | noise | 0 | 0 | 50 | 165 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| Excitation only | excitation | 159 | 16 | 34 | 6 | 0.9636 | 0.3200 | 0.9353 | 0.6436 |
+| Cosine → Noise → Excitation | cosine → noise → excitation | 165 | 17 | 33 | 0 | 1.0000 | 0.3400 | 0.9510 | 0.6600 |
+
+### Perfil `grid_optimal_v2`
+
+Umbrales: cosine=0.5100, excitation=50, global_noise_limit=4.5
+
+| Modo | Pipeline | TP | FP | TN | FN | TPR | FPR | F1 | J |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Cosine only | cosine | 160 | 2 | 48 | 5 | 0.9697 | 0.0400 | 0.9786 | 0.9297 |
+| Noise only | noise | 0 | 0 | 50 | 165 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| Excitation only | excitation | 0 | 0 | 50 | 165 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| Cosine → Noise → Excitation | cosine → noise → excitation | 160 | 2 | 48 | 5 | 0.9697 | 0.0400 | 0.9786 | 0.9297 |
+
+### Delta full pipeline vs cosine-only (HUD)
+
+- ΔJ = -0.2618
+- ΔTPR = +0.0182
+- ΔFPR = +0.2800 (positive = more in-domain false blocks)
+
