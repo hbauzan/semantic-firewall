@@ -17,10 +17,19 @@ export const ChatInterface: React.FC = () => {
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [isStreaming, setIsStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const focusInput = useCallback(() => {
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    focusInput();
+  }, [focusInput]);
 
   const sendPrompt = useCallback(async (prompt: string) => {
     if (!prompt.trim() || isStreaming) return;
@@ -29,9 +38,13 @@ export const ChatInterface: React.FC = () => {
     addMessage({ id: newMessageId, role: 'user', content: prompt });
 
     setInput('');
-    setInputHistory(prev => [...prev, prompt]);
+    setInputHistory((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1] === prompt) return prev;
+      return [...prev, prompt];
+    });
     setHistoryIdx(-1);
     setIsStreaming(true);
+    focusInput();
     let connectionFailed = false;
 
     try {
@@ -136,25 +149,33 @@ export const ChatInterface: React.FC = () => {
       if (!connectionFailed) {
         useStore.setState({ systemAction: 'SYSTEM IDLE' });
       }
+      focusInput();
     }
-  }, [addMessage, isStreaming]);
+  }, [addMessage, isStreaming, focusInput]);
 
-  const handleSend = () => sendPrompt(input);
+  const handleSend = () => {
+    if (!isStreaming) sendPrompt(input);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowUp') {
       e.preventDefault();
+      if (inputHistory.length === 0) return;
       const newIdx = Math.min(historyIdx + 1, inputHistory.length - 1);
-      if (newIdx >= 0) {
-        setHistoryIdx(newIdx);
-        setInput(inputHistory[inputHistory.length - 1 - newIdx]);
-      }
-    } else if (e.key === 'ArrowDown') {
+      setHistoryIdx(newIdx);
+      setInput(inputHistory[inputHistory.length - 1 - newIdx]);
+      return;
+    }
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
+      if (inputHistory.length === 0) return;
       const newIdx = Math.max(historyIdx - 1, -1);
       setHistoryIdx(newIdx);
       setInput(newIdx === -1 ? '' : inputHistory[inputHistory.length - 1 - newIdx]);
-    } else if (e.key === 'Enter') {
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
       handleSend();
     }
   };
@@ -193,12 +214,19 @@ export const ChatInterface: React.FC = () => {
 
       <div className="chat-input">
         <input
+          ref={inputRef}
+          id="chat-prompt-input"
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about your loaded corpus…"
+          onChange={(e) => {
+            setInput(e.target.value);
+            if (historyIdx !== -1) setHistoryIdx(-1);
+          }}
+          placeholder="Ask about your loaded corpus… (↑ history)"
           onKeyDown={handleKeyDown}
-          disabled={isStreaming}
+          autoComplete="off"
+          aria-busy={isStreaming}
+          className={isStreaming ? 'chat-input-field--busy' : ''}
         />
         <button type="button" onClick={handleSend} disabled={isStreaming} className={isStreaming ? 'btn-disabled' : ''}>
           {isStreaming ? 'Processing…' : 'Send'}
