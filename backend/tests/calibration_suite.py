@@ -27,18 +27,11 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
 import lancedb
-from lancedb.pydantic import LanceModel, Vector
 
 from app.core.firewall import SemanticFirewall
 from app.core.models import ConfigState
 from app.core.recommended_thresholds import SWEEP_GRIDS, threshold_3d_grid_size
-
-
-class KnowledgeNode(LanceModel):
-    id: int
-    vector: Vector(1024)
-    text: str
-    metadata: str
+from app.modules.storage import KnowledgeNode, rabitq_schema
 
 
 @dataclass
@@ -169,18 +162,23 @@ def ingest_pdf_to_table(pdf_path: Path, table, embedder, filename: str) -> int:
     """Embed PDF chunks into isolated LanceDB table."""
     import fitz
 
+    from app.modules.storage import compute_rabitq_fields, serialize_sparse
+
     doc = fitz.open(pdf_path)
     full_text = "\n".join(page.get_text() for page in doc)
     doc.close()
     chunks = chunk_text(full_text)
-    vectors = embedder.embed_batch(chunks)
     nodes = []
-    for i, (text, vec) in enumerate(zip(chunks, vectors)):
+    for i, text in enumerate(chunks):
+        output = embedder.embed_full(text)
+        rabitq = compute_rabitq_fields(output.dense)
         nodes.append({
             "id": i + 1,
-            "vector": vec,
+            "vector": output.dense,
+            "sparse_lexical": serialize_sparse(output.sparse),
             "text": text,
             "metadata": json.dumps({"filename": filename, "chunk": i}),
+            **rabitq,
         })
     if nodes:
         table.add(nodes)
@@ -203,10 +201,14 @@ def measure_calibration_clause(
     embedder,
     cfg_probe: ConfigState,
 ) -> dict:
-    cl_vec = embedder.embed(clause)
+    from app.modules.storage import deserialize_sparse
+
+    embedding = embedder.embed_full(clause)
+    cl_vec = embedding.dense
     q = np.asarray(cl_vec, dtype=np.float32)
+    q_sparse = embedding.sparse
     word_count = len(clause.split())
-    results = table.search(cl_vec).limit(cfg_probe.rag_top_k).to_list()
+    results = table.search(cl_vec, vector_column_name="vector").limit(cfg_probe.rag_top_k).to_list()
     if not results:
         return {
             "has_context": False,
@@ -216,18 +218,28 @@ def measure_calibration_clause(
             "word_count": word_count,
         }
 
-    c = np.asarray(results[0]["vector"], dtype=np.float32).reshape(-1)
-    _, _, noise_details = SemanticFirewall.run_noise_filter(q, c, cfg_probe)
-    _, _, cosine_details = SemanticFirewall.run_cosine_filter(q, c, cfg_probe)
-    _, _, excitation_details = SemanticFirewall.run_excitation_filter(
-        q, c, cfg_probe, word_count=word_count
+    row = results[0]
+    c = np.asarray(row["vector"], dtype=np.float32).reshape(-1)
+    c_sparse = deserialize_sparse(row.get("sparse_lexical"))
+    if isinstance(row.get("sparse_lexical"), dict):
+        c_sparse = row.get("sparse_lexical")
+
+    eval_result = SemanticFirewall.evaluate_clause(
+        q, c, cfg_probe, word_count,
+        query_text=clause, q_sparse=q_sparse, c_sparse=c_sparse,
     )
+    noise_trace = next((t for t in eval_result["trace"] if t["stage"] == "noise"), None)
+    cosine_trace = next((t for t in eval_result["trace"] if t["stage"] == "cosine"), None)
+    excitation_trace = next((t for t in eval_result["trace"] if t["stage"] == "excitation"), None)
+    sparse_trace = next((t for t in eval_result["trace"] if t["stage"] == "sparse"), None)
+
     return {
         "has_context": True,
-        "entropy": float(noise_details["entropy"]),
-        "cosine_sim": float(cosine_details["cosine_sim"]),
-        "activations": int(excitation_details["activations"]),
+        "entropy": float(noise_trace["entropy"]) if noise_trace else float("nan"),
+        "cosine_sim": float(cosine_trace.get("cosine_sim", cosine_trace.get("hybrid_score", 0.0))) if cosine_trace else 0.0,
+        "activations": int(excitation_trace["activations"]) if excitation_trace else 0,
         "word_count": word_count,
+        "sparse_sim": float(sparse_trace["sparse_sim"]) if sparse_trace else None,
     }
 
 
@@ -294,22 +306,40 @@ def evaluate_prompt(
     embedder,
 ) -> tuple[bool, str | None, str | None]:
     """Return (passed, breach_reason, failed_clause). Mirrors /chat positive-mode logic."""
+    from app.modules.storage import deserialize_sparse
+
     clauses = SemanticFirewall.segment(prompt.strip())
     negative = cfg.firewall_mode == "negative"
 
     for clause in clauses:
-        cl_vec = embedder.embed(clause)
-        results = table.search(cl_vec).limit(cfg.rag_top_k).to_list()
+        if cfg.noise_enabled:
+            entropy = SemanticFirewall.calculate_raw_entropy(clause)
+            if entropy < cfg.raw_entropy_limit:
+                return False, "BURST_DETECTION_BREACH", clause
+
+        embedding = embedder.embed_full(clause)
+        cl_vec = embedding.dense
+        results = table.search(cl_vec, vector_column_name="vector").limit(cfg.rag_top_k).to_list()
         if not results:
             if negative:
                 continue
             return False, "no_context", clause
 
-        db_vec = results[0]["vector"]
+        row = results[0]
+        db_vec = row["vector"]
         q_arr = np.array(cl_vec, dtype=np.float32)
         c_arr = np.array(db_vec, dtype=np.float32)
         word_count = len(clause.split())
-        result = SemanticFirewall.evaluate_clause(q_arr, c_arr, cfg, word_count)
+        c_sparse = deserialize_sparse(row.get("sparse_lexical"))
+        if isinstance(row.get("sparse_lexical"), dict):
+            c_sparse = row.get("sparse_lexical")
+
+        result = SemanticFirewall.evaluate_clause(
+            q_arr, c_arr, cfg, word_count,
+            query_text=clause,
+            q_sparse=embedding.sparse,
+            c_sparse=c_sparse,
+        )
         if not result["passed"]:
             return False, result["breach_reason"], clause
 
@@ -367,7 +397,7 @@ def setup_isolated_db(pdf_path: Path, embedder) -> tuple[object, Path]:
     if test_db_path.exists():
         shutil.rmtree(test_db_path)
     db = lancedb.connect(str(test_db_path))
-    table = db.create_table("knowledge", schema=KnowledgeNode)
+    table = db.create_table("knowledge", schema=rabitq_schema)
     count = ingest_pdf_to_table(pdf_path, table, embedder, pdf_path.name)
     print(f"Ingested {count} chunks from {pdf_path.name}")
     return table, test_db_path

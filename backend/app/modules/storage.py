@@ -10,6 +10,8 @@ from typing import Any
 import numpy as np
 import pyarrow as pa
 
+from app.core.settings import settings
+
 logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "lancedb_data")
@@ -25,21 +27,47 @@ rabitq_schema = pa.schema([
     pa.field("vector_packed", pa.list_(pa.uint8(), RABITQ_PACKED_BYTES)),
     pa.field("centroid_distance", pa.float32()),
     pa.field("quantization_projection", pa.float32()),
+    pa.field("sparse_lexical", pa.string()),
     pa.field("text", pa.string()),
     pa.field("metadata", pa.string()),
 ])
 
 
 class KnowledgeNode(LanceModel):
-    """LanceDB row model — includes RabitQ binary signature fields."""
+    """LanceDB row model — includes RabitQ binary signature and sparse lexical fields."""
 
     id: int
     vector: Vector(1024)
     vector_packed: list[int] | None = None
     centroid_distance: float | None = None
     quantization_projection: float | None = None
+    sparse_lexical: str | None = None
     text: str
     metadata: str
+
+
+def serialize_sparse(sparse: dict[int, float] | None) -> str | None:
+    """JSON-encode sparse lexical weights for LanceDB storage."""
+    if not sparse:
+        return None
+    return json.dumps({str(k): v for k, v in sparse.items()})
+
+
+def deserialize_sparse(raw: str | dict | None) -> dict[int, float] | None:
+    """Decode sparse lexical weights from stored JSON."""
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        return {int(k): float(v) for k, v in raw.items()}
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return {int(k): float(v) for k, v in parsed.items()}
 
 
 def pack_binary_signature(vector: np.ndarray | list[float]) -> bytes:
@@ -61,12 +89,27 @@ def pack_binary_signature(vector: np.ndarray | list[float]) -> bytes:
     return packed[:RABITQ_PACKED_BYTES].tobytes()
 
 
-def hamming_distance(a: bytes, b: bytes) -> int:
-    """CPU Hamming distance over packed binary signatures."""
+def _hamming_popcount_fallback(a: bytes, b: bytes) -> int:
     dist = 0
     for x, y in zip(a, b):
         dist += (x ^ y).bit_count()
     return dist
+
+
+def hamming_distance(a: bytes, b: bytes) -> int:
+    """CPU Hamming distance over packed binary signatures (SimSIMD optional)."""
+    if len(a) != len(b):
+        length = min(len(a), len(b))
+        a, b = a[:length], b[:length]
+
+    try:
+        import simsimd  # type: ignore[import-untyped]
+
+        arr_a = np.frombuffer(a, dtype=np.uint8)
+        arr_b = np.frombuffer(b, dtype=np.uint8)
+        return int(simsimd.hamming(arr_a, arr_b))
+    except (ImportError, AttributeError, TypeError, ValueError):
+        return _hamming_popcount_fallback(a, b)
 
 
 def compute_rabitq_fields(vector: list[float]) -> dict[str, Any]:
@@ -83,13 +126,21 @@ def compute_rabitq_fields(vector: list[float]) -> dict[str, Any]:
     }
 
 
+def _normalize_row(row: dict) -> dict:
+    """Attach deserialized sparse_lexical for API consumers."""
+    out = dict(row)
+    sparse = deserialize_sparse(row.get("sparse_lexical"))
+    if sparse is not None:
+        out["sparse_lexical"] = sparse
+    return out
+
+
 class Storage:
     def __init__(self):
         self.db = lancedb.connect(DB_PATH)
         self.table_name = "knowledge"
-        self.hamming_prefilter_max = int(
-            os.environ.get("HAMMING_PREFILTER_MAX", "512")
-        )
+        self.hamming_prefilter_max = settings.hamming_prefilter_max
+        self.rabitq_w = settings.rabitq_w
 
         existing = self.db.list_tables()
         table_list = existing.tables if hasattr(existing, 'tables') else list(existing)
@@ -104,10 +155,14 @@ class Storage:
 
     def _enrich_node(self, node: dict) -> dict:
         """Attach binary signature fields when missing."""
-        if "vector_packed" not in node or node.get("vector_packed") is None:
-            rabitq = compute_rabitq_fields(node["vector"])
-            node.update(rabitq)
-        return node
+        enriched = dict(node)
+        if "vector_packed" not in enriched or enriched.get("vector_packed") is None:
+            rabitq = compute_rabitq_fields(enriched["vector"])
+            enriched.update(rabitq)
+        sparse = enriched.get("sparse_lexical")
+        if isinstance(sparse, dict):
+            enriched["sparse_lexical"] = serialize_sparse(sparse)
+        return enriched
 
     def add_nodes(self, nodes: list[dict]):
         """Insert nodes with RabitQ binary signatures."""
@@ -126,7 +181,7 @@ class Storage:
             return []
 
         oversample = min(max(k * 4, k), self.table.count_rows())
-        results = self.table.search(query_vector).limit(oversample).to_list()
+        results = self.table.search(query_vector, vector_column_name="vector").limit(oversample).to_list()
         return self._hamming_prefilter(query_vector, results, k=k)
 
     def resolve_active_pack(self, active_corpus_file: str | None = None) -> str | None:
@@ -152,6 +207,11 @@ class Storage:
             return self.search_nearest_for_pack(query_vector, pack, k=k)
         return self.search_nearest(query_vector, k=k)
 
+    def _composite_score(self, hamming_dist: int, row: dict) -> float:
+        """Lower is better — Hamming distance minus RaBitQ projection bonus."""
+        projection = float(row.get("quantization_projection") or 0.0)
+        return float(hamming_dist) - self.rabitq_w * projection
+
     def _hamming_prefilter(
         self,
         query_vector: list[float],
@@ -164,11 +224,12 @@ class Storage:
             return []
 
         query_packed = pack_binary_signature(query_vector)
-        scored: list[tuple[int, dict]] = []
+        scored: list[tuple[float, dict]] = []
+        discarded = 0
         for row in candidates:
             packed = row.get("vector_packed")
             if packed is None:
-                scored.append((0, row))
+                scored.append((0.0, row))
                 continue
             if isinstance(packed, list):
                 packed_bytes = bytes(packed[:RABITQ_PACKED_BYTES])
@@ -176,13 +237,21 @@ class Storage:
                 packed_bytes = bytes(packed)
             dist = hamming_distance(query_packed, packed_bytes)
             if dist <= self.hamming_prefilter_max:
-                scored.append((dist, row))
+                scored.append((self._composite_score(dist, row), row))
+            else:
+                discarded += 1
+
+        if discarded:
+            logger.info(
+                "Hamming prefilter discarded %d/%d candidates (max=%d)",
+                discarded, len(candidates), self.hamming_prefilter_max,
+            )
 
         if not scored:
-            return candidates[:k]
+            return [_normalize_row(r) for r in candidates[:k]]
 
         scored.sort(key=lambda item: item[0])
-        return [row for _, row in scored[:k]]
+        return [_normalize_row(row) for _, row in scored[:k]]
 
     def search_nearest_for_pack(self, query_vector: list[float], filename: str, k: int = 1):
         """Nearest-neighbor search limited to vectors from a single pack."""
@@ -198,19 +267,25 @@ class Storage:
         oversample = min(max(k * 4, k), self.table.count_rows())
         try:
             results = (
-                self.table.search(query_vector)
+                self.table.search(query_vector, vector_column_name="vector")
                 .where(filter_str)
                 .limit(oversample)
                 .to_list()
             )
             filtered = self._hamming_prefilter(query_vector, results, k=k)
-            return filtered if filtered else results[:k]
+            return filtered if filtered else [_normalize_row(r) for r in results[:k]]
         except Exception as e:
             logger.warning("Pack-scoped search failed, falling back to global: %s", e)
             return self.search_nearest(query_vector, k=k)
 
     def count_rows(self) -> int:
         return self.table.count_rows()
+
+    def iter_all_rows(self) -> list[dict]:
+        """Return all rows for backfill utilities."""
+        if self.table.count_rows() == 0:
+            return []
+        return self.table.search().to_list()
 
     def get_summary(self) -> list[dict]:
         if self.table.count_rows() == 0:

@@ -10,7 +10,14 @@ from app.core.firewall import SemanticFirewall
 from app.core.models import ConfigState
 from app.modules.dispatcher import UnifiedInferenceDispatcher
 from app.modules.mlx_embedder import SafeSparsePooling
-from app.modules.storage import compute_rabitq_fields, pack_binary_signature as storage_pack, hamming_distance
+from app.modules.storage import (
+    Storage,
+    compute_rabitq_fields,
+    deserialize_sparse,
+    hamming_distance,
+    pack_binary_signature as storage_pack,
+    serialize_sparse,
+)
 
 
 def test_calculate_raw_entropy_low_for_repetitive_chars():
@@ -31,6 +38,14 @@ def test_burst_detection_breach_exception_fields():
     assert exc.limit == 4.5
 
 
+def test_sparse_serialize_round_trip():
+    sparse = {1: 0.8, 42: 0.3}
+    raw = serialize_sparse(sparse)
+    assert isinstance(raw, str)
+    restored = deserialize_sparse(raw)
+    assert restored == sparse
+
+
 def test_pack_binary_signature_is_128_bytes():
     vec = np.random.randn(1024).astype(np.float32)
     packed = storage_pack(vec)
@@ -49,12 +64,28 @@ def test_hamming_distance_counts_bit_flips():
     assert hamming_distance(a, b) == 4
 
 
+def test_hamming_fallback_matches_popcount():
+    a = storage_pack(np.random.randn(1024).astype(np.float32))
+    b = storage_pack(np.random.randn(1024).astype(np.float32))
+    from app.modules.storage import _hamming_popcount_fallback
+    assert hamming_distance(a, b) == _hamming_popcount_fallback(a, b)
+
+
 def test_compute_rabitq_fields_shape():
     vec = [0.1] * 1024
     fields = compute_rabitq_fields(vec)
     assert len(fields["vector_packed"]) == 128
     assert fields["centroid_distance"] > 0
     assert isinstance(fields["quantization_projection"], float)
+
+
+def test_rabitq_composite_score_prefers_projection(monkeypatch):
+    storage = Storage.__new__(Storage)
+    storage.rabitq_w = 1.0
+    storage.hamming_prefilter_max = 512
+    row_low = {"quantization_projection": 0.1}
+    row_high = {"quantization_projection": 0.9}
+    assert storage._composite_score(100, row_high) < storage._composite_score(100, row_low)
 
 
 def test_compute_alpha_in_unit_interval():
@@ -89,6 +120,22 @@ def test_sparse_short_circuit_blocks_low_similarity():
     assert details["sparse_sim"] == 0.0
 
 
+def test_evaluate_clause_hybrid_trace_with_sparse():
+    cfg = ConfigState(cosine_threshold=0.0, excitation_threshold=0, global_noise_limit=1.0)
+    vec = np.random.rand(1024).astype(np.float32)
+    q_sparse = {1: 1.0, 2: 0.5}
+    c_sparse = {1: 0.9, 2: 0.4}
+    result = SemanticFirewall.evaluate_clause(
+        vec, vec, cfg, word_count=10,
+        query_text="What is the tire pressure for this vehicle?",
+        q_sparse=q_sparse, c_sparse=c_sparse,
+    )
+    stages = [t["stage"] for t in result["trace"]]
+    assert "sparse" in stages
+    sparse_trace = next(t for t in result["trace"] if t["stage"] == "sparse")
+    assert sparse_trace["sparse_sim"] > 0.0
+
+
 def test_safe_sparse_pooling_numpy_fallback():
     pool = SafeSparsePooling()
     projections = np.array([[0.0, 2.0], [1.0, 0.5]], dtype=np.float32)
@@ -103,7 +150,7 @@ async def test_dispatcher_serializes_concurrent_requests(monkeypatch):
     calls: list[str] = []
 
     class FakeEmbedder:
-        backend_name = "mlx-hybrid"
+        backend_name = "st-hybrid-mps"
 
         def embed_full(self, text: str):
             calls.append(text)
@@ -126,11 +173,35 @@ async def test_dispatcher_serializes_concurrent_requests(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_dispatcher_high_concurrency_serial_order():
+    calls: list[str] = []
+
+    class FakeEmbedder:
+        backend_name = "st-hybrid-cpu"
+
+        def embed_full(self, text: str):
+            calls.append(text)
+            from app.modules.mlx_embedder import EmbeddingOutput
+            return EmbeddingOutput(dense=[0.1] * 4, sparse={1: 1.0})
+
+    dispatcher = UnifiedInferenceDispatcher(embedder=FakeEmbedder())
+    loop = asyncio.get_running_loop()
+    dispatcher.start(loop)
+
+    texts = [f"req-{i}" for i in range(20)]
+    results = await asyncio.gather(*(dispatcher.submit_inference(t) for t in texts))
+    dispatcher.stop()
+
+    assert len(results) == 20
+    assert calls == texts
+
+
+@pytest.mark.asyncio
 async def test_dispatcher_pytorch_uses_to_thread(monkeypatch):
     calls: list[str] = []
 
     class FakeEmbedder:
-        backend_name = "pytorch-mps"
+        backend_name = "legacy-cpu"
 
         def embed_full(self, text: str):
             calls.append(text)

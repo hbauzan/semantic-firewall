@@ -29,5 +29,8 @@ class Embedder:
   def embed_full(self, text: str) -> EmbeddingOutput:
     return self._backend.embed_full(text)
 
+  def embed_full_batch(self, texts: list[str]) -> list[EmbeddingOutput]:
+    return self._backend.embed_full_batch(texts)
+
 
 embedder = Embedder()

@@ -42,6 +42,10 @@ def _enforce_raw_entropy(clause: str, cfg: ConfigState) -> None:
         return
     entropy = SemanticFirewall.calculate_raw_entropy(clause)
     if entropy < cfg.raw_entropy_limit:
+        logger.info(
+            "SHORT_CIRCUIT layer=raw_entropy entropy=%.4f limit=%.4f",
+            entropy, cfg.raw_entropy_limit,
+        )
         raise BurstDetectionBreach(clause, entropy, cfg.raw_entropy_limit)
 
 

@@ -27,6 +27,11 @@ dev = [
     "pytest-asyncio>=1.0.0",
 ]
 
+[project.optional-dependencies]
+apple = [
+    "simsimd>=6.0.0",
+]
+
 [tool.pytest.ini_options]
 markers = [
     "integration: tests that require production LanceDB and embedder (slow)",
