@@ -124,7 +124,7 @@ export const TelemetryHUD: React.FC = () => {
       ? backendHealth.hint
       : activeTask
         ? (activeTask.kind === 'calibrate'
-          ? 'Calibration runs on the backend (embedder + 2D sweep) — may take 1–3 min'
+          ? 'Calibration runs on the backend (embedder + 3D sweep) — may take 1–3 min'
           : 'Ingestion runs on the backend — watch progress below')
         : backendHealth.hint;
 

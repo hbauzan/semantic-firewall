@@ -1,25 +1,32 @@
 import logging
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
-from app.api.router_main import router
-from app.core.settings import settings
-from app.modules.sniffer import start_consumer, stop_consumer
-
-logger = logging.getLogger(__name__)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
 )
 
+from app.core.build_info import log_startup_banner, resolve_version
+
+log_startup_banner()
+
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+from app.api.router_main import router
 from app.core.logging_config import setup_industrial_logging
+from app.core.settings import settings
+from app.modules.sniffer import start_consumer, stop_consumer
+
 setup_industrial_logging()
+
+logger = logging.getLogger(__name__)
 
 # --- Startup warning if API Key is not configured ---
 if settings.api_key_value is None:
@@ -42,7 +49,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Three-Headed Semantic Firewall",
-    version="2.33.1",
+    version=resolve_version(),
     docs_url=None if settings.api_key_value else "/docs",
     redoc_url=None if settings.api_key_value else "/redoc",
     lifespan=lifespan,
@@ -80,6 +87,7 @@ app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "app.main:app",
         host=settings.host,
