@@ -365,7 +365,7 @@ run_custom_cleanup() {
     fi
     $wipe_node_modules && rm -rf frontend/node_modules && echo -e "${GREEN}[+] Removed node_modules/${NC}"
     $wipe_venv && rm -rf backend/.venv && echo -e "${GREEN}[+] Removed .venv/${NC}"
-    echo -e "\n${GREEN}Demolition complete. The dolphins would be proud.${NC}"
+    echo -e "\n${GREEN}Demolition complete. O frettled gruntbuggly!${NC}"
 }
 
 inspect_stale_instances() {
