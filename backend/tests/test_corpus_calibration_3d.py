@@ -1,25 +1,33 @@
-"""Tests for 3D cosine×excitation×noise calibration sweep."""
+"""Tests for 2D cosine×excitation calibration sweep (noise fixed at live config)."""
 from unittest.mock import patch
 
 import numpy as np
 
 from app.core.models import ConfigState
-from app.core.recommended_thresholds import SWEEP_GRIDS, threshold_3d_grid_size
+from app.core.recommended_thresholds import SWEEP_GRIDS, threshold_2d_grid_size, threshold_3d_grid_size
 from app.modules.corpus_calibration import (
+    JointSweepPoint,
     TripleSweepPoint,
     _confusion_from_cache,
     _measure_calibration_dataset,
+    _pick_joint_youden_winner,
     _pick_triple_youden_winner,
+    _sweep_thresholds_2d,
     _sweep_thresholds_3d,
     calibrate_positive_for_pack,
 )
 
 
-def test_threshold_3d_grid_size():
-    n_cos, n_exc, n_noise = threshold_3d_grid_size()
+def test_threshold_2d_grid_size():
+    n_cos, n_exc = threshold_2d_grid_size()
     assert n_cos == len(SWEEP_GRIDS["cosine_threshold"])
     assert n_exc == len(SWEEP_GRIDS["excitation_threshold"])
-    assert n_noise == len(SWEEP_GRIDS["global_noise_limit"])
+    assert n_cos * n_exc >= 100
+
+
+def test_threshold_3d_grid_size_legacy_noise_dim_is_one():
+    n_cos, n_exc, n_noise = threshold_3d_grid_size()
+    assert n_noise == 1
     assert n_cos * n_exc * n_noise >= 100
 
 
@@ -29,7 +37,13 @@ def test_triple_youden_winner_prefers_higher_recall_minus_fpr():
     assert _pick_triple_youden_winner([low, high]) == high
 
 
-def test_3d_sweep_varies_all_three_thresholds():
+def test_joint_youden_winner_prefers_conservative_excitation_on_tie():
+    low_exc = JointSweepPoint(0.53, 25, tp=17, fp=0, tn=9, fn=0)
+    high_exc = JointSweepPoint(0.53, 100, tp=17, fp=0, tn=9, fn=0)
+    assert _pick_joint_youden_winner([low_exc, high_exc]) == high_exc
+
+
+def test_2d_sweep_varies_cosine_and_excitation_noise_fixed():
     cached_rows = [{
         "id": "q1",
         "expected": "pass",
@@ -41,7 +55,7 @@ def test_3d_sweep_varies_all_three_thresholds():
             "word_count": 8,
         }],
     }]
-    base_cfg = ConfigState(firewall_mode="positive")
+    base_cfg = ConfigState(firewall_mode="positive", global_noise_limit=4.5)
     seen: list[tuple[float, int, float]] = []
 
     def capture_confusion(_rows, cfg):
@@ -49,14 +63,36 @@ def test_3d_sweep_varies_all_three_thresholds():
         return 1, 0, 0, 0
 
     with patch("app.modules.corpus_calibration._confusion_from_cache", side_effect=capture_confusion):
-        points = _sweep_thresholds_3d(base_cfg, cached_rows)
+        points = _sweep_thresholds_2d(base_cfg, cached_rows)
 
-    n_cos, n_exc, n_noise = threshold_3d_grid_size()
-    assert len(points) == n_cos * n_exc * n_noise
-    assert len(seen) == n_cos * n_exc * n_noise
+    n_cos, n_exc = threshold_2d_grid_size()
+    assert len(points) == n_cos * n_exc
+    assert len(seen) == n_cos * n_exc
     assert len({s[0] for s in seen}) == n_cos
     assert len({s[1] for s in seen}) == n_exc
-    assert len({s[2] for s in seen}) == n_noise
+    assert all(s[2] == 4.5 for s in seen)
+
+
+def test_3d_wrapper_delegates_to_2d_with_fixed_noise():
+    cached_rows = [{
+        "id": "q1",
+        "expected": "pass",
+        "clauses": [{
+            "has_context": True,
+            "entropy": 9.0,
+            "cosine_sim": 0.6,
+            "activations": 120,
+            "word_count": 8,
+        }],
+    }]
+    base_cfg = ConfigState(firewall_mode="positive", global_noise_limit=3.0)
+
+    with patch("app.modules.corpus_calibration._confusion_from_cache", return_value=(1, 0, 0, 0)):
+        points = _sweep_thresholds_3d(base_cfg, cached_rows)
+
+    n_cos, n_exc = threshold_2d_grid_size()
+    assert len(points) == n_cos * n_exc
+    assert all(p.global_noise_limit == 3.0 for p in points)
 
 
 def test_measure_calibration_dataset_embeds_once_per_clause():
@@ -176,15 +212,15 @@ def test_calibrate_positive_uses_live_config_snapshot():
     assert cfg.noise_tolerance == 0.012
 
 
-def test_calibrate_positive_orchestrates_3d_sweep_only():
+def test_calibrate_positive_orchestrates_2d_sweep_conservative_winner():
     dataset = {
         "_path": "/fake/automotive_v1.json",
         "corpus_id": "automotive",
         "corpus_file": "automotive_maintenance.pdf",
         "queries": [{"id": "q1", "text": "x", "expected": "pass"}],
     }
-    winner = TripleSweepPoint(0.48, 100, 3.5, tp=18, fp=2, tn=4, fn=1)
-    runner = TripleSweepPoint(0.33, 25, 1.5, tp=10, fp=5, tn=1, fn=9)
+    winner = TripleSweepPoint(0.48, 100, 4.5, tp=18, fp=2, tn=4, fn=1)
+    runner = TripleSweepPoint(0.48, 25, 4.5, tp=18, fp=2, tn=4, fn=1)
 
     with (
         patch("app.modules.corpus_calibration.storage.get_summary", return_value=[{"filename": "automotive_maintenance.pdf"}]),
@@ -203,9 +239,9 @@ def test_calibrate_positive_orchestrates_3d_sweep_only():
 
     assert result.cosine_threshold == 0.48
     assert result.excitation_threshold == 100
-    assert result.global_noise_limit == 3.5
-    assert result.sweep_summary["thresholds_3d"]["grid_triples"] == 2
-    assert result.sweep_summary["thresholds_3d"]["global_noise_limit"] == 3.5
+    assert result.global_noise_limit == 4.5
+    assert result.sweep_summary["thresholds_2d"]["grid_pairs"] == 2
+    assert result.sweep_summary["thresholds_2d"]["noise_swept"] is False
 
 
 def test_confusion_from_cache_matches_evaluate_clause_positive():

@@ -52,4 +52,5 @@ def reset_config_after_test():
         excitation_enabled=True,
         firewall_mode="positive",
         active_tab="chat",
+        active_corpus_file=None,
     )

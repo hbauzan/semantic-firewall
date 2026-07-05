@@ -41,6 +41,8 @@ async def update_config(config: ConfigUpdate):
         async with _config_lock:
             current = state_mod.config_state
             req_data = config.model_dump()
+            if "active_corpus_file" not in config.model_fields_set:
+                req_data["active_corpus_file"] = current.active_corpus_file
 
             # --- Phase 2.1-B: Non-Intrusive Smart Calibration ---
             mode_toggled = req_data["firewall_mode"] != current.firewall_mode
@@ -127,7 +129,9 @@ async def audit_query(request: Request, req: AuditRequest):
     from app.core import state as state_mod
     cfg = state_mod.config_state  # immutable snapshot
     q_vec = embedder.embed(req.query)
-    results = storage.search_nearest(q_vec, k=cfg.rag_top_k)
+    results = storage.search_for_firewall(
+        q_vec, k=cfg.rag_top_k, active_corpus_file=cfg.active_corpus_file,
+    )
     if not results:
         return {"passed": False, "breach_reason": "no_context", "trace": [], "activations": 0, "text": "Empty Database."}
 

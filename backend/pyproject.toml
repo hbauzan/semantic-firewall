@@ -28,6 +28,9 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
+markers = [
+    "integration: tests that require production LanceDB and embedder (slow)",
+]
 filterwarnings = [
     # LanceDB / Apache Arrow SWIG internals — out of our control
     "ignore:builtin type Swig.*:DeprecationWarning",

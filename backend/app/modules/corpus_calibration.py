@@ -14,7 +14,7 @@ import numpy as np
 
 from app.core.firewall import SemanticFirewall
 from app.core.models import ConfigState
-from app.core.recommended_thresholds import SWEEP_GRIDS
+from app.core.recommended_thresholds import build_data_driven_grids
 from app.modules.embedder import embedder
 from app.modules.storage import storage
 
@@ -350,8 +350,57 @@ def _confusion(rows: list[tuple[str, str, str, bool]]) -> tuple[int, int, int, i
     return tp, fp, tn, fn
 
 
+def _pick_joint_youden_winner(points: list[JointSweepPoint]) -> JointSweepPoint:
+    """Maximize Youden; on ties prefer conservative thresholds (higher exc, then cosine)."""
+    return max(
+        points,
+        key=lambda p: (p.youden, p.f1, -p.fn, p.excitation_threshold, p.cosine_threshold),
+    )
+
+
 def _pick_triple_youden_winner(points: list[TripleSweepPoint]) -> TripleSweepPoint:
-    return max(points, key=lambda p: (p.youden, p.f1, -p.fn))
+    return max(
+        points,
+        key=lambda p: (p.youden, p.f1, -p.fn, p.excitation_threshold, p.cosine_threshold),
+    )
+
+
+def _sweep_thresholds_2d(
+    base_cfg: ConfigState,
+    cached_rows: list[dict[str, Any]],
+    progress_cb: ProgressCallback = None,
+    progress_start: float = 35.0,
+    progress_end: float = 90.0,
+    grids: dict[str, list[float]] | None = None,
+) -> list[JointSweepPoint]:
+    """Joint grid over cosine × excitation; noise stays at base_cfg value."""
+    sweep_grids = grids or build_data_driven_grids(cached_rows)
+    cos_grid = list(sweep_grids["cosine_threshold"])
+    exc_grid = [int(v) for v in sweep_grids["excitation_threshold"]]
+    total = len(cos_grid) * len(exc_grid)
+    done = 0
+    points: list[JointSweepPoint] = []
+
+    if progress_cb:
+        progress_cb(progress_start, f"2D sweep: cosine × excitation (0/{total})…")
+
+    for cos in cos_grid:
+        for exc in exc_grid:
+            cfg = base_cfg.model_copy(update={
+                "cosine_threshold": cos,
+                "excitation_threshold": exc,
+            })
+            tp, fp, tn, fn = _confusion_from_cache(cached_rows, cfg)
+            points.append(JointSweepPoint(
+                cosine_threshold=cos,
+                excitation_threshold=exc,
+                tp=tp, fp=fp, tn=tn, fn=fn,
+            ))
+            done += 1
+            if progress_cb and (done == 1 or done == total or done % 50 == 0):
+                pct = progress_start + (progress_end - progress_start) * done / total
+                progress_cb(pct, f"2D sweep… ({done}/{total})")
+    return points
 
 
 def _sweep_thresholds_3d(
@@ -361,37 +410,20 @@ def _sweep_thresholds_3d(
     progress_start: float = 35.0,
     progress_end: float = 90.0,
 ) -> list[TripleSweepPoint]:
-    """Joint grid over cosine × excitation × global_noise_limit."""
-    cos_grid = list(SWEEP_GRIDS["cosine_threshold"])
-    exc_grid = list(SWEEP_GRIDS["excitation_threshold"])
-    noise_grid = list(SWEEP_GRIDS["global_noise_limit"])
-    total = len(cos_grid) * len(exc_grid) * len(noise_grid)
-    done = 0
-    points: list[TripleSweepPoint] = []
-
-    if progress_cb:
-        progress_cb(progress_start, f"3D sweep: cosine × excitation × noise (0/{total})…")
-
-    for cos in cos_grid:
-        for exc in exc_grid:
-            for noise in noise_grid:
-                cfg = base_cfg.model_copy(update={
-                    "cosine_threshold": cos,
-                    "excitation_threshold": int(exc),
-                    "global_noise_limit": noise,
-                })
-                tp, fp, tn, fn = _confusion_from_cache(cached_rows, cfg)
-                points.append(TripleSweepPoint(
-                    cosine_threshold=cos,
-                    excitation_threshold=int(exc),
-                    global_noise_limit=noise,
-                    tp=tp, fp=fp, tn=tn, fn=fn,
-                ))
-                done += 1
-                if progress_cb and (done == 1 or done == total or done % 50 == 0):
-                    pct = progress_start + (progress_end - progress_start) * done / total
-                    progress_cb(pct, f"3D sweep… ({done}/{total})")
-    return points
+    """Legacy wrapper: 2D cosine×excitation at fixed noise from base_cfg."""
+    joint_points = _sweep_thresholds_2d(
+        base_cfg, cached_rows, progress_cb, progress_start, progress_end,
+    )
+    noise = base_cfg.global_noise_limit
+    return [
+        TripleSweepPoint(
+            cosine_threshold=p.cosine_threshold,
+            excitation_threshold=p.excitation_threshold,
+            global_noise_limit=noise,
+            tp=p.tp, fp=p.fp, tn=p.tn, fn=p.fn,
+        )
+        for p in joint_points
+    ]
 
 
 def calibrate_positive_for_pack(
@@ -423,9 +455,24 @@ def calibrate_positive_for_pack(
     triple_points = _sweep_thresholds_3d(
         base_cfg, cached_rows, progress_cb=progress_cb,
     )
-    winner = _pick_triple_youden_winner(triple_points)
+    joint_winner = _pick_joint_youden_winner([
+        JointSweepPoint(
+            p.cosine_threshold, p.excitation_threshold,
+            p.tp, p.fp, p.tn, p.fn,
+        )
+        for p in triple_points
+    ])
+    winner = TripleSweepPoint(
+        cosine_threshold=joint_winner.cosine_threshold,
+        excitation_threshold=joint_winner.excitation_threshold,
+        global_noise_limit=base_cfg.global_noise_limit,
+        tp=joint_winner.tp,
+        fp=joint_winner.fp,
+        tn=joint_winner.tn,
+        fn=joint_winner.fn,
+    )
     logger.info(
-        "Calibration %s 3D joint: cos=%.2f exc=%d noise=%.1f youden=%.3f",
+        "Calibration %s 2D joint: cos=%.2f exc=%d noise=%.1f (fixed) youden=%.3f",
         filename,
         winner.cosine_threshold,
         winner.excitation_threshold,
@@ -437,13 +484,14 @@ def calibrate_positive_for_pack(
         progress_cb(95.0, "Applying optimal thresholds…")
 
     sweep_summary = {
-        "thresholds_3d": {
+        "thresholds_2d": {
             "cosine_threshold": winner.cosine_threshold,
             "excitation_threshold": winner.excitation_threshold,
             "global_noise_limit": winner.global_noise_limit,
+            "noise_swept": False,
             "f1": round(winner.f1, 4),
             "youden": round(winner.youden, 4),
-            "grid_triples": len(triple_points),
+            "grid_pairs": len(triple_points),
         },
     }
 

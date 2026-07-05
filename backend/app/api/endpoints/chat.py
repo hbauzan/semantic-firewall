@@ -93,7 +93,9 @@ async def chat_endpoint(request: Request, req: ChatRequest):
 
     for clause in clauses:
         cl_vec = embedder.embed(clause)
-        results = storage.search_nearest(cl_vec, k=cfg.rag_top_k)
+        results = storage.search_for_firewall(
+            cl_vec, k=cfg.rag_top_k, active_corpus_file=cfg.active_corpus_file,
+        )
         if not results:
             if negative:
                 # Negative mode: no corpus match → nothing to restrict → PASS
@@ -358,7 +360,9 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
     if fw_on:
         for clause in clauses:
             cl_vec = embedder.embed(clause)
-            results = storage.search_nearest(cl_vec, k=cfg.rag_top_k)
+            results = storage.search_for_firewall(
+            cl_vec, k=cfg.rag_top_k, active_corpus_file=cfg.active_corpus_file,
+        )
             if not results:
                 if proxy_negative:
                     # Negative mode: no corpus match → nothing to restrict → skip
