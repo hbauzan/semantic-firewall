@@ -45,6 +45,13 @@ class ConfigState(BaseModel):
         default="ollama",
         description="Active Upstream LLM Provider",
     )
+    active_corpus_file: str | None = Field(
+        default=None,
+        description=(
+            "Pack filename for pack-scoped RAG/firewall search. "
+            "When null and exactly one pack is loaded, that pack is used automatically."
+        ),
+    )
 
     @model_validator(mode='after')
     def validate_unique_orders(self):
@@ -75,6 +82,7 @@ class ConfigUpdate(BaseModel):
     firewall_mode: Literal["positive", "negative"] = Field(default="positive")
     active_tab: str = Field(default="chat")
     upstream_provider: Literal["ollama", "google", "openai", "anthropic", "groq"] = Field(default="ollama")
+    active_corpus_file: str | None = Field(default=None)
 
 
 # Max prompt length to prevent memory exhaustion before vectorization

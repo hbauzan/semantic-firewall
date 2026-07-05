@@ -40,6 +40,7 @@ def test_list_packs_reports_calibratable_corpora():
     assert "calibratable_corpora" in data
     assert "automotive_maintenance.pdf" in data["calibratable_corpora"]
     assert "medical_hypertension.pdf" in data["calibratable_corpora"]
+    assert "Manual Gol 2020.pdf" in data["calibratable_corpora"]
     for pack in data["packs"]:
         assert "calibratable" in pack
         assert "has_auto_dataset" in pack

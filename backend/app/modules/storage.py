@@ -53,6 +53,32 @@ class Storage:
         results = self.table.search(query_vector).limit(k).to_list()
         return results
 
+    def resolve_active_pack(self, active_corpus_file: str | None = None) -> str | None:
+        """Resolve which pack scopes firewall/RAG search.
+
+        Priority: explicit active_corpus_file (if loaded) → sole loaded pack → None (global).
+        """
+        packs = self.get_summary()
+        pack_names = {p["filename"] for p in packs}
+        if active_corpus_file and active_corpus_file in pack_names:
+            return active_corpus_file
+        if len(packs) == 1:
+            return packs[0]["filename"]
+        return None
+
+    def search_for_firewall(
+        self,
+        query_vector: list[float],
+        *,
+        k: int,
+        active_corpus_file: str | None = None,
+    ):
+        """Pack-scoped nearest-neighbor search when a pack is active; else global."""
+        pack = self.resolve_active_pack(active_corpus_file)
+        if pack:
+            return self.search_nearest_for_pack(query_vector, pack, k=k)
+        return self.search_nearest(query_vector, k=k)
+
     def search_nearest_for_pack(self, query_vector: list[float], filename: str, k: int = 1):
         """Nearest-neighbor search limited to vectors from a single pack."""
         if self.table.count_rows() == 0:

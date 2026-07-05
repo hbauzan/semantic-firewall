@@ -104,6 +104,7 @@ async def _apply_config(payload: dict) -> dict:
             "cosine_threshold": payload["cosine_threshold"],
             "excitation_threshold": payload["excitation_threshold"],
             "global_noise_limit": payload["global_noise_limit"],
+            "active_corpus_file": payload["filename"],
         })
         state_mod.config_state = new_state
 

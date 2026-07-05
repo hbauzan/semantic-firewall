@@ -42,7 +42,7 @@ curl http://localhost:8000/corpus/calibration-task-status/{task_id}
 Applies Youden-optimal thresholds for **positive mode**:
 
 1. **Auto dataset** (if needed) — ~25 queries: on-corpus (LLM or template fallback), off-topic/adversarial from static pools, piggybacking templates. Saved to `datasets/auto_<slug>.json`.
-2. **3D joint sweep** — `cosine_threshold` × `excitation_threshold` × `global_noise_limit` (~1.287 configs). Clause metrics are embedded once and cached; the grid evaluates confusion from cache only.
+2. **2D joint sweep** — `cosine_threshold` × `excitation_threshold` (data-driven grid from measured metrics; noise stays at live config). Clause metrics are embedded once and cached; the grid evaluates confusion from cache only.
 
 Evaluation uses the **live pipeline snapshot**: filter seq order (Noise/Cosine/Excitation), ON/OFF toggles, `rag_top_k`, `noise_tolerance`, and `adaptive_factor` from config at Cal time. Only the three threshold sliders are overwritten on completion.
 

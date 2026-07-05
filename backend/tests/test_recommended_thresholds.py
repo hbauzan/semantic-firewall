@@ -3,18 +3,21 @@ from app.core.recommended_thresholds import (
     POSITIVE_RECOMMENDED,
     SLIDER_HALF_SPAN,
     SWEEP_GRIDS,
+    build_data_driven_grids,
     build_sweep_grid,
     slider_bounds,
+    threshold_2d_grid_size,
 )
 
 
-def test_sweep_grids_are_centered_on_positive_recommended():
+def test_sweep_grids_span_wider_than_hud_sliders():
     for param, center in POSITIVE_RECOMMENDED.items():
+        if param == "global_noise_limit":
+            continue
         grid = SWEEP_GRIDS[param]
-        assert min(grid) < center < max(grid)
-        assert center in grid or abs(min(grid, key=lambda v: abs(v - center)) - center) <= (
-            0.05 if param == "cosine_threshold" else 25 if param == "excitation_threshold" else 0.5
-        )
+        lo, hi, _step = slider_bounds(param)
+        assert min(grid) <= lo
+        assert max(grid) >= hi
 
 
 def test_slider_bounds_center_on_recommended():
@@ -24,18 +27,39 @@ def test_slider_bounds_center_on_recommended():
         assert abs(mid - center) < 1e-9
 
 
-def test_excitation_sweep_extends_below_old_minimum():
+def test_excitation_sweep_extends_to_zero():
     grid = build_sweep_grid("excitation_threshold")
-    assert min(grid) < 75
-    assert POSITIVE_RECOMMENDED["excitation_threshold"] in grid
+    assert min(grid) == 0
+    assert max(grid) >= POSITIVE_RECOMMENDED["excitation_threshold"]
 
 
-def test_3d_grid_triple_count():
-    from app.core.recommended_thresholds import threshold_3d_grid_size
+def test_cosine_sweep_has_fine_steps():
+    grid = build_sweep_grid("cosine_threshold")
+    assert len(grid) >= 25
+    assert 0.53 in grid or any(abs(v - 0.53) < 0.03 for v in grid)
 
-    n_cos, n_exc, n_noise = threshold_3d_grid_size()
-    assert n_cos * n_exc * n_noise == (
+
+def test_2d_grid_pair_count():
+    n_cos, n_exc = threshold_2d_grid_size()
+    assert n_cos * n_exc == (
         len(SWEEP_GRIDS["cosine_threshold"])
         * len(SWEEP_GRIDS["excitation_threshold"])
-        * len(SWEEP_GRIDS["global_noise_limit"])
     )
+
+
+def test_data_driven_grids_from_cached_rows():
+    cached_rows = [
+        {
+            "expected": "pass",
+            "clauses": [{"has_context": True, "cosine_sim": 0.62, "activations": 160}],
+        },
+        {
+            "expected": "block",
+            "clauses": [{"has_context": True, "cosine_sim": 0.35, "activations": 90}],
+        },
+    ]
+    grids = build_data_driven_grids(cached_rows)
+    assert min(grids["cosine_threshold"]) <= 0.35
+    assert max(grids["cosine_threshold"]) >= 0.62
+    assert min(grids["excitation_threshold"]) <= 90
+    assert max(grids["excitation_threshold"]) >= 160
