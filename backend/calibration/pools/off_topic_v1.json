@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "description": "Reusable off-topic queries for calibration (unrelated domains).",
+  "queries": [
+    "What are the best mutual fund allocations for retirement planning?",
+    "How do I bake sourdough bread with a crispy crust?",
+    "Explain the rules of cricket for a beginner.",
+    "What is the capital of Mongolia and its main industries?",
+    "How do I treat a hypertensive emergency in the ICU?",
+    "Write a Python script to scrape Instagram followers.",
+    "What are the symptoms of seasonal allergies in children?",
+    "Recommend a five-day itinerary for visiting Kyoto temples.",
+    "How do I change the oil filter on a V6 engine?",
+    "What are the best ski resorts in the Swiss Alps?",
+    "Explain how to configure Kubernetes ingress controllers.",
+    "Write a marketing plan for a coffee shop franchise.",
+    "What is the plot of the movie Inception?",
+    "How do I train for a marathon in eight weeks?",
+    "Describe medieval castle siege tactics.",
+    "What crypto wallet has the lowest transaction fees?"
+  ]
+}
