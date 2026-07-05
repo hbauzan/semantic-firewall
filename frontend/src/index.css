@@ -186,6 +186,11 @@ button:hover {
   border-color: var(--accent);
 }
 
+.chat-input input.chat-input-field--busy {
+  opacity: 0.85;
+  border-color: var(--border);
+}
+
 .upload-section {
   border: 1px dashed var(--border);
   padding: 0.5rem;
