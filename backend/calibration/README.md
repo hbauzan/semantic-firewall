@@ -31,18 +31,23 @@ uv run python tests/calibration_suite.py excitation-compare --dataset calibratio
 
 ### In-product (positive mode)
 
-With the pack **loaded** in LanceDB (upload the matching PDF), click **Cal** next to the pack in the Control Panel, or:
+With any pack **loaded** in LanceDB, click **Cal** next to the pack in the Control Panel. The backend auto-generates a labeled dataset when none exists (hand-curated datasets take priority).
 
 ```bash
-curl -X POST http://localhost:8000/corpus/packs/automotive_maintenance.pdf/calibrate-positive
+# Starts async calibration; poll status until completed
+curl -X POST http://localhost:8000/corpus/packs/my_document.pdf/calibrate-positive
+curl http://localhost:8000/corpus/calibration-task-status/{task_id}
 ```
 
-Applies Youden-optimal thresholds for **positive mode** using the labeled dataset for that filename:
+Applies Youden-optimal thresholds for **positive mode**:
 
-1. **2D joint sweep** — `cosine_threshold` × `excitation_threshold`, with `global_noise_limit` fixed at the positive recommended value (`4.5`).
-2. **1D noise sweep** — `global_noise_limit` with the winning cosine/excitation held.
+1. **Auto dataset** (if needed) — ~25 queries: on-corpus (LLM or template fallback), off-topic/adversarial from static pools, piggybacking templates. Saved to `datasets/auto_<slug>.json`.
+2. **2D joint sweep** — `cosine_threshold` × `excitation_threshold`, with `global_noise_limit` held at the **current** value from config (not reset to defaults).
+3. **1D noise sweep** — `global_noise_limit` with the winning cosine/excitation held.
 
-Full 3D grid search is deferred. Unknown PDFs without a dataset return 404.
+Evaluation uses the **live pipeline snapshot**: filter seq order (Noise/Cosine/Excitation), ON/OFF toggles, `rag_top_k`, `noise_tolerance`, and `adaptive_factor` from config at Cal time. Only the three threshold sliders are overwritten on completion.
+
+Hand-curated datasets (`automotive_v1.json`, `medical_v1.json`) are reused without regeneration when `corpus_file` matches.
 
 Sweep grids are centered on positive Youden defaults (`0.5315` / `150` / `4.5`) — see `app/core/recommended_thresholds.py`. HUD sliders use the same center (`frontend/src/thresholdBounds.ts`).
 

@@ -42,9 +42,10 @@ def test_list_packs_reports_calibratable_corpora():
     assert "medical_hypertension.pdf" in data["calibratable_corpora"]
     for pack in data["packs"]:
         assert "calibratable" in pack
+        assert "has_auto_dataset" in pack
 
 
-def test_calibrate_missing_dataset_detail(monkeypatch):
+def test_calibrate_missing_dataset_starts_task(monkeypatch):
     from app.modules import corpus_calibration
 
     monkeypatch.setattr(
@@ -52,9 +53,38 @@ def test_calibrate_missing_dataset_detail(monkeypatch):
         "get_summary",
         lambda: [{"filename": "random_manual.pdf"}],
     )
+
+    async def fake_start(filename: str) -> str:
+        assert filename == "random_manual.pdf"
+        return "cal-task-123"
+
+    monkeypatch.setattr(
+        "app.api.endpoints.corpus.start_calibration_async",
+        fake_start,
+    )
     res = client.post("/corpus/packs/random_manual.pdf/calibrate-positive")
-    assert res.status_code == 404
-    assert "Cal is only available for" in res.json()["detail"]
+    assert res.status_code == 200
+    assert res.json()["task_id"] == "cal-task-123"
+
+
+def test_api_calibrate_prisma_like_filename(monkeypatch):
+    fname = "om_ng-chevrolet_Prisma_my15-es_AR.pdf.pdf"
+    monkeypatch.setattr(
+        "app.api.endpoints.corpus.storage.get_summary",
+        lambda: [{"filename": fname}],
+    )
+
+    async def fake_start(filename: str) -> str:
+        assert filename == fname
+        return "cal-task-prisma"
+
+    monkeypatch.setattr(
+        "app.api.endpoints.corpus.start_calibration_async",
+        fake_start,
+    )
+    res = client.post(f"/corpus/packs/{fname}/calibrate-positive")
+    assert res.status_code == 200
+    assert res.json()["task_id"] == "cal-task-prisma"
 
 
 def test_dimensional_excitation_math():
