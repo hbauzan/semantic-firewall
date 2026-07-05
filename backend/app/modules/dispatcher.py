@@ -28,7 +28,7 @@ class UnifiedInferenceDispatcher:
     self._thread: threading.Thread | None = None
     self._loop: asyncio.AbstractEventLoop | None = None
     self._started = False
-    self._use_actor_thread = self._embedder.backend_name == "mlx-hybrid"
+    self._use_actor_thread = self._embedder.backend_name.startswith("st-hybrid")
 
   def start(self, loop: asyncio.AbstractEventLoop) -> None:
     if self._started:
@@ -74,14 +74,12 @@ class UnifiedInferenceDispatcher:
         self._reject(task.future, exc)
 
   def _resolve(self, future: asyncio.Future, result: EmbeddingOutput) -> None:
-    if self._loop is None:
-      return
-    self._loop.call_soon_threadsafe(future.set_result, result)
+    loop = future.get_loop()
+    loop.call_soon_threadsafe(future.set_result, result)
 
   def _reject(self, future: asyncio.Future, exc: Exception) -> None:
-    if self._loop is None:
-      return
-    self._loop.call_soon_threadsafe(future.set_exception, exc)
+    loop = future.get_loop()
+    loop.call_soon_threadsafe(future.set_exception, exc)
 
 
 _dispatcher: UnifiedInferenceDispatcher | None = None

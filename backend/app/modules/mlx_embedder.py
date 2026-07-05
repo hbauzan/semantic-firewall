@@ -1,4 +1,9 @@
-"""MLX-native hybrid inference with transparent PyTorch CPU fallback (macOS Apple Silicon)."""
+"""MLX-native hybrid inference with transparent PyTorch CPU fallback (macOS Apple Silicon).
+
+NOTE: Full MLX-native BGE-M3 inference (dense + fused SPLADE) is deferred.
+SentenceTransformer performs embedding; SafeSparsePooling is optional post-process only.
+Future work: mlx-community/bge-m3-mlx-8bit via mlx-embeddings.
+"""
 from __future__ import annotations
 
 import logging
@@ -32,7 +37,7 @@ def _mlx_runtime_available() -> bool:
 
 
 class SafeSparsePooling:
-  """Fused sparse max-pooling — avoids materializing full vocab projection on Metal."""
+  """Optional post-process max-pool on pre-extracted sparse token weights."""
 
   def __init__(self) -> None:
     self._compiled = None
@@ -58,7 +63,7 @@ class SafeSparsePooling:
 
 
 class MlxHybridEmbedder:
-  """Hybrid dense+sparse embedder — MLX on Apple Silicon, PyTorch CPU elsewhere."""
+  """Hybrid dense+sparse embedder — SentenceTransformer primary; MLX pooling optional."""
 
   def __init__(self) -> None:
     self._torch_embedder: Any | None = None
@@ -70,23 +75,27 @@ class MlxHybridEmbedder:
     import torch
     from sentence_transformers import SentenceTransformer
 
-    if _mlx_runtime_available():
-      self._backend = "mlx-hybrid"
-      self.device = "cpu"
-      logger.info(
-        "MLX hybrid embedder active on Apple Silicon (sparse pooling via Metal)."
-      )
-    elif torch.backends.mps.is_available():
+    if torch.backends.mps.is_available():
       self.device = "mps"
-      self._backend = "pytorch-mps"
+      self._backend = "st-hybrid-mps"
     elif torch.cuda.is_available():
       self.device = "cuda"
-      self._backend = "pytorch-cuda"
+      self._backend = "st-hybrid-cuda"
     else:
       self.device = "cpu"
-      self._backend = "pytorch-cpu"
+      self._backend = "st-hybrid-cpu"
 
-    logger.info("Loading %s on %s (%s)...", settings.embedding_model, self.device, self._backend)
+    if _mlx_runtime_available() and self._sparse_pool._compiled is not None:
+      logger.info(
+        "SentenceTransformer hybrid embedder on %s (%s); sparse pooling via MLX.",
+        self.device, self._backend,
+      )
+    else:
+      logger.info(
+        "SentenceTransformer hybrid embedder on %s (%s).",
+        self.device, self._backend,
+      )
+
     self.model = SentenceTransformer(settings.embedding_model, device=self.device)
     logger.info("%s loaded.", settings.embedding_model)
 
@@ -134,6 +143,9 @@ class MlxHybridEmbedder:
         sparse = {indices[i]: float(pooled[i]) for i in range(min(len(indices), pooled.size))}
 
     return EmbeddingOutput(dense=dense, sparse=sparse or None)
+
+  def embed_full_batch(self, texts: list[str]) -> list[EmbeddingOutput]:
+    return [self.embed_full(text) for text in texts]
 
   def _compiled_pool_available(self) -> bool:
     return self._sparse_pool._compiled is not None

@@ -118,6 +118,16 @@ class Settings(BaseSettings):
     chunk_overlap: int = Field(default=50, ge=0, le=2000)   # Reduced for precision
     embedding_batch_size: int = Field(default=10, ge=1, le=100)
 
+    # --- Vector search / RaBitQ prefilter ---
+    hamming_prefilter_max: int = Field(
+        default=512, ge=1, le=2048,
+        description="Max Hamming distance for binary signature pre-filter.",
+    )
+    rabitq_w: float = Field(
+        default=0.0, ge=0.0, le=10.0,
+        description="RaBitQ projection weight in composite prefilter score (0 = Hamming only).",
+    )
+
     @property
     def max_upload_bytes(self) -> int:
         """Convert MB setting to bytes for upload validation."""

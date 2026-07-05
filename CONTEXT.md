@@ -18,7 +18,11 @@
 
 **Embedding** — The 1024-dimensional vector produced by the **Embedder** for a piece of text. The space in which all firewall geometry is measured.
 
-**Embedder** — The model that produces **embeddings** (`BAAI/bge-m3`, 1024D). Single shared instance.
+**Embedder** — The model that produces **embeddings** (`BAAI/bge-m3`, 1024D). Single shared instance; dense + optional sparse lexical weights via SentenceTransformer.
+
+**Sparse lexical weights** — BGE-M3 sparse retrieval signal stored per corpus chunk (`sparse_lexical`) and compared at query time for hybrid scoring.
+
+**RaBitQ signature** — 1024-bit binary projection of a dense vector used for Hamming pre-filtering in LanceDB search.
 
 **Pack** — One uploaded source document ingested into the **Corpus**, tracked with a chunk count.
 

@@ -3,11 +3,35 @@
 Provides reusable TestClient, config reset helpers, and common imports
 for all test modules (Finding Q5 — Test Suite Partitioning).
 """
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.models import ConfigState
 from app.core.state import set_config_sync as set_config
+
+
+def mock_firewall_search_result() -> list[dict]:
+    """Synthetic LanceDB hit so integration tests reach the vector pipeline."""
+    vec = np.random.rand(1024).astype(np.float32)
+    vec = (vec / np.linalg.norm(vec)).tolist()
+    return [{
+        "vector": vec,
+        "sparse_lexical": {10: 1.0, 20: 0.5, 30: 0.25},
+        "text": "Synthetic firewall context chunk for integration tests.",
+        "metadata": '{"filename": "test.pdf"}',
+    }]
+
+
+@pytest.fixture
+def firewall_context(monkeypatch):
+    """Patch storage.search_for_firewall to return a synthetic corpus hit."""
+    from app.modules.storage import storage
+
+    def _fake_search(*_args, **_kwargs):
+        return mock_firewall_search_result()
+
+    monkeypatch.setattr(storage, "search_for_firewall", _fake_search)
 
 
 # --- Shared TestClient (lifespan starts inference dispatcher) ---

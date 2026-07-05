@@ -90,11 +90,12 @@ def _process_pdf_sync(file_bytes: bytes, filename: str, task_id: str):
         batch_size = settings.embedding_batch_size
         for i in range(0, total_chunks, batch_size):
             batch_chunks = text_chunks[i:i+batch_size]
-            embeddings = embedder.embed_batch(batch_chunks)
-            for j, emb in enumerate(embeddings):
+            for j, chunk in enumerate(batch_chunks):
+                output = embedder.embed_full(chunk)
                 nodes.append({
-                    "vector": emb,
-                    "text": batch_chunks[j],
+                    "vector": output.dense,
+                    "sparse_lexical": output.sparse,
+                    "text": chunk,
                     "metadata": json.dumps({"filename": filename, "chunk_index": i+j})
                 })
             progress = 30.0 + (70.0 * min(i + batch_size, total_chunks) / total_chunks)

@@ -79,7 +79,10 @@ class SemanticFirewall:
 
     @staticmethod
     def compute_alpha(text: str) -> float:
-        """Sigmoid blend weight α(q) — favors dense similarity for complex queries."""
+        """Sigmoid blend weight α(q) — favors dense similarity for complex queries.
+
+        Uses syntactic proxy (L(q), Lex_d(q)) instead of a local perplexity model.
+        """
         length = SemanticFirewall.query_length(text)
         density = SemanticFirewall.lexical_density(text)
         x = 0.45 * min(length / 20.0, 1.0) + 0.55 * density - 0.35
@@ -87,7 +90,10 @@ class SemanticFirewall:
 
     @staticmethod
     def compute_epsilon(text: str, base_tolerance: float) -> float:
-        """Exponential contraction of sparse excitation tolerance ε(q)."""
+        """Exponential contraction of sparse excitation tolerance ε(q).
+
+        Perplexity P(q) is approximated via length + lexical density proxy.
+        """
         length = SemanticFirewall.query_length(text)
         density = SemanticFirewall.lexical_density(text)
         complexity = 0.5 * min(length / 20.0, 1.0) + 0.5 * density
@@ -299,6 +305,7 @@ class SemanticFirewall:
             })
             if not effective_passed:
                 breach_reason = f"negative:{stage_name}" if negative else stage_name
+                logger.info("SHORT_CIRCUIT layer=%s alpha=%.4f", stage_name, alpha_q)
                 return {
                     "passed": False,
                     "breach_reason": breach_reason,
@@ -338,6 +345,7 @@ class SemanticFirewall:
 
             if not effective_passed:
                 breach_reason = f"negative:{stage_name}" if negative else stage_name
+                logger.info("SHORT_CIRCUIT layer=%s", stage_name)
                 return {
                     "passed": False,
                     "breach_reason": breach_reason,

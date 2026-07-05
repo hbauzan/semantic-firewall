@@ -149,7 +149,7 @@ async def test_semantic_piggybacking_rejection():
             assert "[FW_BLOCK]" in content
 
 @pytest.mark.asyncio
-async def test_noise_prefilter_entropy_telemetry():
+async def test_noise_prefilter_entropy_telemetry(firewall_context):
     """Verify that Noise Pre-Filter uses Shannon Entropy and reports it in telemetry."""
     set_config(global_noise_limit=10.0, noise_order=1)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
@@ -161,7 +161,7 @@ async def test_noise_prefilter_entropy_telemetry():
             assert "Entropy(" in content
 
 @pytest.mark.asyncio
-async def test_pipeline_order_respected():
+async def test_pipeline_order_respected(firewall_context):
     """When noise runs first (order=1) and is ultra-strict, cosine and excitation should never appear as OK."""
     set_config(
         excitation_threshold=1, noise_tolerance=1.0, cosine_threshold=0.0,
@@ -609,7 +609,7 @@ def test_system_logs_export_ndjson():
 
 
 @pytest.mark.asyncio
-async def test_upstream_error_mapped_to_trace_status_error(monkeypatch):
+async def test_upstream_error_mapped_to_trace_status_error(monkeypatch, firewall_context):
     """Verify that upstream LLM errors update trace status to ERROR in proxy stream."""
     from app.modules.sniffer import sniffer_queue, _trace_buffer
     from app.modules.providers.ollama import OllamaProvider

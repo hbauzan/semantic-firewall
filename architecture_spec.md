@@ -31,7 +31,9 @@ app/
 │       ├── chat.py          # /chat and /v1/chat/completions (unified provider)
 │       └── system.py        # /health, /system/stats, /v1/sniffer/stream
 └── modules/
-    ├── embedder.py          # BGE-M3 embedding singleton
+    ├── embedder.py          # BGE-M3 embedding singleton (delegates to mlx_embedder)
+    ├── mlx_embedder.py      # SentenceTransformer hybrid dense+sparse; MLX pooling optional
+    ├── dispatcher.py        # UnifiedInferenceDispatcher — serializes embed calls
     ├── storage.py           # LanceDB vector store
     ├── ingestor.py          # PDF chunking pipeline + TaskStore with TTL
     ├── sniffer.py           # RTSS producer-consumer + SSE + persistence
@@ -49,12 +51,40 @@ app/
 - **Models (`core/models.py`):** All Pydantic schemas. `ConfigState` is a **frozen BaseModel** — immutable after construction. `Field` constraints enforce value ranges. `@model_validator` ensures pipeline order uniqueness.
 - **State (`core/state.py`):** Configuration singleton + `asyncio.Lock` for serialized writes. `set_config()` is an **async** function that acquires the lock before performing merge-validate-swap, guaranteeing no concurrent config corruption. A separate `set_config_sync()` exists for single-threaded test harnesses only. Each request handler snapshots the reference at entry (`cfg = config_state`) for mid-request consistency.
 - **Routes (`api/router_main.py` + `api/endpoints/`):** Decomposed into thematic sub-routers (corpus, config, chat, system) aggregated by `router_main.py`. Each endpoint module imports shared dependencies (`verify_api_key`, `limiter`) from `_shared.py`. The `/chat` endpoint uses `BaseProvider.stream_chat()` (no standalone `stream_ollama` function). Providers are instantiated lazily inside request handlers to prevent boot-time crashes if API keys are missing.
-- **Embedder Singleton (`modules/embedder.py`):** Automatically maps Tensor operations sequentially to Apple Silicon (`MPS`), Nvidia (`CUDA`), or fallback CPU. The model name is read from the `settings` singleton.
+- **Embedder Singleton (`modules/embedder.py`):** Delegates to `mlx_embedder.MlxHybridEmbedder` — SentenceTransformer (`BAAI/bge-m3`) for dense + sparse lexical weights. Backend names: `st-hybrid-mps|cuda|cpu`. **Future (Phase 3):** native MLX via `mlx-community/bge-m3-mlx-8bit` + fused SPLADE kernel; not yet active.
+- **Inference Dispatcher (`modules/dispatcher.py`):** Actor thread serializes `embed_full()` under concurrent FastAPI requests.
 - **Storage Layer (`modules/storage.py`):** Serverless **LanceDB** vector store ensuring BigInt capacity on IDs natively structured via `LanceModel` (id, vector, text, metadata). Implements native JSON metadata grouping for dynamic **Document Management** (`get_summary`, `delete_pack`) allowing live corpus curation. Filename validation prevents SQL injection on delete operations.
 - **Ingestor Protocol (`modules/ingestor.py`):** Employs `PyMuPDF` iteratively with Python `asyncio.to_thread` for non-blocking chunking routines. Chunk size, overlap, and batch size are read from the `settings` singleton (defaults: 512, 50, 10). Completed/failed tasks are automatically pruned after 1 hour (`TaskStore` with TTL). Updated default chunking parameters for higher granularity: chunk_size=512, chunk_overlap=50. This ensures that specific adversarial instructions are not "diluted" within large text blocks, increasing the signal-to-noise ratio for the Variance filter.
 - **Settings (`core/settings.py`):** Uses `pydantic-settings` (`BaseSettings`) for typed, validated configuration following 12-Factor App principles. All env vars are declared in a single `Settings` class with type annotations, default values, and range constraints. The `.env` file is loaded automatically at boot — no `source` or manual export required. If a variable has an invalid type or fails validation, the app crashes immediately with a clear Pydantic error (fail-fast). Secrets (`FIREWALL_API_KEY`) use `SecretStr` to prevent accidental logging. A singleton `settings` instance is created at import time and imported by all modules. The backend and frontend share a single root-level `.env` file — see `.env.example` for the full list. Vite reads the same file via `envDir: '..'` in `vite.config.ts`.
 
 ## 3. Execution Pipeline (Sequential Reorderable Firewall)
+
+### 3.0 CPU Early Discard (Raw Character Entropy)
+
+Before tokenization or embedding, each **Clause** passes a CPU-only Shannon entropy check over raw characters:
+
+$$H(q) = -\sum_i p(x_i) \log_2 p(x_i)$$
+
+If `H(q) < raw_entropy_limit` (default `3.0`, distinct from embedding-space `global_noise_limit`), the request is rejected immediately as `BURST_DETECTION_BREACH` with no LanceDB or embedder work. Controlled by `noise_enabled` (same toggle as the vector noise stage). Logs: `SHORT_CIRCUIT layer=raw_entropy`.
+
+### 3.0.1 Hybrid Dense + Sparse Scoring
+
+When both query and corpus chunk expose BGE-M3 sparse lexical weights (`sparse_lexical`, JSON in LanceDB), the engine computes:
+
+- **Sparse short-circuit** before the ordered pipeline
+- **Hybrid cosine score:** `α(q)·Sim_dense + (1-α(q))·Sim_sparse`
+- **α(q)** and **ε(q)** use a syntactic proxy (query length + lexical density), not a separate perplexity model
+
+Perplexity is intentionally deferred to avoid loading a second model on 16GB unified memory.
+
+### 3.0.2 LanceDB RaBitQ Pre-filter
+
+Each corpus vector stores a 1024-bit binary signature (`vector_packed`), plus `centroid_distance` and `quantization_projection`. Nearest-neighbor search oversamples, then a Hamming pre-filter (`hamming_prefilter_max`, default 512) discards distant candidates. Optional composite ranking: `score = hamming - rabitq_w * quantization_projection` (`RABITQ_W` env, default 0).
+
+### 3.0.3 Inference Dispatcher
+
+Embedding calls route through `UnifiedInferenceDispatcher` — a dedicated actor thread serializes SentenceTransformer inference under Python 3.14 free-threading while CPU-side Hamming and entropy checks run concurrently.
+
 The firewall executes three distinct validation stages in a **user-defined sequence** controlled via the HUD's `Seq` inputs. The pipeline is constructed at evaluation time by sorting the three stages based on their integer priority values:
 
 | Stage | Filter | Config Key | Default Order |
