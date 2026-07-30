@@ -15,6 +15,6 @@ export const NEGATIVE_RECOMMENDED = {
 /** Slider ranges centered on positive recommended (midpoint = recommended). */
 export const THRESHOLD_SLIDERS = {
   cosine: { min: 0.28, max: 0.78, step: 0.01 },
-  excitation: { min: 50, max: 250, step: 1 },
+  excitation: { min: 0, max: 250, step: 1 },
   globalNoise: { min: 1.5, max: 7.5, step: 0.1 },
 } as const;
