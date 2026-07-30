@@ -151,7 +151,7 @@ async def test_semantic_piggybacking_rejection():
 @pytest.mark.asyncio
 async def test_noise_prefilter_entropy_telemetry(firewall_context):
     """Verify that Noise Pre-Filter uses Shannon Entropy and reports it in telemetry."""
-    set_config(global_noise_limit=10.0, noise_order=1)
+    set_config(global_noise_limit=10.0, noise_order=1, cosine_order=2)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         async with ac.stream("POST", "/chat", json={"prompt": "Trigger Entropy"}) as response:
             content = ""

@@ -482,26 +482,6 @@ export const ControlPanel: React.FC = () => {
         <button type="button" onClick={handleResetToRecommended} className="reset-btn">Reset to Recommended</button>
       </div>
 
-      {/* --- Noise Pre-Filter --- */}
-      <div className={`filter-group ${noiseEnabled ? '' : 'filter-group--disabled'}`}>
-        <button onClick={() => setNoiseEnabled(!noiseEnabled)}
-          className={`toggle-btn ${noiseEnabled ? 'toggle-btn--on' : ''}`}>
-          {noiseEnabled ? 'ON' : 'OFF'}
-        </button>
-        <div style={{ flex: 1 }}>
-          <div className="slider-label">
-            Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong>
-            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].noise} />
-          </div>
-          <StepSlider value={globalNoiseLimit} min={THRESHOLD_SLIDERS.globalNoise.min} max={THRESHOLD_SLIDERS.globalNoise.max} step={THRESHOLD_SLIDERS.globalNoise.step} onChange={setGlobalNoiseLimit} />
-        </div>
-        <div className="seq-column">
-          <div className="seq-label">Seq</div>
-          <input type="number" min="1" max="3" step="1" value={noiseOrder}
-            onChange={(e) => handleOrderChange('noise', Number(e.target.value))} className="seq-input" />
-        </div>
-      </div>
-
       {/* --- Cosine Gate --- */}
       <div className={`filter-group ${cosineEnabled ? '' : 'filter-group--disabled'}`}>
         <button onClick={() => setCosineEnabled(!cosineEnabled)}
@@ -522,6 +502,26 @@ export const ControlPanel: React.FC = () => {
           <div className="seq-label">Seq</div>
           <input type="number" min="1" max="3" step="1" value={cosineOrder}
             onChange={(e) => handleOrderChange('cosine', Number(e.target.value))} className="seq-input" />
+        </div>
+      </div>
+
+      {/* --- Noise Pre-Filter --- */}
+      <div className={`filter-group ${noiseEnabled ? '' : 'filter-group--disabled'}`}>
+        <button onClick={() => setNoiseEnabled(!noiseEnabled)}
+          className={`toggle-btn ${noiseEnabled ? 'toggle-btn--on' : ''}`}>
+          {noiseEnabled ? 'ON' : 'OFF'}
+        </button>
+        <div style={{ flex: 1 }}>
+          <div className="slider-label">
+            Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong>
+            <InfoTooltip entry={TOOLTIP_REGISTRY[lang].noise} />
+          </div>
+          <StepSlider value={globalNoiseLimit} min={THRESHOLD_SLIDERS.globalNoise.min} max={THRESHOLD_SLIDERS.globalNoise.max} step={THRESHOLD_SLIDERS.globalNoise.step} onChange={setGlobalNoiseLimit} />
+        </div>
+        <div className="seq-column">
+          <div className="seq-label">Seq</div>
+          <input type="number" min="1" max="3" step="1" value={noiseOrder}
+            onChange={(e) => handleOrderChange('noise', Number(e.target.value))} className="seq-input" />
         </div>
       </div>
 

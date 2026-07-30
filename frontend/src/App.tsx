@@ -14,10 +14,15 @@ function App() {
     fetch(`${API_BASE_URL}/chat/history`)
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          const currentMessages = useStore.getState().messages;
-          if (currentMessages.length === 0) {
-            useStore.setState({ messages: data });
+        if (Array.isArray(data)) {
+          if (data.length > 0) {
+            const currentMessages = useStore.getState().messages;
+            if (currentMessages.length === 0) {
+              useStore.setState({ messages: data });
+            }
+          } else {
+            // Backend history wiped or empty -> sync frontend state & clear localStorage
+            useStore.setState({ messages: [] });
           }
         }
       })
