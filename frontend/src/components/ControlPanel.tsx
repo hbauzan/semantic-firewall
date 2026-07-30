@@ -47,11 +47,11 @@ export const ControlPanel: React.FC = () => {
     excitationThreshold, noiseTolerance, cosineThreshold, globalNoiseLimit,
     cosineOrder, excitationOrder, noiseOrder, adaptiveFactor,
     noiseEnabled, cosineEnabled, excitationEnabled, ragTopK, firewallMode, activeTab,
-    upstreamProvider, snifferViewLimit,
+    upstreamProvider, snifferViewLimit, calibrationCoverage, lastCalibratedConfig,
     setExcitationThreshold, setNoiseTolerance, setCosineThreshold, setGlobalNoiseLimit,
     setCosineOrder, setExcitationOrder, setNoiseOrder, setAdaptiveFactor,
     setNoiseEnabled, setCosineEnabled, setExcitationEnabled, setRagTopK, setFirewallMode,
-    setUpstreamProvider, setSnifferViewLimit,
+    setUpstreamProvider, setSnifferViewLimit, setCalibrationCoverage, setLastCalibratedConfig,
     ingestionStatus, setIngestionStatus, setSystemAction,
     backendHealth, activeTask, startTask, updateTask, finishTask,
   } = useStore();
@@ -74,7 +74,7 @@ export const ControlPanel: React.FC = () => {
   const packWasCalibratedBefore = (pack: PackInfo) =>
     pack.has_auto_dataset === true || calibratedThisSession.has(pack.filename);
 
-  const applyConfigToStore = (c: Record<string, unknown>) => {
+  const applyConfigToStore = (c: Record<string, unknown>, updateCalibratedBaseline = true) => {
     setExcitationThreshold(c.excitation_threshold as number);
     setNoiseTolerance(c.noise_tolerance as number);
     setCosineThreshold(c.cosine_threshold as number);
@@ -90,6 +90,17 @@ export const ControlPanel: React.FC = () => {
     setFirewallMode(c.firewall_mode as 'positive' | 'negative');
     if (c.sniffer_view_limit) setSnifferViewLimit(c.sniffer_view_limit as number);
     if (c.upstream_provider) setUpstreamProvider(c.upstream_provider as typeof upstreamProvider);
+    if (c.calibration_coverage) setCalibrationCoverage(c.calibration_coverage as any);
+
+    if (updateCalibratedBaseline && c.cosine_threshold !== undefined && c.excitation_threshold !== undefined && c.global_noise_limit !== undefined) {
+      setLastCalibratedConfig({
+        cosine_threshold: c.cosine_threshold as number,
+        excitation_threshold: c.excitation_threshold as number,
+        global_noise_limit: c.global_noise_limit as number,
+        noise_tolerance: c.noise_tolerance as number | undefined,
+        adaptive_factor: c.adaptive_factor as number | undefined,
+      });
+    }
   };
 
   const handleOrderChange = (filterName: 'noise' | 'cosine' | 'excitation', newOrder: number) => {
@@ -389,7 +400,7 @@ export const ControlPanel: React.FC = () => {
 
     try {
       const res = await fetch(
-        `${API_BASE_URL}/corpus/packs/${encodeURIComponent(filename)}/calibrate-positive`,
+        `${API_BASE_URL}/corpus/packs/${encodeURIComponent(filename)}/calibrate-positive?coverage=${calibrationCoverage}`,
         { method: 'POST' },
       );
       if (!res.ok) {
@@ -423,11 +434,23 @@ export const ControlPanel: React.FC = () => {
 
   const isNeg = firewallMode === 'negative';
 
-  const handleResetToRecommended = () => {
-    const rec = isNeg ? NEGATIVE_RECOMMENDED : POSITIVE_RECOMMENDED;
-    setCosineThreshold(rec.cosine);
-    setExcitationThreshold(rec.excitation);
-    setGlobalNoiseLimit(rec.globalNoise);
+  const handleResetToCalibrated = () => {
+    if (lastCalibratedConfig) {
+      setCosineThreshold(lastCalibratedConfig.cosine_threshold);
+      setExcitationThreshold(lastCalibratedConfig.excitation_threshold);
+      setGlobalNoiseLimit(lastCalibratedConfig.global_noise_limit);
+      if (lastCalibratedConfig.noise_tolerance !== undefined) {
+        setNoiseTolerance(lastCalibratedConfig.noise_tolerance);
+      }
+      if (lastCalibratedConfig.adaptive_factor !== undefined) {
+        setAdaptiveFactor(lastCalibratedConfig.adaptive_factor);
+      }
+    } else {
+      const rec = isNeg ? NEGATIVE_RECOMMENDED : POSITIVE_RECOMMENDED;
+      setCosineThreshold(rec.cosine);
+      setExcitationThreshold(rec.excitation);
+      setGlobalNoiseLimit(rec.globalNoise);
+    }
   };
 
   return (
@@ -479,7 +502,7 @@ export const ControlPanel: React.FC = () => {
       )}
 
       <div className="reset-row">
-        <button type="button" onClick={handleResetToRecommended} className="reset-btn">Reset to Recommended</button>
+        <button type="button" onClick={handleResetToCalibrated} className="reset-btn">Reset to Calibrated</button>
       </div>
 
       {/* --- Cosine Gate --- */}
@@ -513,7 +536,7 @@ export const ControlPanel: React.FC = () => {
         </button>
         <div style={{ flex: 1 }}>
           <div className="slider-label">
-            Noise Pre-Filter: <strong>{globalNoiseLimit.toFixed(2)}</strong>
+            Noise Pre-Filter (Entropy): <strong>{globalNoiseLimit.toFixed(2)}</strong>
             <InfoTooltip entry={TOOLTIP_REGISTRY[lang].noise} />
           </div>
           <StepSlider value={globalNoiseLimit} min={THRESHOLD_SLIDERS.globalNoise.min} max={THRESHOLD_SLIDERS.globalNoise.max} step={THRESHOLD_SLIDERS.globalNoise.step} onChange={setGlobalNoiseLimit} />
@@ -632,6 +655,22 @@ export const ControlPanel: React.FC = () => {
         <div className="section-title corpus-section-title">
           Document Corpus
           <InfoTooltip entry={TOOLTIP_REGISTRY[lang].corpus} />
+        </div>
+
+        <div className="config-section" style={{ marginBottom: '0.8rem' }}>
+          <div className="slider-label">
+            Calibration Coverage Mode
+          </div>
+          <select
+            value={calibrationCoverage}
+            onChange={(e) => setCalibrationCoverage(e.target.value as any)}
+            className="upstream-select"
+            title="Coverage mode for automatic corpus calibration"
+          >
+            <option value="fast">Fast (Minimum ~10 queries)</option>
+            <option value="recommended">Recommended (Balanced ~30 queries)</option>
+            <option value="exhaustive">Exhaustive (Maximum ~100 queries)</option>
+          </select>
         </div>
 
         {packs.length === 0 && !ingestionStatus.taskId && (

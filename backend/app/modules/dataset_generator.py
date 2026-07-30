@@ -59,8 +59,10 @@ def filename_to_slug(filename: str) -> str:
     return slug or "pack"
 
 
-def auto_dataset_path(filename: str) -> Path:
-    return DATASETS_DIR / f"auto_{filename_to_slug(filename)}.json"
+def auto_dataset_path(filename: str, mode: str = "recommended") -> Path:
+    slug = filename_to_slug(filename)
+    mode_str = mode.lower() if mode else "recommended"
+    return DATASETS_DIR / f"auto_{slug}_{mode_str}.json"
 
 
 def _load_pool(name: str) -> list[str]:
@@ -112,12 +114,101 @@ def _parse_llm_questions(raw: str) -> list[str]:
     return lines
 
 
-def _generate_on_corpus_llm(text_sample: str, topic: str, chunks: list[str]) -> list[str]:
+def compute_coverage_counts(n_chunks: int, mode: str = "recommended") -> tuple[int, int, int, int]:
+    """Calculate (k_on_corpus, off_topic, piggyback, adversarial) based on N chunks and mode."""
+    mode_str = (mode or "recommended").lower()
+    n = max(1, n_chunks)
+    if mode_str == "fast":
+        k = int(np.clip(np.ceil(np.sqrt(n)), 3, 6))
+        off_topic = 4
+        piggyback = 2
+        adversarial = 2
+    elif mode_str == "exhaustive":
+        k = int(np.clip(np.ceil(0.15 * n), 15, 100))
+        off_topic = int(np.ceil(0.8 * k))
+        piggyback = int(np.ceil(0.5 * k))
+        adversarial = int(np.ceil(0.4 * k))
+    else:
+        # recommended mode default
+        k = int(np.clip(np.ceil(4.0 * np.log(max(2, n))), 8, 30))
+        off_topic = int(np.ceil(0.6 * k))
+        piggyback = int(np.ceil(0.4 * k))
+        adversarial = int(np.ceil(0.3 * k))
+
+    return k, off_topic, piggyback, adversarial
+
+
+def cluster_chunk_texts(rows: list[dict], k: int) -> list[str]:
+    """Pure numpy K-Means clustering over chunk vectors. Returns representative text per cluster centroid."""
+    if not rows:
+        return []
+    valid_rows = [r for r in rows if r.get("vector") and (r.get("text") or "").strip()]
+    if not valid_rows:
+        return []
+    if len(valid_rows) <= k:
+        return [(r.get("text") or "").strip() for r in valid_rows]
+
+    vecs = np.array([r["vector"] for r in valid_rows], dtype=np.float32)
+    norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+    norms[norms == 0] = 1e-9
+    norm_vecs = vecs / norms
+
+    n_samples, n_features = norm_vecs.shape
+    rng = np.random.default_rng(42)
+    centroids = np.zeros((k, n_features), dtype=np.float32)
+    centroids[0] = norm_vecs[rng.integers(0, n_samples)]
+
+    for c_idx in range(1, k):
+        dots = np.dot(norm_vecs, centroids[:c_idx].T)
+        min_dists = np.maximum(0.0, 1.0 - np.max(dots, axis=1))
+        probs = min_dists / (np.sum(min_dists) + 1e-9)
+        centroids[c_idx] = norm_vecs[rng.choice(n_samples, p=probs)]
+
+    labels = np.zeros(n_samples, dtype=int)
+    for _ in range(15):
+        sims = np.dot(norm_vecs, centroids.T)
+        new_labels = np.argmax(sims, axis=1)
+        if np.array_equal(labels, new_labels):
+            break
+        labels = new_labels
+        for c_idx in range(k):
+            mask = (labels == c_idx)
+            if np.any(mask):
+                c_mean = np.mean(norm_vecs[mask], axis=0)
+                c_norm = np.linalg.norm(c_mean)
+                centroids[c_idx] = c_mean / (c_norm + 1e-9)
+
+    cluster_texts: list[str] = []
+    for c_idx in range(k):
+        mask = (labels == c_idx)
+        if not np.any(mask):
+            continue
+        cluster_indices = np.where(mask)[0]
+        sub_vecs = norm_vecs[cluster_indices]
+        sims = np.dot(sub_vecs, centroids[c_idx])
+        best_idx = cluster_indices[np.argmax(sims)]
+        cluster_texts.append((valid_rows[best_idx].get("text") or "").strip())
+
+    return cluster_texts
+
+
+def _generate_on_corpus_llm(
+    text_sample: str,
+    topic: str,
+    chunks: list[str],
+    target_count: int = ON_CORPUS_COUNT,
+    cluster_samples: list[str] | None = None,
+) -> list[str]:
+    concept_hint = ""
+    if cluster_samples:
+        concept_hint = "Key concept excerpts from document clusters:\n" + "\n".join([f"- {cs[:300]}" for cs in cluster_samples[:target_count]]) + "\n\n"
+
     prompt = (
         "You are building a test dataset for a document Q&A firewall.\n"
-        f"Document excerpt:\n---\n{text_sample[:4000]}\n---\n"
+        f"Document excerpt:\n---\n{text_sample[:3000]}\n---\n"
+        f"{concept_hint}"
         f"Domain topic hint: {topic}\n\n"
-        f"Generate exactly {ON_CORPUS_COUNT} legitimate questions about this document's domain.\n"
+        f"Generate exactly {target_count} legitimate questions covering these distinct concepts of the document's domain.\n"
         "Rules:\n"
         "- Each line is one question ending with ?\n"
         "- Paraphrase and ask about concepts — NEVER copy sentences verbatim from the excerpt\n"
@@ -132,13 +223,16 @@ def _generate_on_corpus_llm(text_sample: str, topic: str, chunks: list[str]) -> 
         if _is_verbatim_leakage(q, chunks):
             continue
         accepted.append(q)
-        if len(accepted) >= ON_CORPUS_COUNT:
+        if len(accepted) >= target_count:
             break
     return accepted
 
 
-def _generate_on_corpus_template(topic: str) -> list[str]:
-    return [tpl.format(topic=topic) for tpl in _TEMPLATE_ON_CORPUS[:ON_CORPUS_COUNT]]
+def _generate_on_corpus_template(topic: str, target_count: int = ON_CORPUS_COUNT) -> list[str]:
+    return [
+        _TEMPLATE_ON_CORPUS[i % len(_TEMPLATE_ON_CORPUS)].format(topic=f"{topic} (part {i+1})")
+        for i in range(target_count)
+    ]
 
 
 def _build_queries(
@@ -146,11 +240,17 @@ def _build_queries(
     off_pool: list[str],
     adv_pool: list[str],
     slug: str,
+    counts: tuple[int, int, int, int] | None = None,
 ) -> list[dict]:
     queries: list[dict] = []
     idx = 1
 
-    for text in on_corpus[:ON_CORPUS_COUNT]:
+    if counts:
+        k_on, off_cnt, pig_cnt, adv_cnt = counts
+    else:
+        k_on, off_cnt, pig_cnt, adv_cnt = ON_CORPUS_COUNT, OFF_TOPIC_COUNT, PIGGYBACKING_COUNT, ADVERSARIAL_COUNT
+
+    for text in on_corpus[:k_on]:
         queries.append({
             "id": f"{slug[:8]}_{idx:02d}",
             "category": "on_corpus",
@@ -159,7 +259,8 @@ def _build_queries(
         })
         idx += 1
 
-    for text in off_pool[:OFF_TOPIC_COUNT]:
+    for i in range(off_cnt):
+        text = off_pool[i % len(off_pool)]
         queries.append({
             "id": f"{slug[:8]}_{idx:02d}",
             "category": "off_topic",
@@ -168,10 +269,10 @@ def _build_queries(
         })
         idx += 1
 
-    for i in range(PIGGYBACKING_COUNT):
-        on_q = on_corpus[i % len(on_corpus)]
+    for i in range(pig_cnt):
+        on_q = on_corpus[i % len(on_corpus)] if on_corpus else "What is in this document?"
         off_snippet = off_pool[i % len(off_pool)].rstrip("?")
-        text = _PIGGYBACK_TEMPLATES[i].format(on_q=on_q, off_snippet=off_snippet)
+        text = _PIGGYBACK_TEMPLATES[i % len(_PIGGYBACK_TEMPLATES)].format(on_q=on_q, off_snippet=off_snippet)
         queries.append({
             "id": f"{slug[:8]}_{idx:02d}",
             "category": "piggybacking",
@@ -180,7 +281,8 @@ def _build_queries(
         })
         idx += 1
 
-    for text in adv_pool[:ADVERSARIAL_COUNT]:
+    for i in range(adv_cnt):
+        text = adv_pool[i % len(adv_pool)]
         queries.append({
             "id": f"{slug[:8]}_{idx:02d}",
             "category": "adversarial",
@@ -200,10 +302,18 @@ def _fingerprint_matches(dataset: dict, fingerprint: dict) -> bool:
     )
 
 
-def load_cached_auto_dataset(filename: str, fingerprint: dict) -> dict | None:
-    path = auto_dataset_path(filename)
+def load_cached_auto_dataset(filename: str, fingerprint: dict, mode: str = "recommended") -> dict | None:
+    path = auto_dataset_path(filename, mode)
     if not path.is_file():
-        return None
+        if mode == "recommended":
+            legacy_path = DATASETS_DIR / f"auto_{filename_to_slug(filename)}.json"
+            if legacy_path.is_file():
+                path = legacy_path
+            else:
+                return None
+        else:
+            return None
+
     with path.open(encoding="utf-8") as f:
         data = json.load(f)
     if data.get("corpus_file") != filename:
@@ -214,10 +324,11 @@ def load_cached_auto_dataset(filename: str, fingerprint: dict) -> dict | None:
     return data
 
 
-def save_dataset(dataset: dict) -> Path:
+def save_dataset(dataset: dict, mode: str = "recommended") -> Path:
     DATASETS_DIR.mkdir(parents=True, exist_ok=True)
     slug = filename_to_slug(dataset["corpus_file"])
-    path = DATASETS_DIR / f"auto_{slug}.json"
+    mode_str = mode.lower() if mode else "recommended"
+    path = DATASETS_DIR / f"auto_{slug}_{mode_str}.json"
     payload = {k: v for k, v in dataset.items() if k != "_path"}
     with path.open("w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)
@@ -226,25 +337,33 @@ def save_dataset(dataset: dict) -> Path:
     return path
 
 
-def has_auto_dataset(filename: str) -> bool:
-    return auto_dataset_path(filename).is_file()
+def has_auto_dataset(filename: str, mode: str | None = None) -> bool:
+    if mode:
+        return auto_dataset_path(filename, mode).is_file()
+    slug = filename_to_slug(filename)
+    for p in DATASETS_DIR.glob(f"auto_{slug}*.json"):
+        if p.is_file():
+            return True
+    return False
 
 
 def generate_dataset_for_pack(
     filename: str,
+    mode: str = "recommended",
     progress_cb: ProgressCallback = None,
 ) -> dict:
-    """Build a v1-schema labeled dataset for any loaded pack."""
+    """Build a dynamic concept-clustered v1-schema dataset for any loaded pack."""
+    mode_str = (mode or "recommended").lower()
     if progress_cb:
-        progress_cb(5.0, "Extracting corpus sample…")
+        progress_cb(5.0, f"Extracting corpus sample (mode={mode_str})…")
 
     fingerprint = storage.get_pack_fingerprint(filename)
     if fingerprint["chunk_count"] == 0:
         raise ValueError(f"Pack '{filename}' has no chunks in LanceDB.")
 
-    cached = load_cached_auto_dataset(filename, fingerprint)
+    cached = load_cached_auto_dataset(filename, fingerprint, mode=mode_str)
     if cached is not None:
-        logger.info("Reusing cached auto dataset for %s", filename)
+        logger.info("Reusing cached auto dataset for %s (mode=%s)", filename, mode_str)
         if progress_cb:
             progress_cb(30.0, "Using cached labeled queries…")
         return cached
@@ -252,45 +371,48 @@ def generate_dataset_for_pack(
     text_sample = storage.get_pack_text_sample(filename)
     rows = storage._pack_rows(filename)
     chunks = [(r.get("text") or "") for r in rows]
+    chunk_count = len(chunks)
+
+    counts = compute_coverage_counts(chunk_count, mode=mode_str)
+    k_on, off_cnt, pig_cnt, adv_cnt = counts
+
+    cluster_samples = cluster_chunk_texts(rows, k_on)
 
     topic = _extract_topic_keywords(text_sample)
     slug = filename_to_slug(filename)
 
     if progress_cb:
-        progress_cb(15.0, "Generating labeled queries (LLM)…")
+        progress_cb(15.0, f"Generating {k_on} concept queries (mode={mode_str})…")
 
-    on_corpus = _generate_on_corpus_llm(text_sample, topic, chunks)
+    on_corpus = _generate_on_corpus_llm(
+        text_sample, topic, chunks, target_count=k_on, cluster_samples=cluster_samples
+    )
     generation_method = "llm"
-    if len(on_corpus) < ON_CORPUS_COUNT:
+    if len(on_corpus) < k_on:
         logger.warning(
             "LLM unavailable or insufficient on_corpus queries for %s; using template fallback",
             filename,
         )
         generation_method = "template_fallback"
-        on_corpus = _generate_on_corpus_template(topic)
+        on_corpus = _generate_on_corpus_template(topic, target_count=k_on)
 
     off_pool = _load_pool("off_topic_v1.json")
     adv_pool = _load_pool("adversarial_v1.json")
-    queries = _build_queries(on_corpus, off_pool, adv_pool, slug)
+    queries = _build_queries(on_corpus, off_pool, adv_pool, slug, counts=counts)
 
     dataset = {
         "schema_version": "1.0",
         "corpus_id": slug,
         "corpus_file": filename,
-        "description": f"Auto-generated calibration dataset for {filename}.",
+        "coverage_mode": mode_str,
+        "description": f"Auto-generated {mode_str} calibration dataset for {filename}.",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "generation_method": generation_method,
         "pack_fingerprint": fingerprint,
         "queries": queries,
     }
 
-    if len(queries) != TOTAL_QUERIES:
-        logger.warning(
-            "Auto dataset for %s has %d queries (expected %d)",
-            filename, len(queries), TOTAL_QUERIES,
-        )
-
-    save_dataset(dataset)
+    save_dataset(dataset, mode=mode_str)
     if progress_cb:
-        progress_cb(30.0, "Labeled queries ready.")
+        progress_cb(30.0, f"Labeled queries ready ({len(queries)} queries).")
     return dataset

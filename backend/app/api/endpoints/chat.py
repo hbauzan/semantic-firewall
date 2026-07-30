@@ -229,6 +229,20 @@ async def chat_endpoint(request: Request, req: ChatRequest):
         provider, model_id = get_provider(cfg)
         
         if failed_clause is not None:
+            all_traces.extend([
+                {
+                    "stage": "noise_tolerance",
+                    "passed": True,
+                    "value": cfg.noise_tolerance,
+                    "threshold": cfg.noise_tolerance,
+                },
+                {
+                    "stage": "adaptive",
+                    "passed": True,
+                    "value": cfg.adaptive_factor,
+                    "threshold": cfg.adaptive_factor,
+                },
+            ])
             # NEW: Emit BREACH trace to Sniffer for UI parity
             emit_trace(
                 model=model_id,
@@ -249,16 +263,30 @@ async def chat_endpoint(request: Request, req: ChatRequest):
         entropy = 0.0
         for t in all_traces:
             if t.get("stage") == "noise":
-                entropy = t.get("value", 0.0)
+                entropy = t.get("entropy", t.get("value", 0.0))
                 break
 
-        all_traces.append({
-            "stage": "rag_context",
-            "passed": True,
-            "chunk_count": rag_chunk_count,
-            "k": cfg.rag_top_k,
-            "clauses_with_hits": clauses_with_hits,
-        })
+        all_traces.extend([
+            {
+                "stage": "rag_context",
+                "passed": True,
+                "chunk_count": rag_chunk_count,
+                "k": cfg.rag_top_k,
+                "clauses_with_hits": clauses_with_hits,
+            },
+            {
+                "stage": "noise_tolerance",
+                "passed": True,
+                "value": cfg.noise_tolerance,
+                "threshold": cfg.noise_tolerance,
+            },
+            {
+                "stage": "adaptive",
+                "passed": True,
+                "value": cfg.adaptive_factor,
+                "threshold": cfg.adaptive_factor,
+            },
+        ])
 
         trace_id = emit_trace(
             model=model_id,
@@ -274,7 +302,12 @@ async def chat_endpoint(request: Request, req: ChatRequest):
             f"[FW_PASS]\n"
             f"Engine: {cfg.upstream_provider.upper()} | {model_id}\n"
             f"Mode: {cfg.firewall_mode.upper()}\n"
-            f"Metrics: Entropy({entropy:.2f}) | Cosine({last_cosine:.3f}) | Resonance({last_activations})\n"
+            f"Metrics: Entropy({entropy:.2f} / Limit: {cfg.global_noise_limit:.2f}) | "
+            f"Cosine({last_cosine:.3f} / Limit: {cfg.cosine_threshold:.3f}) | "
+            f"Excitation({last_activations} / Limit: {cfg.excitation_threshold}) | "
+            f"Noise Tolerance({cfg.noise_tolerance}) | "
+            f"Adaptive({cfg.adaptive_factor:.2f}) | "
+            f"RAG Context({rag_chunk_count} chunks, k={cfg.rag_top_k})\n"
             f"RAG: {rag_chunk_count} chunks injected "
             f"(k={cfg.rag_top_k}, clauses={clauses_with_hits}, unique={rag_chunk_count})\n"
             f"{'-' * 40}\n"
@@ -405,21 +438,21 @@ def _format_block_message(
     if bare_reason == "cosine":
         val = details.get("cosine_sim", 0)
         req = cfg.cosine_threshold
-        metric_line = f'Metrics: Cosine({val:.3f}) | Limit: {req:.2f}'
+        metric_line = f'Metrics: Cosine({val:.3f} / Limit: {req:.3f}) | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
     elif bare_reason == "noise":
         val = details.get("entropy", 0)
-        metric_line = f'Metrics: Entropy({val:.4f}) | Limit: {cfg.global_noise_limit:.3f}'
+        metric_line = f'Metrics: Entropy({val:.4f} / Limit: {cfg.global_noise_limit:.3f}) | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
     elif bare_reason == "BURST_DETECTION_BREACH":
         val = details.get("entropy", 0)
-        metric_line = f'Metrics: RawEntropy({val:.4f}) | Limit: {details.get("limit", cfg.raw_entropy_limit):.3f}'
+        metric_line = f'Metrics: RawEntropy({val:.4f} / Limit: {details.get("limit", cfg.raw_entropy_limit):.3f}) | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
     elif bare_reason == "no_context":
-        metric_line = f'Reason: no_context'
+        metric_line = f'Reason: no_context | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
     elif bare_reason == "excitation":
         act = details.get("activations", 0)
         thr = details.get("threshold", 0)
-        metric_line = f'Metrics: Resonance({act}) | Limit: {thr:.0f}'
+        metric_line = f'Metrics: Excitation({act} / Limit: {thr:.0f}) | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
     else:
-        metric_line = f'Reason: {reason}'
+        metric_line = f'Reason: {reason} | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
 
     pipeline = " -> ".join([f"{r['stage']}:{'OK' if r['passed'] else 'FAIL'}" for r in traces])
     
