@@ -101,14 +101,18 @@ def delete_pack(filename: str):
 
 @router.post("/corpus/packs/{filename}/calibrate-positive", dependencies=[Depends(verify_api_key)])
 @limiter.limit(settings.rate_limit_upload)
-async def calibrate_pack_positive(request: Request, filename: str):
+async def calibrate_pack_positive(request: Request, filename: str, coverage: str | None = None):
     """Start async Youden threshold sweep for a loaded pack."""
+    from app.core import state as state_mod
+    cfg = state_mod.config_state
+
     packs = {p["filename"] for p in storage.get_summary()}
     if filename not in packs:
         raise HTTPException(status_code=404, detail=f"Pack '{filename}' is not loaded in the corpus.")
 
+    target_coverage = coverage or cfg.calibration_coverage
     try:
-        task_id = await start_calibration_async(filename)
+        task_id = await start_calibration_async(filename, coverage_mode=target_coverage)
     except CalibrationError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

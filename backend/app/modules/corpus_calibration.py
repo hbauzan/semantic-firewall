@@ -150,19 +150,24 @@ def list_dataset_index() -> list[dict]:
     return index
 
 
-def resolve_dataset_for_pack(filename: str) -> dict | None:
+def resolve_dataset_for_pack(filename: str, mode: str = "recommended") -> dict | None:
     from app.modules.dataset_generator import _fingerprint_matches
 
     hand_curated: dict | None = None
     auto: dict | None = None
+    target_mode = (mode or "recommended").lower()
+
     for data in list_dataset_index():
         if data.get("corpus_file") != filename:
             continue
         path = Path(data.get("_path", ""))
         if path.name.startswith("auto_"):
-            auto = data
+            ds_mode = (data.get("coverage_mode") or "").lower()
+            if ds_mode == target_mode:
+                auto = data
         else:
             hand_curated = data
+
     if hand_curated is not None:
         return hand_curated
     if auto is not None:
@@ -428,6 +433,7 @@ def _sweep_thresholds_3d(
 
 def calibrate_positive_for_pack(
     filename: str,
+    coverage_mode: str = "recommended",
     progress_cb: ProgressCallback = None,
 ) -> PositiveCalibrationResult:
     """Run joint 3D threshold sweep (cosine × excitation × noise); return Youden optima."""
@@ -435,12 +441,12 @@ def calibrate_positive_for_pack(
     if filename not in packs:
         raise CalibrationError(f"Pack '{filename}' is not loaded in the corpus.")
 
-    dataset = resolve_dataset_for_pack(filename)
+    dataset = resolve_dataset_for_pack(filename, mode=coverage_mode)
     generation_method: str | None = None
     if dataset is None:
         from app.modules.dataset_generator import generate_dataset_for_pack
 
-        dataset = generate_dataset_for_pack(filename, progress_cb=progress_cb)
+        dataset = generate_dataset_for_pack(filename, mode=coverage_mode, progress_cb=progress_cb)
         generation_method = dataset.get("generation_method")
     else:
         generation_method = dataset.get("generation_method")

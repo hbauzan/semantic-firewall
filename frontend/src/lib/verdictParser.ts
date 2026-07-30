@@ -14,7 +14,7 @@ export interface ParsedVerdict {
 
 const REASON_LABELS: Record<string, string> = {
   cosine: 'Query is not similar enough to your document corpus.',
-  excitation: 'Dimensional resonance did not match the corpus fingerprint.',
+  excitation: 'Excitation filter threshold not met (insufficient activations).',
   noise: 'Prompt entropy looks like an adversarial burst pattern.',
   no_context: 'No corpus loaded — cannot verify this query.',
 };
@@ -53,7 +53,7 @@ export function parseFirewallMessage(content: string): ParsedVerdict | null {
     let bareReason = 'unknown';
     if (metrics.toLowerCase().includes('cosine')) bareReason = 'cosine';
     else if (metrics.toLowerCase().includes('entropy')) bareReason = 'noise';
-    else if (metrics.toLowerCase().includes('resonance')) bareReason = 'excitation';
+    else if (metrics.toLowerCase().includes('excitation') || metrics.toLowerCase().includes('resonance')) bareReason = 'excitation';
     else if (metrics.toLowerCase().includes('no_context')) bareReason = 'no_context';
 
     return {
