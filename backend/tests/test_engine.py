@@ -130,7 +130,7 @@ def test_engine_negative_mode_identical_vectors_breach():
     result = SemanticFirewall.evaluate_clause(vec, vec, cfg, word_count=10)
     assert result["passed"] is False
     assert result["breach_reason"] == "negative:cosine"
-    assert result["trace"][1]["passed"] is False
+    assert result["trace"][-1]["passed"] is False
 
 def test_engine_negative_mode_divergent_vectors_pass():
     """Negative mode: orthogonal vectors (low similarity) must PASS."""
