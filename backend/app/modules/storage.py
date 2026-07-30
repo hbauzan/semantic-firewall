@@ -152,6 +152,16 @@ class Storage:
             )
         else:
             self.table = self.db.open_table(self.table_name)
+            self._ensure_schema_compatibility()
+
+    def _ensure_schema_compatibility(self):
+        """Ensure all fields defined in rabitq_schema exist in the table on disk."""
+        existing_fields = set(self.table.schema.names)
+        missing_fields = [f for f in rabitq_schema if f.name not in existing_fields]
+        if missing_fields:
+            missing_names = [f.name for f in missing_fields]
+            logger.info("Migrating LanceDB table schema: adding missing fields %s", missing_names)
+            self.table.add_columns(missing_fields)
 
     def _enrich_node(self, node: dict) -> dict:
         """Attach binary signature fields when missing."""
