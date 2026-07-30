@@ -86,6 +86,8 @@ class SnifferTrace(BaseModel):
             "no_context_passed": None,
             "rag_chunk_count": None,
             "rag_top_k": None,
+            "noise_tolerance_value": None,
+            "adaptive_factor_value": None,
         }
 
         for stage in self.firewall.pipeline_trace:
@@ -107,6 +109,10 @@ class SnifferTrace(BaseModel):
             elif s_name == "rag_context":
                 event["rag_chunk_count"] = int(stage.value)
                 event["rag_top_k"] = int(stage.threshold)
+            elif s_name == "noise_tolerance":
+                event["noise_tolerance_value"] = stage.value
+            elif s_name == "adaptive":
+                event["adaptive_factor_value"] = stage.value
 
         return event
 
@@ -240,6 +246,9 @@ def emit_trace(
             # Counts only — not a security filter. value=unique chunks, threshold=k.
             value = float(t.get("chunk_count", 0))
             threshold = float(t.get("k", 0))
+        elif stage_name in ("noise_tolerance", "adaptive", "raw_entropy", "sparse"):
+            value = float(t.get("value", t.get("entropy", t.get("sparse_sim", 0.0))))
+            threshold = float(t.get("threshold", t.get("limit", t.get("sparse_threshold", 0.0))))
         stages.append(PipelineStageTrace(
             stage=stage_name,
             passed=t.get("passed", False),

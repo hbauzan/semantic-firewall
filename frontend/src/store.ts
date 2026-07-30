@@ -64,6 +64,14 @@ export interface FirewallSlice {
   activeTab: 'chat' | 'sniffer';
   upstreamProvider: 'ollama' | 'google' | 'openai' | 'anthropic' | 'groq';
   snifferViewLimit: number;
+  calibrationCoverage: 'fast' | 'recommended' | 'exhaustive';
+  lastCalibratedConfig: {
+    cosine_threshold: number;
+    excitation_threshold: number;
+    global_noise_limit: number;
+    noise_tolerance?: number;
+    adaptive_factor?: number;
+  } | null;
   setExcitationThreshold: (val: number) => void;
   setNoiseTolerance: (val: number) => void;
   setCosineThreshold: (val: number) => void;
@@ -80,6 +88,14 @@ export interface FirewallSlice {
   setActiveTab: (val: 'chat' | 'sniffer') => void;
   setUpstreamProvider: (val: 'ollama' | 'google' | 'openai' | 'anthropic' | 'groq') => void;
   setSnifferViewLimit: (val: number) => void;
+  setCalibrationCoverage: (val: 'fast' | 'recommended' | 'exhaustive') => void;
+  setLastCalibratedConfig: (config: {
+    cosine_threshold: number;
+    excitation_threshold: number;
+    global_noise_limit: number;
+    noise_tolerance?: number;
+    adaptive_factor?: number;
+  }) => void;
 }
 
 // --- Chat Slice ---
@@ -175,6 +191,8 @@ const createFirewallSlice: StateCreator<StoreState, [], [], FirewallSlice> = (se
   activeTab: 'chat',
   upstreamProvider: 'ollama',
   snifferViewLimit: 10,
+  calibrationCoverage: 'recommended',
+  lastCalibratedConfig: null,
   setExcitationThreshold: (val) => set({ excitationThreshold: val }),
   setNoiseTolerance: (val) => set({ noiseTolerance: val }),
   setCosineThreshold: (val) => set({ cosineThreshold: val }),
@@ -191,6 +209,8 @@ const createFirewallSlice: StateCreator<StoreState, [], [], FirewallSlice> = (se
   setActiveTab: (val) => set({ activeTab: val }),
   setUpstreamProvider: (val) => set({ upstreamProvider: val }),
   setSnifferViewLimit: (val) => set({ snifferViewLimit: val }),
+  setCalibrationCoverage: (val) => set({ calibrationCoverage: val }),
+  setLastCalibratedConfig: (config) => set({ lastCalibratedConfig: config }),
 });
 
 const createChatSlice: StateCreator<StoreState, [], [], ChatSlice> = (set) => ({

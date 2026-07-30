@@ -55,7 +55,7 @@ def test_calibrate_missing_dataset_starts_task(monkeypatch):
         lambda: [{"filename": "random_manual.pdf"}],
     )
 
-    async def fake_start(filename: str) -> str:
+    async def fake_start(filename: str, **_kw) -> str:
         assert filename == "random_manual.pdf"
         return "cal-task-123"
 
@@ -75,7 +75,7 @@ def test_api_calibrate_prisma_like_filename(monkeypatch):
         lambda: [{"filename": fname}],
     )
 
-    async def fake_start(filename: str) -> str:
+    async def fake_start(filename: str, **_kw) -> str:
         assert filename == fname
         return "cal-task-prisma"
 
@@ -359,7 +359,7 @@ async def test_rtss_telemetry_flow():
     assert trace.firewall.decision == "BREACH"
     assert len(trace.firewall.pipeline_trace) >= 1
     for stage in trace.firewall.pipeline_trace:
-        assert stage.stage in ("noise", "cosine", "excitation", "no_context", "raw_entropy", "sparse")
+        assert stage.stage in ("noise", "cosine", "excitation", "no_context", "raw_entropy", "sparse", "rag_context", "noise_tolerance", "adaptive")
         assert isinstance(stage.passed, bool)
         assert isinstance(stage.value, (int, float))
         assert isinstance(stage.threshold, (int, float))
