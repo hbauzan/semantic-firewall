@@ -83,4 +83,5 @@ def reset_config_after_test():
         firewall_mode="positive",
         active_tab="chat",
         active_corpus_file=None,
+        calibration_coverage="recommended",
     )

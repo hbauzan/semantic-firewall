@@ -67,7 +67,7 @@ class CalibrationTaskStore:
 calibration_tasks = CalibrationTaskStore()
 
 
-def _run_calibration_sync(filename: str, task_id: str) -> dict:
+def _run_calibration_sync(filename: str, task_id: str, coverage_mode: str = "recommended") -> dict:
     def progress_cb(progress: float, message: str) -> None:
         calibration_tasks.put(
             task_id,
@@ -79,7 +79,7 @@ def _run_calibration_sync(filename: str, task_id: str) -> dict:
             ),
         )
 
-    result = calibrate_positive_for_pack(filename, progress_cb=progress_cb)
+    result = calibrate_positive_for_pack(filename, coverage_mode=coverage_mode, progress_cb=progress_cb)
     return {
         "status": "calibrated",
         "filename": filename,
@@ -113,7 +113,7 @@ async def _apply_config(payload: dict) -> dict:
     return payload
 
 
-async def _guarded_calibration(filename: str, task_id: str) -> None:
+async def _guarded_calibration(filename: str, task_id: str, coverage_mode: str = "recommended") -> None:
     try:
         async with _calibration_semaphore:
             calibration_tasks.put(
@@ -125,7 +125,7 @@ async def _guarded_calibration(filename: str, task_id: str) -> None:
                     message="Starting calibration…",
                 ),
             )
-            payload = await asyncio.to_thread(_run_calibration_sync, filename, task_id)
+            payload = await asyncio.to_thread(_run_calibration_sync, filename, task_id, coverage_mode)
             calibration_tasks.put(
                 task_id,
                 CalibrationTaskStatus(
@@ -146,7 +146,7 @@ async def _guarded_calibration(filename: str, task_id: str) -> None:
                     result=payload,
                 ),
             )
-            logger.info("Calibration complete: %s", filename)
+            logger.info("Calibration complete: %s (mode=%s)", filename, coverage_mode)
     except CalibrationError as e:
         calibration_tasks.put(
             task_id,
@@ -170,7 +170,7 @@ async def _guarded_calibration(filename: str, task_id: str) -> None:
         )
 
 
-async def start_calibration_async(filename: str) -> str:
+async def start_calibration_async(filename: str, coverage_mode: str = "recommended") -> str:
     task_id = str(uuid.uuid4())
     calibration_tasks.put(
         task_id,
@@ -183,7 +183,7 @@ async def start_calibration_async(filename: str) -> str:
     )
     calibration_tasks.prune()
 
-    task = asyncio.create_task(_guarded_calibration(filename, task_id))
+    task = asyncio.create_task(_guarded_calibration(filename, task_id, coverage_mode))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
     return task_id

@@ -54,6 +54,10 @@ class ConfigState(BaseModel):
             "When null and exactly one pack is loaded, that pack is used automatically."
         ),
     )
+    calibration_coverage: Literal["fast", "recommended", "exhaustive"] = Field(
+        default="recommended",
+        description="Dataset coverage mode for automatic corpus calibration",
+    )
 
     @model_validator(mode='after')
     def validate_unique_orders(self):
@@ -86,6 +90,7 @@ class ConfigUpdate(BaseModel):
     active_tab: str = Field(default="chat")
     upstream_provider: Literal["ollama", "google", "openai", "anthropic", "groq"] = Field(default="ollama")
     active_corpus_file: str | None = Field(default=None)
+    calibration_coverage: Literal["fast", "recommended", "exhaustive"] = Field(default="recommended")
 
 
 # Max prompt length to prevent memory exhaustion before vectorization
