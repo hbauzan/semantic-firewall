@@ -348,7 +348,7 @@ run_custom_cleanup() {
     $wipe_backend && stop_local_backend
     $wipe_frontend && stop_local_frontend
     $wipe_log && rm -f backend/backend.log && echo -e "${GREEN}[+] Removed backend.log${NC}"
-    $wipe_session && rm -rf backend/data && echo -e "${GREEN}[+] Removed backend/data/${NC}"
+    $wipe_session && rm -rf backend/data && echo -e "${GREEN}[+] Removed backend/data/ (refresh browser tab to sync empty chat state)${NC}"
     $wipe_lance && rm -rf backend/lancedb_data && echo -e "${GREEN}[+] Removed lancedb_data/${NC}"
     if $wipe_auto_ds; then
         rm -f backend/calibration/datasets/auto_*.json 2>/dev/null || true
