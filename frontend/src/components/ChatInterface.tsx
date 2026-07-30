@@ -180,8 +180,31 @@ export const ChatInterface: React.FC = () => {
     }
   };
 
+  const handleClearChat = async () => {
+    useStore.setState({ messages: [] });
+    try {
+      await fetch(`${API_BASE_URL}/chat/history`, { method: 'DELETE' });
+    } catch (err) {
+      console.error('Failed to clear backend chat history:', err);
+    }
+  };
+
   return (
     <div className="main-panel">
+      {messages.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0.4rem 0.6rem 0.2rem' }}>
+          <button
+            type="button"
+            className="step-btn"
+            style={{ width: 'auto', padding: '2px 8px', fontSize: '0.75rem', color: '#ff3366', borderColor: '#ff3366' }}
+            onClick={handleClearChat}
+            disabled={isStreaming}
+            title="Clear chat history"
+          >
+            Clear Chat
+          </button>
+        </div>
+      )}
       <div className="chat-history">
         {messages.map((msg) => (
           <VerdictCard key={msg.id} content={msg.content} role={msg.role} />
