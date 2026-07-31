@@ -257,10 +257,17 @@ async def main_async():
     parser.add_argument("--explorer-model", type=str, help="Override explorer model ID")
     parser.add_argument("--select-model", action="store_true", help="Open model selector menu")
     parser.add_argument("--sync-corpus", action="store_true", help="Inspect and adapt dataset to active LanceDB corpus")
+    parser.add_argument("--build-pack", "--pack", action="store_true", help="Build agent handoff pack (rompepepe_context.txt)")
     parser.add_argument("--non-interactive", action="store_true", help="Skip preflight confirmation prompt")
     parser.add_argument("--view-reports", action="store_true", help="View past QA reports")
 
     args = parser.parse_args()
+
+    if args.build_pack:
+        from rompepepe.packager import build_rompepepe_pack
+        out_path = build_rompepepe_pack()
+        print(f"[+] Handoff Pack created at: {out_path}")
+        return
 
     if args.explorer_provider or args.explorer_model:
         updates = {}
@@ -328,11 +335,12 @@ async def main_async():
         print(" [2] Strategy B: Closed-Loop Adaptive Exploration (Fuzzing)")
         print(" [3] Select / Configure Explorer Model")
         print(" [4] Inspect Active LanceDB Corpus & Adapted Queries")
-        print(" [5] View Past QA Reports")
-        print(" [6] Resume Interrupted Session")
-        print(" [7] Quit")
+        print(" [5] Build Agent Handoff Pack (rompepepe_context.txt)")
+        print(" [6] View Past QA Reports")
+        print(" [7] Resume Interrupted Session")
+        print(" [8] Quit")
         print("==============================================")
-        choice = input(" Select option [1-7]: ").strip()
+        choice = input(" Select option [1-8]: ").strip()
         
         if choice == "1":
             await run_grid_search(fw_client, session_mgr, report_gen)
@@ -343,8 +351,12 @@ async def main_async():
         elif choice == "4":
             await inspect_lancedb_corpus_menu(fw_client)
         elif choice == "5":
-            view_reports(config.vault_storage_path)
+            from rompepepe.packager import build_rompepepe_pack
+            out_p = build_rompepepe_pack()
+            print(f"[+] Agent Handoff Pack created: {out_p}")
         elif choice == "6":
+            view_reports(config.vault_storage_path)
+        elif choice == "7":
             latest = session_mgr.get_latest_interrupted_session()
             if latest:
                 print(f"[+] Found interrupted session: {latest.session_id}")
