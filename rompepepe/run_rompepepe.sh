@@ -32,7 +32,7 @@ ensure_env() {
 
 run_python_script() {
     cd "$PROJECT_ROOT"
-    uv run python -m rompepepe.main "$@"
+    PYTHONPATH="$PROJECT_ROOT" uv run --directory backend python -m rompepepe.main "$@"
     cd "$SCRIPT_DIR"
 }
 
@@ -44,14 +44,15 @@ while true; do
     echo -e "${BOLD}${CYAN}   ROMP E PE PE — Semantic Robustness & Boundary Exploration Engine${NC}"
     echo -e "${CYAN}========================================================================${NC}"
     echo -e "${YELLOW} Target API:${NC} $(grep FIREWALL_API_BASE_URL .env 2>/dev/null | cut -d= -f2 || echo 'http://localhost:8000')"
-    echo -e "${YELLOW} Explorer:${NC}   $(grep EXPLORER_PROVIDER .env 2>/dev/null | cut -d= -f2 || echo 'ollama') ($(grep EXPLORER_MODEL .env 2>/dev/null | cut -d= -f2 || echo 'llama3.1'))"
+    echo -e "${YELLOW} Explorer:${NC}   ${BOLD}${GREEN}$(grep EXPLORER_PROVIDER .env 2>/dev/null | cut -d= -f2 || echo 'google')${NC} (${CYAN}$(grep EXPLORER_MODEL .env 2>/dev/null | cut -d= -f2 || echo 'gemini-1.5-flash')${NC})"
     echo -e "${CYAN}========================================================================${NC}"
     echo -e " ${GREEN}[1]${NC} Run Systematic Matrix Search (Grid Search)"
     echo -e " ${GREEN}[2]${NC} Run Closed-Loop Adaptive Exploratory Fuzzing"
-    echo -e " ${GREEN}[3]${NC} View Past QA & Boundary Reports"
-    echo -e " ${GREEN}[4]${NC} Resume Interrupted Session"
-    echo -e " ${GREEN}[5]${NC} Configure Environment (.env)"
-    echo -e " ${RED}[6]${NC} Quit"
+    echo -e " ${GREEN}[3]${NC} ${BOLD}${YELLOW}Select / Configure Explorer Model${NC} (Gemini, Claude, GPT, Ollama)"
+    echo -e " ${GREEN}[4]${NC} View Past QA & Boundary Reports"
+    echo -e " ${GREEN}[5]${NC} Resume Interrupted Session"
+    echo -e " ${GREEN}[6]${NC} Edit .env Directly"
+    echo -e " ${RED}[7]${NC} Quit"
     echo -e "${CYAN}========================================================================${NC}"
     
     # Check if there is an interrupted session to alert the user
@@ -63,11 +64,11 @@ while true; do
     if [ -n "$INTERRUPTED_SESSION" ]; then
         SESS_ID=$(basename "$INTERRUPTED_SESSION" .json)
         echo -e "${YELLOW} [!] Interrupted session detected: ${BOLD}${SESS_ID}${NC}"
-        echo -e "${YELLOW}     Press '4' to resume where it left off.${NC}"
+        echo -e "${YELLOW}     Press '5' to resume where it left off.${NC}"
         echo -e "${CYAN}========================================================================${NC}"
     fi
 
-    read -p " Select an option [1-6]: " choice
+    read -p " Select an option [1-7]: " choice
     case $choice in
         1)
             echo -e "\n${GREEN}[+] Launching Systematic Matrix Search (Strategy A)...${NC}"
@@ -82,10 +83,14 @@ while true; do
             read -p "Press Enter to return to menu..."
             ;;
         3)
-            run_python_script --view-reports
+            run_python_script --select-model
             read -p "Press Enter to return to menu..."
             ;;
         4)
+            run_python_script --view-reports
+            read -p "Press Enter to return to menu..."
+            ;;
+        5)
             if [ -n "$INTERRUPTED_SESSION" ]; then
                 SESS_ID=$(basename "$INTERRUPTED_SESSION" .json)
                 read -p " Resume previous session [${SESS_ID}]? (y/n): " confirm
@@ -99,19 +104,19 @@ while true; do
             fi
             read -p "Press Enter to return to menu..."
             ;;
-        5)
+        6)
             echo -e "\n${CYAN}Current .env configuration:${NC}"
             cat .env
-            echo -e "\n${YELLOW}Opening .env in editor (press Ctrl+X to exit nano if using default)...${NC}"
+            echo -e "\n${YELLOW}Opening .env in editor...${NC}"
             ${EDITOR:-nano} .env || vim .env || open .env
             read -p "Press Enter to return to menu..."
             ;;
-        6)
+        7)
             echo -e "\n${GREEN}Goodbye! Keep breaking boundaries.${NC}"
             exit 0
             ;;
         *)
-            echo -e "${RED}[!] Invalid option. Please select 1-6.${NC}"
+            echo -e "${RED}[!] Invalid option. Please select 1-7.${NC}"
             sleep 1
             ;;
     esac
