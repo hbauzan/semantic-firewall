@@ -8,7 +8,7 @@ import sys
 
 from rompepepe.client.explorer_client import ExplorerClient
 from rompepepe.client.firewall_client import FirewallClient
-from rompepepe.config import get_config
+from rompepepe.config import get_config, update_env_file
 from rompepepe.engines.adaptive_fuzzing import AdaptiveFuzzingEngine
 from rompepepe.engines.grid_search import GridSearchEngine
 from rompepepe.reports.generator import ReportGenerator
@@ -22,7 +22,6 @@ logger = logging.getLogger("rompepepe")
 def format_progress(session: SessionState, elapsed_sec: float):
     total = session.total_steps
     curr = session.current_step
-    pct = (curr / total * 100.0) if total > 0 else 0.0
 
     passed = sum(1 for r in session.results if r.passed)
     stability = (passed / curr * 100.0) if curr > 0 else 100.0
@@ -42,6 +41,63 @@ def format_progress(session: SessionState, elapsed_sec: float):
     sys.stdout.flush()
 
 
+async def select_model_menu(fw_client: FirewallClient | None = None):
+    cfg = get_config()
+    print("\n=======================================================")
+    print("   SELECT EXPLORER LLM PROVIDER & MODEL")
+    print("=======================================================")
+    print(f" Current Active: \033[1;32m{cfg.explorer_provider}\033[0m (\033[1;36m{cfg.explorer_model}\033[0m)")
+    print("=======================================================")
+    print(" [1] Google Gemini — gemini-1.5-flash (Recommended)")
+    print(" [2] Google Gemini — gemini-2.0-flash")
+    print(" [3] Anthropic — claude-3-5-sonnet-latest")
+    print(" [4] OpenAI — gpt-4o")
+    print(" [5] Ollama — llama3.1 (Local)")
+    print(" [6] Auto-Sync from Target Firewall (/galaxy/config)")
+    print(" [7] Custom Provider & Model String")
+    print("=======================================================")
+
+    choice = input(" Select option [1-7]: ").strip()
+    provider = cfg.explorer_provider
+    model = cfg.explorer_model
+
+    if choice == "1":
+        provider, model = "google", "gemini-1.5-flash"
+    elif choice == "2":
+        provider, model = "google", "gemini-2.0-flash"
+    elif choice == "3":
+        provider, model = "anthropic", "claude-3-5-sonnet-latest"
+    elif choice == "4":
+        provider, model = "openai", "gpt-4o"
+    elif choice == "5":
+        provider, model = "ollama", "llama3.1"
+    elif choice == "6":
+        if fw_client:
+            try:
+                fw_cfg = await fw_client.get_config()
+                provider = fw_cfg.get("upstream_provider", "google")
+                if provider == "google":
+                    model = "gemini-1.5-flash"
+                elif provider == "ollama":
+                    model = "llama3.1"
+                elif provider == "openai":
+                    model = "gpt-4o"
+                elif provider == "anthropic":
+                    model = "claude-3-5-sonnet-latest"
+                print(f"[+] Auto-synced from Firewall backend: provider={provider}, model={model}")
+            except Exception as e:
+                print(f"[!] Could not connect to firewall API: {e}")
+                return
+    elif choice == "7":
+        provider = input(" Enter provider (google/anthropic/openai/ollama): ").strip().lower() or "google"
+        model = input(" Enter model ID: ").strip() or "gemini-1.5-flash"
+
+    update_env_file({"EXPLORER_PROVIDER": provider, "EXPLORER_MODEL": model})
+    print(f"\n[+] Configuration updated in rompepepe/.env:")
+    print(f"    EXPLORER_PROVIDER = {provider}")
+    print(f"    EXPLORER_MODEL    = {model}")
+
+
 async def run_grid_search(
     fw_client: FirewallClient,
     session_mgr: SessionManager,
@@ -50,7 +106,7 @@ async def run_grid_search(
     non_interactive: bool = False,
 ):
     engine = GridSearchEngine(fw_client, session_mgr)
-    grid = None  # default grid
+    grid = None
     dataset_size = 15
 
     if not session_id:
@@ -165,16 +221,33 @@ async def main_async():
     parser.add_argument("--resume", type=str, help="Resume session ID")
     parser.add_argument("--resume-latest", action="store_true", help="Resume latest interrupted session")
     parser.add_argument("--iterations", type=int, default=40, help="Iterations for adaptive fuzzing")
+    parser.add_argument("--explorer-provider", type=str, help="Override explorer provider (google, anthropic, openai, ollama)")
+    parser.add_argument("--explorer-model", type=str, help="Override explorer model ID")
+    parser.add_argument("--select-model", action="store_true", help="Open model selector menu")
     parser.add_argument("--non-interactive", action="store_true", help="Skip preflight confirmation prompt")
     parser.add_argument("--view-reports", action="store_true", help="View past QA reports")
 
     args = parser.parse_args()
+
+    if args.explorer_provider or args.explorer_model:
+        updates = {}
+        if args.explorer_provider:
+            updates["EXPLORER_PROVIDER"] = args.explorer_provider
+        if args.explorer_model:
+            updates["EXPLORER_MODEL"] = args.explorer_model
+        update_env_file(updates)
+
     config = get_config()
 
     fw_client = FirewallClient(
         base_url=config.firewall_api_base_url,
         api_key=config.firewall_x_api_key,
     )
+
+    if args.select_model:
+        await select_model_menu(fw_client)
+        return
+
     exp_client = ExplorerClient(
         provider=config.explorer_provider,
         api_key=config.explorer_api_key,
@@ -211,25 +284,27 @@ async def main_async():
     elif args.strategy == "fuzz":
         await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen, iterations=args.iterations, non_interactive=args.non_interactive)
     else:
-        # Interactive CLI fallback if launched directly without args
         print("\n==============================================")
         print("  ROMP E PE PE — Autonomous Stress Engine CLI")
         print("==============================================")
         print(" [1] Strategy A: Systematic Matrix Search (Grid Search)")
         print(" [2] Strategy B: Closed-Loop Adaptive Exploration (Fuzzing)")
-        print(" [3] View Past QA Reports")
-        print(" [4] Resume Interrupted Session")
-        print(" [5] Quit")
+        print(" [3] Select / Configure Explorer Model")
+        print(" [4] View Past QA Reports")
+        print(" [5] Resume Interrupted Session")
+        print(" [6] Quit")
         print("==============================================")
-        choice = input(" Select option [1-5]: ").strip()
+        choice = input(" Select option [1-6]: ").strip()
         
         if choice == "1":
             await run_grid_search(fw_client, session_mgr, report_gen)
         elif choice == "2":
             await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen)
         elif choice == "3":
-            view_reports(config.vault_storage_path)
+            await select_model_menu(fw_client)
         elif choice == "4":
+            view_reports(config.vault_storage_path)
+        elif choice == "5":
             latest = session_mgr.get_latest_interrupted_session()
             if latest:
                 print(f"[+] Found interrupted session: {latest.session_id}")
