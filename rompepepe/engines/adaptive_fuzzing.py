@@ -73,13 +73,10 @@ class AdaptiveFuzzingEngine:
         except Exception as e:
             logger.warning(f"Could not fetch corpus packs: {e}")
 
-        # Default seeds
+        # Default seeds adapted dynamically to LanceDB packs
         if not seed_prompts:
-            corpus_data = load_seed_corpus()
-            seed_prompts = (
-                corpus_data.get("positive_queries", [])[:3]
-                + corpus_data.get("negative_queries", [])[:3]
-            )
+            from rompepepe.test_dataset import build_adapted_corpus
+            seed_prompts = await build_adapted_corpus(self.firewall_client)
 
         if session_id:
             session = self.session_manager.load_session(session_id)
