@@ -150,7 +150,7 @@ class Settings(BaseSettings):
     # --- Server ---
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000, ge=1, le=65535)
-    reload: bool = Field(default=False)
+    reload: bool = Field(default=True)
 
     # --- Derived helpers (not env vars) ---
 
