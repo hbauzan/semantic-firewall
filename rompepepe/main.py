@@ -48,49 +48,57 @@ async def select_model_menu(fw_client: FirewallClient | None = None):
     print("=======================================================")
     print(f" Current Active: \033[1;32m{cfg.explorer_provider}\033[0m (\033[1;36m{cfg.explorer_model}\033[0m)")
     print("=======================================================")
-    print(" [1] Google Gemini — gemini-1.5-flash (Recommended)")
+    print(" [1] Google Gemini — gemini-3.1-flash-lite (Firewall .env Default)")
     print(" [2] Google Gemini — gemini-2.0-flash")
-    print(" [3] Anthropic — claude-3-5-sonnet-latest")
-    print(" [4] OpenAI — gpt-4o")
-    print(" [5] Ollama — llama3.1 (Local)")
-    print(" [6] Auto-Sync from Target Firewall (/galaxy/config)")
-    print(" [7] Custom Provider & Model String")
+    print(" [3] Google Gemini — gemini-1.5-flash")
+    print(" [4] Anthropic — claude-3-5-sonnet-latest")
+    print(" [5] OpenAI — gpt-4o")
+    print(" [6] Ollama — llama3.1 (Local)")
+    print(" [7] Auto-Sync from Target Firewall & .env")
+    print(" [8] Custom Provider & Model String")
     print("=======================================================")
 
-    choice = input(" Select option [1-7]: ").strip()
+    choice = input(" Select option [1-8]: ").strip()
     provider = cfg.explorer_provider
     model = cfg.explorer_model
 
     if choice == "1":
-        provider, model = "google", "gemini-1.5-flash"
+        provider, model = "google", "gemini-3.1-flash-lite"
     elif choice == "2":
         provider, model = "google", "gemini-2.0-flash"
     elif choice == "3":
-        provider, model = "anthropic", "claude-3-5-sonnet-latest"
+        provider, model = "google", "gemini-1.5-flash"
     elif choice == "4":
-        provider, model = "openai", "gpt-4o"
+        provider, model = "anthropic", "claude-3-5-sonnet-latest"
     elif choice == "5":
-        provider, model = "ollama", "llama3.1"
+        provider, model = "openai", "gpt-4o"
     elif choice == "6":
+        provider, model = "ollama", "llama3.1"
+    elif choice == "7":
+        # Read from root .env & firewall config
+        from rompepepe.config import load_env_file
+        root_env = load_env_file(Path(__file__).parent.parent / ".env")
+        provider = root_env.get("UPSTREAM_PROVIDER", "google").lower()
         if fw_client:
             try:
                 fw_cfg = await fw_client.get_config()
-                provider = fw_cfg.get("upstream_provider", "google")
-                if provider == "google":
-                    model = "gemini-1.5-flash"
-                elif provider == "ollama":
-                    model = "llama3.1"
-                elif provider == "openai":
-                    model = "gpt-4o"
-                elif provider == "anthropic":
-                    model = "claude-3-5-sonnet-latest"
-                print(f"[+] Auto-synced from Firewall backend: provider={provider}, model={model}")
-            except Exception as e:
-                print(f"[!] Could not connect to firewall API: {e}")
-                return
-    elif choice == "7":
+                provider = fw_cfg.get("upstream_provider", provider)
+            except Exception:
+                pass
+        
+        if provider == "google":
+            model = root_env.get("GEMINI_MODEL_ID", "gemini-3.1-flash-lite")
+        elif provider == "ollama":
+            model = root_env.get("OLLAMA_MODEL", "llama3.1")
+        elif provider == "openai":
+            model = root_env.get("OPENAI_MODEL", "gpt-4o")
+        elif provider == "anthropic":
+            model = root_env.get("ANTHROPIC_MODEL", "claude-3-5-sonnet-latest")
+        
+        print(f"[+] Auto-synced from Firewall .env & backend: provider={provider}, model={model}")
+    elif choice == "8":
         provider = input(" Enter provider (google/anthropic/openai/ollama): ").strip().lower() or "google"
-        model = input(" Enter model ID: ").strip() or "gemini-1.5-flash"
+        model = input(" Enter model ID: ").strip() or "gemini-3.1-flash-lite"
 
     update_env_file({"EXPLORER_PROVIDER": provider, "EXPLORER_MODEL": model})
     print(f"\n[+] Configuration updated in rompepepe/.env:")
