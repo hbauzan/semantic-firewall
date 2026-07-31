@@ -1,0 +1,6 @@
+# Rompepepe Vault Storage (runtime sessions, logs, and generated reports)
+vault/sessions/*.json
+vault/reports/*.md
+vault/logs/*.log
+__pycache__/
+*.pyc
