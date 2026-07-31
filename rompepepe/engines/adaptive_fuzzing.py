@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 from rompepepe.client.explorer_client import ExplorerClient
 from rompepepe.client.firewall_client import FirewallClient
-from rompepepe.state.models import BoundaryTrace, SessionState, TestResult
+from rompepepe.state.models import BoundaryTrace, SessionState, TestResult, TelemetryTrace
 from rompepepe.state.session_manager import SessionManager
 from rompepepe.test_dataset import load_seed_corpus
 
@@ -121,13 +121,20 @@ class AdaptiveFuzzingEngine:
                 mutated_prompt = current_prompt
 
             # 2. Audit mutated prompt against Firewall REST API
-            try:
-                current_config = await self.firewall_client.get_config()
-                telemetry = await self.firewall_client.audit(mutated_prompt)
-                duration_ms = (time.perf_counter() - t0) * 1000.0
-            except Exception as e:
-                duration_ms = (time.perf_counter() - t0) * 1000.0
-                telemetry = await self.firewall_client.audit("error") if False else None
+            telemetry = None
+            duration_ms = 0.0
+            for retry in range(3):
+                try:
+                    current_config = await self.firewall_client.get_config()
+                    telemetry = await self.firewall_client.audit(mutated_prompt)
+                    duration_ms = (time.perf_counter() - t0) * 1000.0
+                    break
+                except Exception as e:
+                    duration_ms = (time.perf_counter() - t0) * 1000.0
+                    if "429" in str(e) and retry < 2:
+                        await asyncio.sleep(1.0 * (retry + 1))
+                    else:
+                        telemetry = TelemetryTrace(passed=False, breach_reason=f"HTTP Error: {e}", text="HTTP Error")
 
             result = TestResult(
                 step=step,
@@ -135,7 +142,7 @@ class AdaptiveFuzzingEngine:
                 config=current_config if 'current_config' in locals() else {},
                 passed=telemetry.passed if telemetry else False,
                 breach_reason=telemetry.breach_reason if telemetry else "Error",
-                telemetry=telemetry or None,  # type: ignore
+                telemetry=telemetry or TelemetryTrace(passed=False, breach_reason="HTTP Error"),
                 duration_ms=duration_ms,
             )
 
