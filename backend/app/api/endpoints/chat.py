@@ -475,7 +475,8 @@ def _format_block_message(
     tuning_targets = []
     if cos_trace:
         c_val = cos_trace.get("cosine_sim", 0.0)
-        tuning_targets.append(f"Cosine <= {c_val:.3f}")
+        rec_cos = math.floor(c_val * 1000.0) / 1000.0
+        tuning_targets.append(f"Cosine <= {rec_cos:.3f}")
     if exc_trace:
         act = exc_trace.get("activations", 0)
         factor = exc_trace.get("adaptive_factor", 1.0)
@@ -483,7 +484,8 @@ def _format_block_message(
         tuning_targets.append(f"Excitation <= {rec_exc}")
     if noise_trace:
         ent = noise_trace.get("entropy", 0.0)
-        tuning_targets.append(f"Noise <= {ent:.3f}")
+        rec_noise = math.floor(ent * 1000.0) / 1000.0
+        tuning_targets.append(f"Noise <= {rec_noise:.3f}")
 
     hint_line = f"[TUNING HINT] To PASS: {', '.join(tuning_targets)}" if tuning_targets else ""
 

@@ -16,5 +16,5 @@ export const NEGATIVE_RECOMMENDED = {
 export const THRESHOLD_SLIDERS = {
   cosine: { min: 0.28, max: 0.78, step: 0.01 },
   excitation: { min: 0, max: 250, step: 1 },
-  globalNoise: { min: 1.5, max: 7.5, step: 0.1 },
+  globalNoise: { min: 1.5, max: 15.0, step: 0.1 },
 } as const;
