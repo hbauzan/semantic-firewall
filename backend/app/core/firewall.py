@@ -315,6 +315,9 @@ class SemanticFirewall:
                     "last_cosine": last_cosine,
                 }
 
+        first_breach_reason = None
+        first_breach_details = None
+
         for _order, stage_name, stage_fn in pipeline:
             extra: dict[str, Any] = {"word_count": word_count}
             if stage_name == "cosine" and hybrid_score is not None:

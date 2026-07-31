@@ -10,6 +10,13 @@ export interface ParsedVerdict {
   pipeline: string;
   segment: string;
   body: string;
+  tuningHint?: string;
+  recommendedTargets?: {
+    cosine?: number;
+    excitation?: number;
+    noise?: number;
+  };
+  ragSnippet?: string;
 }
 
 const REASON_LABELS: Record<string, string> = {
@@ -43,6 +50,24 @@ export function parseFirewallMessage(content: string): ParsedVerdict | null {
   const pipeMatch = content.match(/Pipeline:\s*\[([^\]]*)\]/);
   if (pipeMatch) pipeline = pipeMatch[1];
 
+  let tuningHint = '';
+  const hintMatch = content.match(/\[TUNING HINT\]([^\n]+)/);
+  if (hintMatch) tuningHint = hintMatch[1].trim();
+
+  let ragSnippet = '';
+  const ragMatch = content.match(/RAG Match [^:]+:\s*"([^"]*)"/);
+  if (ragMatch) ragSnippet = ragMatch[1].trim();
+
+  const recommendedTargets: { cosine?: number; excitation?: number; noise?: number } = {};
+  if (tuningHint) {
+    const cosM = tuningHint.match(/Cosine\s*<=\s*([\d.]+)/i);
+    if (cosM) recommendedTargets.cosine = parseFloat(cosM[1]);
+    const excM = tuningHint.match(/Excitation\s*<=\s*([\d.]+)/i);
+    if (excM) recommendedTargets.excitation = parseFloat(excM[1]);
+    const noiseM = tuningHint.match(/Noise\s*<=\s*([\d.]+)/i);
+    if (noiseM) recommendedTargets.noise = parseFloat(noiseM[1]);
+  }
+
   let body = '';
   const llmIdx = content.indexOf('[LLM_RESPONSE]:');
   if (llmIdx >= 0) {
@@ -64,6 +89,9 @@ export function parseFirewallMessage(content: string): ParsedVerdict | null {
       pipeline,
       segment,
       body: '',
+      tuningHint,
+      recommendedTargets,
+      ragSnippet,
     };
   }
 
@@ -76,6 +104,9 @@ export function parseFirewallMessage(content: string): ParsedVerdict | null {
       pipeline,
       segment: '',
       body,
+      tuningHint,
+      recommendedTargets,
+      ragSnippet,
     };
   }
 
@@ -87,5 +118,8 @@ export function parseFirewallMessage(content: string): ParsedVerdict | null {
     pipeline,
     segment,
     body: content,
+    tuningHint,
+    recommendedTargets,
+    ragSnippet,
   };
 }
