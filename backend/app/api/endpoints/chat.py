@@ -9,6 +9,7 @@ Key changes from the original:
 import asyncio
 import json
 import logging
+import math
 import numpy as np
 import uuid
 from fastapi import APIRouter, Depends, Request
@@ -116,6 +117,9 @@ async def _evaluate_clauses(
             failed_clause = clause
             block_reason = result["breach_reason"]
             block_details = result["breach_details"] or {}
+            if results:
+                block_details["top_hit_text"] = results[0].get("text", "")
+                block_details["top_hit_score"] = last_cosine
             break
 
     return (
@@ -430,41 +434,88 @@ def _format_block_message(
     negative = cfg.firewall_mode == "negative"
     mode_tag = " [NEGATIVE]" if negative else ""
 
-    # Strip mode prefix for matching (e.g. "negative:cosine" → "cosine")
-    bare_reason = reason.split(":", 1)[-1] if reason.startswith("negative:") else reason
-
     header = f"[FIREWALL_AUDIT]\n[FW_BLOCK]{mode_tag}"
-    
-    if bare_reason == "cosine":
-        val = details.get("cosine_sim", 0)
+
+    cos_trace = next((t for t in traces if t.get("stage") == "cosine"), None)
+    exc_trace = next((t for t in traces if t.get("stage") == "excitation"), None)
+    noise_trace = next((t for t in traces if t.get("stage") == "noise"), None)
+
+    metric_parts = []
+    if cos_trace:
+        val = cos_trace.get("cosine_sim", 0.0)
         req = cfg.cosine_threshold
-        metric_line = f'Metrics: Cosine({val:.3f} / Limit: {req:.3f}) | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
-    elif bare_reason == "noise":
-        val = details.get("entropy", 0)
-        metric_line = f'Metrics: Entropy({val:.4f} / Limit: {cfg.global_noise_limit:.3f}) | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
-    elif bare_reason == "BURST_DETECTION_BREACH":
-        val = details.get("entropy", 0)
-        metric_line = f'Metrics: RawEntropy({val:.4f} / Limit: {details.get("limit", cfg.raw_entropy_limit):.3f}) | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
-    elif bare_reason == "no_context":
-        metric_line = f'Reason: no_context | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
-    elif bare_reason == "excitation":
-        act = details.get("activations", 0)
-        thr = details.get("threshold", 0)
-        metric_line = f'Metrics: Excitation({act} / Limit: {thr:.0f}) | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
+        st = "OK" if cos_trace.get("passed", False) else "FAIL"
+        metric_parts.append(f"Cosine({val:.3f} / Limit: {req:.3f}) [{st}]")
+
+    if exc_trace:
+        act = exc_trace.get("activations", 0)
+        thr = exc_trace.get("threshold", 0)
+        st = "OK" if exc_trace.get("passed", False) else "FAIL"
+        adaptive_applied = exc_trace.get("adaptive_applied", False)
+        factor = exc_trace.get("adaptive_factor", 1.0)
+        base_thr = cfg.excitation_threshold
+        if adaptive_applied and factor != 1.0:
+            exc_desc = f"Excitation({act} / Limit: {thr:.0f} [Adaptive {factor:.2f}x: Base {base_thr} -> {thr:.0f}]) [{st}]"
+        else:
+            exc_desc = f"Excitation({act} / Limit: {thr:.0f}) [{st}]"
+        metric_parts.append(exc_desc)
+
+    if noise_trace:
+        ent = noise_trace.get("entropy", 0.0)
+        limit = cfg.global_noise_limit
+        st = "OK" if noise_trace.get("passed", False) else "FAIL"
+        metric_parts.append(f"Entropy({ent:.4f} / Limit: {limit:.3f}) [{st}]")
+
+    if metric_parts:
+        metric_line = f"Metrics: {' | '.join(metric_parts)}"
     else:
-        metric_line = f'Reason: {reason} | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})'
+        metric_line = f"Reason: {reason} | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})"
+
+    # Tuning hints for manual calibration
+    tuning_targets = []
+    if cos_trace:
+        c_val = cos_trace.get("cosine_sim", 0.0)
+        tuning_targets.append(f"Cosine <= {c_val:.3f}")
+    if exc_trace:
+        act = exc_trace.get("activations", 0)
+        factor = exc_trace.get("adaptive_factor", 1.0)
+        rec_exc = int(math.floor(act / factor)) if (exc_trace.get("adaptive_applied") and factor > 0) else act
+        tuning_targets.append(f"Excitation <= {rec_exc}")
+    if noise_trace:
+        ent = noise_trace.get("entropy", 0.0)
+        tuning_targets.append(f"Noise <= {ent:.3f}")
+
+    hint_line = f"[TUNING HINT] To PASS: {', '.join(tuning_targets)}" if tuning_targets else ""
+
+    top_hit_text = details.get("top_hit_text", "")
+    top_hit_score = details.get("top_hit_score", 0.0)
+    rag_match_line = ""
+    if top_hit_text:
+        snippet = top_hit_text.strip().replace("\n", " ")
+        if len(snippet) > 120:
+            snippet = snippet[:117] + "..."
+        score_fmt = f"{top_hit_score:.3f}" if top_hit_score else "N/A"
+        rag_match_line = f"RAG Match ({score_fmt}): \"{snippet}\""
 
     pipeline = " -> ".join([f"{r['stage']}:{'OK' if r['passed'] else 'FAIL'}" for r in traces])
-    
-    return (
-        f"{header}\n"
-        f"Mode: {cfg.firewall_mode.upper()}\n"
-        f"Segment: \"{failed_clause}\"\n"
-        f"{metric_line}\n"
-        f"Pipeline: [{pipeline}]\n"
-        f"{'-' * 40}\n"
-        f"[CONNECTION_TERMINATED]\n\n"
-    )
+
+    lines = [
+        header,
+        f"Mode: {cfg.firewall_mode.upper()}",
+        f"Segment: \"{failed_clause}\"",
+        metric_line,
+    ]
+    if hint_line:
+        lines.append(hint_line)
+    if rag_match_line:
+        lines.append(rag_match_line)
+    lines.extend([
+        f"Pipeline: [{pipeline}]",
+        "-" * 40,
+        "[CONNECTION_TERMINATED]\n\n"
+    ])
+
+    return "\n".join(lines)
 
 
 # --- OpenAI-Compatible Transparent Proxy ---
