@@ -285,7 +285,7 @@ async def main_async():
         await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen, iterations=args.iterations, non_interactive=args.non_interactive)
     else:
         print("\n==============================================")
-        print("  ROMP E PE PE — Autonomous Stress Engine CLI")
+        print("  Rompé Pepe! Rompé nomá!!! — Autonomous Stress Engine CLI")
         print("==============================================")
         print(" [1] Strategy A: Systematic Matrix Search (Grid Search)")
         print(" [2] Strategy B: Closed-Loop Adaptive Exploration (Fuzzing)")
