@@ -41,7 +41,7 @@ ensure_env
 while true; do
     clear
     echo -e "${CYAN}========================================================================${NC}"
-    echo -e "${BOLD}${CYAN}   ROMP E PE PE — Semantic Robustness & Boundary Exploration Engine${NC}"
+    echo -e "${BOLD}${CYAN}   Rompé Pepe! Rompé nomá!!! — Semantic Robustness & Boundary Exploration Engine${NC}"
     echo -e "${CYAN}========================================================================${NC}"
     echo -e "${YELLOW} Target API:${NC} $(grep FIREWALL_API_BASE_URL .env 2>/dev/null | cut -d= -f2 || echo 'http://localhost:8000')"
     echo -e "${YELLOW} Explorer:${NC}   ${BOLD}${GREEN}$(grep EXPLORER_PROVIDER .env 2>/dev/null | cut -d= -f2 || echo 'google')${NC} (${CYAN}$(grep EXPLORER_MODEL .env 2>/dev/null | cut -d= -f2 || echo 'gemini-1.5-flash')${NC})"
