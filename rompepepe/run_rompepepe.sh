@@ -50,10 +50,11 @@ while true; do
     echo -e " ${GREEN}[2]${NC} Run Closed-Loop Adaptive Exploratory Fuzzing"
     echo -e " ${GREEN}[3]${NC} ${BOLD}${YELLOW}Select / Configure Explorer Model${NC} (Gemini, Claude, GPT, Ollama)"
     echo -e " ${GREEN}[4]${NC} ${BOLD}${CYAN}Inspect & Sync Active LanceDB Corpus Dataset${NC}"
-    echo -e " ${GREEN}[5]${NC} View Past QA & Boundary Reports"
-    echo -e " ${GREEN}[6]${NC} Resume Interrupted Session"
-    echo -e " ${GREEN}[7]${NC} Edit .env Directly"
-    echo -e " ${RED}[8]${NC} Quit"
+    echo -e " ${GREEN}[5]${NC} ${BOLD}${GREEN}Build Agent Handoff Pack${NC} (rompepepe_context.txt)"
+    echo -e " ${GREEN}[6]${NC} View Past QA & Boundary Reports"
+    echo -e " ${GREEN}[7]${NC} Resume Interrupted Session"
+    echo -e " ${GREEN}[8]${NC} Edit .env Directly"
+    echo -e " ${RED}[9]${NC} Quit"
     echo -e "${CYAN}========================================================================${NC}"
     
     # Check if there is an interrupted session to alert the user
@@ -65,11 +66,11 @@ while true; do
     if [ -n "$INTERRUPTED_SESSION" ]; then
         SESS_ID=$(basename "$INTERRUPTED_SESSION" .json)
         echo -e "${YELLOW} [!] Interrupted session detected: ${BOLD}${SESS_ID}${NC}"
-        echo -e "${YELLOW}     Press '6' to resume where it left off.${NC}"
+        echo -e "${YELLOW}     Press '7' to resume where it left off.${NC}"
         echo -e "${CYAN}========================================================================${NC}"
     fi
 
-    read -p " Select an option [1-8]: " choice
+    read -p " Select an option [1-9]: " choice
     case $choice in
         1)
             echo -e "\n${GREEN}[+] Launching Systematic Matrix Search (Strategy A)...${NC}"
@@ -92,10 +93,15 @@ while true; do
             read -p "Press Enter to return to menu..."
             ;;
         5)
-            run_python_script --view-reports
+            echo -e "\n${GREEN}[+] Building Agent Handoff Pack...${NC}"
+            run_python_script --build-pack
             read -p "Press Enter to return to menu..."
             ;;
         6)
+            run_python_script --view-reports
+            read -p "Press Enter to return to menu..."
+            ;;
+        7)
             if [ -n "$INTERRUPTED_SESSION" ]; then
                 SESS_ID=$(basename "$INTERRUPTED_SESSION" .json)
                 read -p " Resume previous session [${SESS_ID}]? (y/n): " confirm
@@ -109,14 +115,14 @@ while true; do
             fi
             read -p "Press Enter to return to menu..."
             ;;
-        7)
+        8)
             echo -e "\n${CYAN}Current .env configuration:${NC}"
             cat .env
             echo -e "\n${YELLOW}Opening .env in editor...${NC}"
             ${EDITOR:-nano} .env || vim .env || open .env
             read -p "Press Enter to return to menu..."
             ;;
-        8)
+        9)
             echo -e "\n${GREEN}Goodbye! Keep breaking boundaries.${NC}"
             exit 0
             ;;
