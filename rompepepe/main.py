@@ -223,6 +223,30 @@ def view_reports(vault_path: Path):
                     print("\n... [truncated] ...")
 
 
+async def inspect_lancedb_corpus_menu(fw_client: FirewallClient):
+    print("\n=======================================================")
+    print("   ACTIVE LANCEDB CORPUS PACK INSPECTOR & SYNC")
+    print("=======================================================")
+    try:
+        packs = await fw_client.get_packs()
+        if not packs:
+            print("[!] No active corpus packs currently loaded in LanceDB via API.")
+        else:
+            print(f"[+] Located {len(packs)} active corpus pack(s) in LanceDB:")
+            for p in packs:
+                if isinstance(p, dict):
+                    print(f"    - {p.get('filename')} ({p.get('num_vectors', 'N/A')} vectors)")
+        
+        from rompepepe.test_dataset import build_adapted_corpus
+        queries = await build_adapted_corpus(fw_client)
+        print(f"\n[+] Domain-adapted dataset constructed ({len(queries)} total queries).")
+        print("    Sample queries:")
+        for q in queries[:5]:
+            print(f"    * '{q}'")
+    except Exception as e:
+        print(f"[!] Error inspecting LanceDB corpus: {e}")
+
+
 async def main_async():
     parser = argparse.ArgumentParser(description="rompepepe — Autonomous Stress Testing Engine")
     parser.add_argument("--strategy", choices=["grid", "fuzz"], help="Strategy to run")
@@ -232,6 +256,7 @@ async def main_async():
     parser.add_argument("--explorer-provider", type=str, help="Override explorer provider (google, anthropic, openai, ollama)")
     parser.add_argument("--explorer-model", type=str, help="Override explorer model ID")
     parser.add_argument("--select-model", action="store_true", help="Open model selector menu")
+    parser.add_argument("--sync-corpus", action="store_true", help="Inspect and adapt dataset to active LanceDB corpus")
     parser.add_argument("--non-interactive", action="store_true", help="Skip preflight confirmation prompt")
     parser.add_argument("--view-reports", action="store_true", help="View past QA reports")
 
@@ -254,6 +279,10 @@ async def main_async():
 
     if args.select_model:
         await select_model_menu(fw_client)
+        return
+
+    if args.sync_corpus:
+        await inspect_lancedb_corpus_menu(fw_client)
         return
 
     exp_client = ExplorerClient(
@@ -298,11 +327,12 @@ async def main_async():
         print(" [1] Strategy A: Systematic Matrix Search (Grid Search)")
         print(" [2] Strategy B: Closed-Loop Adaptive Exploration (Fuzzing)")
         print(" [3] Select / Configure Explorer Model")
-        print(" [4] View Past QA Reports")
-        print(" [5] Resume Interrupted Session")
-        print(" [6] Quit")
+        print(" [4] Inspect Active LanceDB Corpus & Adapted Queries")
+        print(" [5] View Past QA Reports")
+        print(" [6] Resume Interrupted Session")
+        print(" [7] Quit")
         print("==============================================")
-        choice = input(" Select option [1-6]: ").strip()
+        choice = input(" Select option [1-7]: ").strip()
         
         if choice == "1":
             await run_grid_search(fw_client, session_mgr, report_gen)
@@ -311,8 +341,10 @@ async def main_async():
         elif choice == "3":
             await select_model_menu(fw_client)
         elif choice == "4":
-            view_reports(config.vault_storage_path)
+            await inspect_lancedb_corpus_menu(fw_client)
         elif choice == "5":
+            view_reports(config.vault_storage_path)
+        elif choice == "6":
             latest = session_mgr.get_latest_interrupted_session()
             if latest:
                 print(f"[+] Found interrupted session: {latest.session_id}")

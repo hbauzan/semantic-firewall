@@ -100,11 +100,8 @@ class GridSearchEngine:
         if custom_dataset:
             test_queries = custom_dataset
         else:
-            test_queries = (
-                corpus_data.get("positive_queries", [])
-                + corpus_data.get("negative_queries", [])
-                + corpus_data.get("edge_case_queries", [])
-            )
+            from rompepepe.test_dataset import build_adapted_corpus
+            test_queries = await build_adapted_corpus(self.client)
 
         if not grid:
             grid = generate_config_grid()
