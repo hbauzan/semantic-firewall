@@ -9,7 +9,7 @@ import time
 from typing import Any, Callable
 
 from rompepepe.client.firewall_client import FirewallClient
-from rompepepe.state.models import SessionState, TestResult
+from rompepepe.state.models import SessionState, TestResult, TelemetryTrace
 from rompepepe.state.session_manager import SessionManager
 from rompepepe.test_dataset import load_seed_corpus
 
@@ -157,16 +157,26 @@ class GridSearchEngine:
                         continue
 
                     t0 = time.perf_counter()
-                    try:
-                        telemetry = await self.client.audit(query)
-                        duration_ms = (time.perf_counter() - t0) * 1000.0
-                        passed = telemetry.passed
-                        breach_reason = telemetry.breach_reason
-                    except Exception as e:
-                        duration_ms = (time.perf_counter() - t0) * 1000.0
-                        passed = False
-                        breach_reason = f"HTTP Error: {e}"
-                        telemetry = await self.client.audit("error_fallback") if False else None  # stub
+                    telemetry = None
+                    passed = False
+                    breach_reason = None
+
+                    # Retry up to 3 times on 429 Too Many Requests rate limiting
+                    for retry in range(3):
+                        try:
+                            telemetry = await self.client.audit(query)
+                            duration_ms = (time.perf_counter() - t0) * 1000.0
+                            passed = telemetry.passed
+                            breach_reason = telemetry.breach_reason
+                            break
+                        except Exception as e:
+                            duration_ms = (time.perf_counter() - t0) * 1000.0
+                            passed = False
+                            breach_reason = f"HTTP Error: {e}"
+                            if "429" in str(e) and retry < 2:
+                                await asyncio.sleep(1.0 * (retry + 1))
+                            else:
+                                telemetry = TelemetryTrace(passed=False, breach_reason=breach_reason, text="HTTP Error")
 
                     result = TestResult(
                         step=current_step,
