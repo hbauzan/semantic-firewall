@@ -774,3 +774,18 @@ def test_audit_uses_full_pipeline():
     # Backward compat
     assert "activations" in data
     assert "text" in data
+
+
+def test_tuning_hint_rounding():
+    """Verify _format_block_message floors Noise and Cosine values in tuning recommendations."""
+    from app.api.endpoints.chat import _format_block_message
+    from app.core.models import ConfigState
+
+    cfg = ConfigState()
+    traces = [
+        {"stage": "noise", "passed": False, "entropy": 9.5485},
+        {"stage": "cosine", "passed": False, "cosine_sim": 0.6538},
+    ]
+    msg = _format_block_message("test clause", "noise", {}, cfg, traces)
+    assert "[TUNING HINT] To PASS: Cosine <= 0.653, Noise <= 9.548" in msg
+

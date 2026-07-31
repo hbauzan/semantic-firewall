@@ -1,0 +1,118 @@
+#!/bin/bash
+# rompepepe — Autonomous Semantic Stress-Testing & Boundary Exploration Engine
+# Interactive Control Panel
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+cd "$SCRIPT_DIR"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+ensure_env() {
+    if [ ! -f ".env" ]; then
+        echo -e "${YELLOW}[!] .env not found. Creating from .env.example...${NC}"
+        if [ -f ".env.example" ]; then
+            cp .env.example .env
+            echo -e "${GREEN}[+] .env created successfully.${NC}"
+        else
+            echo -e "${RED}[!] .env.example not found.${NC}"
+            return 1
+        fi
+    fi
+}
+
+run_python_script() {
+    cd "$PROJECT_ROOT"
+    uv run python -m rompepepe.main "$@"
+    cd "$SCRIPT_DIR"
+}
+
+ensure_env
+
+while true; do
+    clear
+    echo -e "${CYAN}========================================================================${NC}"
+    echo -e "${BOLD}${CYAN}   ROMP E PE PE — Semantic Robustness & Boundary Exploration Engine${NC}"
+    echo -e "${CYAN}========================================================================${NC}"
+    echo -e "${YELLOW} Target API:${NC} $(grep FIREWALL_API_BASE_URL .env 2>/dev/null | cut -d= -f2 || echo 'http://localhost:8000')"
+    echo -e "${YELLOW} Explorer:${NC}   $(grep EXPLORER_PROVIDER .env 2>/dev/null | cut -d= -f2 || echo 'ollama') ($(grep EXPLORER_MODEL .env 2>/dev/null | cut -d= -f2 || echo 'llama3.1'))"
+    echo -e "${CYAN}========================================================================${NC}"
+    echo -e " ${GREEN}[1]${NC} Run Systematic Matrix Search (Grid Search)"
+    echo -e " ${GREEN}[2]${NC} Run Closed-Loop Adaptive Exploratory Fuzzing"
+    echo -e " ${GREEN}[3]${NC} View Past QA & Boundary Reports"
+    echo -e " ${GREEN}[4]${NC} Resume Interrupted Session"
+    echo -e " ${GREEN}[5]${NC} Configure Environment (.env)"
+    echo -e " ${RED}[6]${NC} Quit"
+    echo -e "${CYAN}========================================================================${NC}"
+    
+    # Check if there is an interrupted session to alert the user
+    INTERRUPTED_SESSION=""
+    if [ -d "vault/sessions" ]; then
+        INTERRUPTED_SESSION=$(grep -l '"status": "interrupted"' vault/sessions/*.json 2>/dev/null | head -n 1 || true)
+    fi
+
+    if [ -n "$INTERRUPTED_SESSION" ]; then
+        SESS_ID=$(basename "$INTERRUPTED_SESSION" .json)
+        echo -e "${YELLOW} [!] Interrupted session detected: ${BOLD}${SESS_ID}${NC}"
+        echo -e "${YELLOW}     Press '4' to resume where it left off.${NC}"
+        echo -e "${CYAN}========================================================================${NC}"
+    fi
+
+    read -p " Select an option [1-6]: " choice
+    case $choice in
+        1)
+            echo -e "\n${GREEN}[+] Launching Systematic Matrix Search (Strategy A)...${NC}"
+            run_python_script --strategy grid
+            read -p "Press Enter to return to menu..."
+            ;;
+        2)
+            read -p " Enter number of fuzzing iterations [default: 40]: " iters
+            iters=${iters:-40}
+            echo -e "\n${GREEN}[+] Launching Adaptive Exploratory Fuzzing (Strategy B, ${iters} iterations)...${NC}"
+            run_python_script --strategy fuzz --iterations "$iters"
+            read -p "Press Enter to return to menu..."
+            ;;
+        3)
+            run_python_script --view-reports
+            read -p "Press Enter to return to menu..."
+            ;;
+        4)
+            if [ -n "$INTERRUPTED_SESSION" ]; then
+                SESS_ID=$(basename "$INTERRUPTED_SESSION" .json)
+                read -p " Resume previous session [${SESS_ID}]? (y/n): " confirm
+                if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                    run_python_script --resume "$SESS_ID"
+                else
+                    run_python_script --resume-latest
+                fi
+            else
+                run_python_script --resume-latest
+            fi
+            read -p "Press Enter to return to menu..."
+            ;;
+        5)
+            echo -e "\n${CYAN}Current .env configuration:${NC}"
+            cat .env
+            echo -e "\n${YELLOW}Opening .env in editor (press Ctrl+X to exit nano if using default)...${NC}"
+            ${EDITOR:-nano} .env || vim .env || open .env
+            read -p "Press Enter to return to menu..."
+            ;;
+        6)
+            echo -e "\n${GREEN}Goodbye! Keep breaking boundaries.${NC}"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}[!] Invalid option. Please select 1-6.${NC}"
+            sleep 1
+            ;;
+    esac
+done
