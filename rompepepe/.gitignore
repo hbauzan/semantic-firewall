@@ -2,5 +2,6 @@
 vault/sessions/*.json
 vault/reports/*.md
 vault/logs/*.log
+rompepepe_context.txt
 __pycache__/
 *.pyc
