@@ -160,13 +160,12 @@ def chunk_text(text: str, chunk_size: int = 400) -> list[str]:
 
 def ingest_pdf_to_table(pdf_path: Path, table, embedder, filename: str) -> int:
     """Embed PDF chunks into isolated LanceDB table."""
-    import fitz
+    from pypdf import PdfReader
 
     from app.modules.storage import compute_rabitq_fields, serialize_sparse
 
-    doc = fitz.open(pdf_path)
-    full_text = "\n".join(page.get_text() for page in doc)
-    doc.close()
+    reader = PdfReader(pdf_path)
+    full_text = "\n".join(page.extract_text() or "" for page in reader.pages)
     chunks = chunk_text(full_text)
     nodes = []
     for i, text in enumerate(chunks):
