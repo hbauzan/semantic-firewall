@@ -40,3 +40,5 @@ Hoy filtrás la **entrada** al LLM. El Nivel 2 filtra también la **salida**: ve
 
 ## Cuándo abrir este archivo de nuevo
 Cuando el Nivel 1 esté publicado, tenga tracción, y sientas que el siguiente paso natural es la simetría entrada/salida. Ni antes.
+
+Preparación offline (sin implementar en `main`): [`cosas para estudiar - Gemini.md`](./cosas%20para%20estudiar%20-%20Gemini.md). Ahí está el retry dimensional, el chunking multi-escala, el bake-off de embedder y el protocolo de rompepepe a dos vías.

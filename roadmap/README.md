@@ -20,6 +20,8 @@ repo root
 └── roadmap/
     ├── README.md                 ← estás acá
     ├── 00-vision-y-niveles.md    ← el "para qué"
+    ├── cosas para estudiar - Gemini.md  ← estudio: retry dimensional + juez bidireccional
+    ├── cosas para estudiar - Cursor.md  ← estudio independiente: canal vs lobotomía, membresía, límites
     ├── nivel-1/                  ← detalle Nivel 1 (1–2 hechas; 3–9 en backlog)
     ├── nivel-2-futuro.md
     └── nivel-3-futuro.md
@@ -35,7 +37,8 @@ repo root
 - **Tareas del momento:** [`roadmap.md`](../roadmap.md) — harness offline de benchmark (AdvBench + sweep Youden).
 
 Visión y claims: [`00-vision-y-niveles.md`](./00-vision-y-niveles.md).  
-Secuencia Nivel 1: [`nivel-1/README.md`](./nivel-1/README.md).
+Secuencia Nivel 1: [`nivel-1/README.md`](./nivel-1/README.md).  
+Estudio (no activo): [`cosas para estudiar - Cursor.md`](./cosas%20para%20estudiar%20-%20Cursor.md) — visión independiente (canal vs lobotomía, membresía, límites de embeddings). También [`cosas para estudiar - Gemini.md`](./cosas%20para%20estudiar%20-%20Gemini.md). Experimentos offline; no pisan el Nivel 1.
 
 ---
 

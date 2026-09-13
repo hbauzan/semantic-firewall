@@ -1,10 +1,56 @@
 # Three-Headed Semantic Firewall
 
-A local-first RAG security layer that validates query-to-corpus geometric alignment across 1024 dimensions before routing to an LLM. Three independent filters — Noise, Cosine, and Excitation — execute in a user-defined sequence. Any single failure blocks the entire prompt.
+[![Version](https://img.shields.io/badge/version-v2.34.0-blue.svg)](./manifest.json)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](./LICENSE)
+[![Python](https://img.shields.io/badge/python-3.14+-3776AB.svg?logo=python&logoColor=white)](./backend/pyproject.toml)
+[![React](https://img.shields.io/badge/react-19-61DAFB.svg?logo=react&logoColor=black)](./frontend/package.json)
+[![Vector DB](https://img.shields.io/badge/vector__db-LanceDB-orange.svg)](https://lancedb.com)
+[![Model](https://img.shields.io/badge/model-BAAI%2Fbge--m3%20(1024D)-purple.svg)](https://huggingface.co/BAAI/bge-m3)
+[![Tests](https://img.shields.io/badge/tests-114%20passed-brightgreen.svg)](./backend/tests)
 
-Built for sovereign AI deployments where data never leaves the machine.
+**A local-first RAG security layer and deterministic containment gate that validates query-to-corpus geometric alignment across 1024 dimensions before routing to an LLM.**
 
-> **Version:** v2.33.1 | **Model:** BAAI/bge-m3 (1024D) | **LLM:** Ollama / OpenAI / Anthropic / Google / Groq | **DB:** LanceDB
+Three independent filters — Noise, Cosine, and Excitation — execute in a user-defined sequence. Any single failure halts execution and blocks the prompt. Built for sovereign AI deployments where data never leaves the machine.
+
+| | |
+| :--- | :--- |
+| **License** | [Apache-2.0](./LICENSE) © 2026 Hector Bauzan |
+| **Version** | v2.34.0 (Checkpoint / On Pause) |
+| **Embedder** | `BAAI/bge-m3` (1024D Dense + Sparse Lexical) |
+| **Storage** | LanceDB (Serverless Vector DB + RaBitQ Hamming prefilter) |
+| **Runtime** | Python 3.14 (`uv`) · React 19 (`pnpm` / Vite) |
+| **Upstream** | Ollama (Local llama3.1) · OpenAI · Anthropic · Google Gemini · Groq |
+| **Local (macOS)** | `./run_commander.sh` |
+
+---
+
+### GitHub Repository Metadata & Topics
+
+> **About (Description):**  
+> `Local-first semantic firewall & deterministic containment gate for LLMs and RAG. Validates 1024D embedding geometry to enforce data sovereignty and prevent prompt injection / data exfiltration.`
+>
+> **Topics / Tags:**  
+> `ai-security` · `llm-security` · `rag` · `guardrails` · `firewall` · `semantic-search` · `embeddings` · `lancedb` · `fastapi` · `react19` · `vite` · `bge-m3` · `red-teaming` · `fuzzing` · `data-sovereignty` · `sentence-transformers` · `prompt-injection` · `dlp` · `zero-trust-ai` · `local-first`
+
+---
+
+> [!NOTE]
+> ### ⏸️ Project Status: Paused ("Life Caught Up With Me")
+>
+> Putting this project on temporary pause because, frankly, life has caught up with me and I just can't keep up with everything right now.
+>
+> Also, let's be real: this "Three-Headed" beast might not actually have three heads anymore. Empirical benchmarks showed that maybe it's only one or two heads doing the actual heavy lifting—or maybe I'll end up renaming/rebranding the whole thing once the dust settles.
+>
+> **The Core Vision (What I intend to build once I get some breathing room):**  
+> A local LLM (fine-tuned, customized, or whatever runtime you prefer to run) working hand-in-hand with a vector database (in this case, LanceDB) that stores and enforces *everything the chatbot/agent/LLM is actually permitted to know and touch*. Upstream can be anything: Ollama, OpenAI, Anthropic, Google, Groq, or whatever comes next.  
+> 
+> It's an approach geared toward the closest possible mathematical determinism, built so that an individual, a private enterprise, or a sovereign state entity can truly safeguard their data sovereignty and autodetermination.
+> 
+> Maybe I'm flying way too high here and should take a break from AI and the flowers I legally pick up at Pepe Mujica's neighborhood pharmacy... *pero ta*, the latest deep-dive evaluations carried out by Gemini and Cursor (since Claude decided to ban me) mapped out a really interesting path that I genuinely believe is worth traveling down the road.
+> 
+> For now: *goodbye, so on, and thanks for all the fish.*  
+> *Remember, remember, the 5th of November.*  
+> And above all: [Always Look on the Bright Side of Life 🎶](https://www.youtube.com/watch?v=sV4l6NgaCjw).
 
 ---
 
@@ -658,4 +704,5 @@ To disable the key, comment out or remove the line from `.env` and restart the b
 
 ## License
 
-Proprietary. All rights reserved. Threepwood INtelligence.
+Apache License 2.0 — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE).  
+Copyright © 2026 Hector Bauzan.
