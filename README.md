@@ -2,11 +2,12 @@
 
 [![Version](https://img.shields.io/badge/version-v2.34.0-blue.svg)](./manifest.json)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](./LICENSE)
+[![DNPI](https://img.shields.io/badge/DNPI%20Registro-N%C2%BA%20226-blueviolet.svg)](./NOTICE)
 [![Python](https://img.shields.io/badge/python-3.14+-3776AB.svg?logo=python&logoColor=white)](./backend/pyproject.toml)
 [![React](https://img.shields.io/badge/react-19-61DAFB.svg?logo=react&logoColor=black)](./frontend/package.json)
 [![Vector DB](https://img.shields.io/badge/vector__db-LanceDB-orange.svg)](https://lancedb.com)
 [![Model](https://img.shields.io/badge/model-BAAI%2Fbge--m3%20(1024D)-purple.svg)](https://huggingface.co/BAAI/bge-m3)
-[![Tests](https://img.shields.io/badge/tests-114%20passed-brightgreen.svg)](./backend/tests)
+[![Tests](https://img.shields.io/badge/tests-118%20passed-brightgreen.svg)](./backend/tests)
 
 **A local-first RAG security layer and deterministic containment gate that validates query-to-corpus geometric alignment across 1024 dimensions before routing to an LLM.**
 
@@ -14,7 +15,8 @@ Three independent filters — Noise, Cosine, and Excitation — execute in a use
 
 | | |
 | :--- | :--- |
-| **License** | [Apache-2.0](./LICENSE) © 2026 Hector Bauzan |
+| **License** | [Apache-2.0](./LICENSE) · [NOTICE](./NOTICE) © 2026 Hector Andres Bauzan Saavedra |
+| **Registration** | DNPI / Registro de Software Nº 226 (04/08/2026, Uruguay) |
 | **Version** | v2.34.0 (Checkpoint / On Pause) |
 | **Embedder** | `BAAI/bge-m3` (1024D Dense + Sparse Lexical) |
 | **Storage** | LanceDB (Serverless Vector DB + RaBitQ Hamming prefilter) |
@@ -702,7 +704,18 @@ To disable the key, comment out or remove the line from `.env` and restart the b
 
 ---
 
-## License
+## License & Intellectual Property
 
-Apache License 2.0 — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE).  
-Copyright © 2026 Hector Bauzan.
+Licensed under the **Apache License, Version 2.0** — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE).  
+Copyright © 2026 Hector Andres Bauzan Saavedra.
+
+### Official Software Registration / Registro Oficial
+* **Obra / Work:** Three-Headed Semantic Firewall
+* **Titular / Author:** Hector Andres Bauzan Saavedra
+* **Número de Inscripción:** Nº 226
+* **Fecha de Inscripción:** 04/08/2026 (August 4, 2026)
+* **Organismo / Registry:** Dirección Nacional de la Propiedad Industrial (DNPI - MIEM) / Registro de Software, República Oriental del Uruguay
+* **Marco Legal:** Ley 9.739 de 17/12/1937 (conforme Ley N° 20.212 y Decreto N° 39/2025)
+
+Pursuant to Section 4(d) of the Apache License, Version 2.0, the [NOTICE](./NOTICE) file must be retained and distributed with any reproduction or derivative work.
+
