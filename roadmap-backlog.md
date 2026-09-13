@@ -105,7 +105,7 @@ El firewall **no cambia** en B/C: sigue evaluando cada prompt con embeddings loc
 
 ## Notas de entorno útiles (para cualquier ítem futuro)
 
-- Tooling: backend `uv`, frontend `pnpm`; ver `dev-protocol.md`.
+- Tooling: backend `uv`, frontend `pnpm`.
 - Provider Gemini: key en `.env` (`GOOGLE_API_KEY`, `GEMINI_MODEL_ID`); la selección efectiva es el HUD (`upstream_provider` en `ConfigState`), no solo `UPSTREAM_PROVIDER` del `.env`.
 - Handoff a LLM externo: `./run_pack.sh` → `context.txt`.
 - Datos privados / logs / `_archive/` / `context.txt` no van a git.

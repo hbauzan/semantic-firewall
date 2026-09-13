@@ -44,5 +44,5 @@ Secuencia Nivel 1: [`nivel-1/README.md`](./nivel-1/README.md).
 1. Externalizá el estado en checklists (no en la cabeza).
 2. Micro-sesiones; un commit, una cosa.
 3. Checkpoints 4 y 8 obligatorios antes de evidencia / lanzamiento.
-4. Tooling: `uv` (backend), `pnpm` (frontend). Doc-sync **condicional** (ver skill `dev-protocol`).
+4. Tooling: `uv` (backend), `pnpm` (frontend). Doc-sync **condicional**.
 5. No trabajar Nivel 2/3 hasta cerrar Nivel 1.

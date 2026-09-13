@@ -46,7 +46,7 @@ def pytest_sessionfinish(session, exitstatus):
 @pytest.fixture
 def mock_llm_stream(monkeypatch):
     """Stub the default (Ollama) provider's stream_chat with a deterministic
-    fake, so PASS-path tests never reach a live model (dev-protocol §3.2).
+    fake, so PASS-path tests never reach a live model.
 
     Mirrors the inline mock already used in test_openai_proxy_v1_compliance,
     centralized here for reuse. Yields OpenAI-style SSE chunks, which both

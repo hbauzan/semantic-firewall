@@ -1,5 +1,8 @@
 # Environment files (may contain secrets)
 .env
+.env.*
+.env*.local
+!.env.example
 
 # Python
 __pycache__/
@@ -14,6 +17,7 @@ node_modules/
 
 # Vector database (local data, not code)
 lancedb_data/
+backend/lancedb_data/
 lancedb_stress_test/
 lancedb_calibration_test/
 
@@ -28,27 +32,25 @@ backend/tests/db_scaling_metrics.md
 backend/calibration/reports/
 backend/calibration/datasets/auto_*.json
 
-# IDE
+# IDE & OS
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
 
 # Runtime data (prompts/respuestas interceptados — NO versionar)
-backend/data/*.json
+backend/data/
 
 # Logs (no van al repo)
 backend/logs/
+*.log
 
 # Agent/dev tooling local (no es código del proyecto)
 .agents/
-.claude/skills/
-skills-lock.json
+.claude/
 
 # Local archive (exports, historical plans, marketing — not part of the working tree)
 _archive/

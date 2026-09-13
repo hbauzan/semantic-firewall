@@ -41,7 +41,6 @@ SKIP_DIR_NAMES = {
 
 SKIP_FILE_NAMES = {
     "context.txt",
-    "skills-lock.json",
 }
 
 
