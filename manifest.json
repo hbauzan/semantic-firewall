@@ -1,6 +1,6 @@
 {
     "project": "Three-Headed Semantic Firewall",
-    "version": "v2.33.1",
+    "version": "v2.34.0",
     "state_schema": {
         "excitation_threshold": {
             "type": "int",

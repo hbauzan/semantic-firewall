@@ -34,7 +34,7 @@ Checklist de “Nivel 1 terminado” (ítems aún abiertos): dataset etiquetado,
 
 ## Nivel 2 y 3 — visión (no implementar)
 
-- **Nivel 2** — filtrar también la **salida** del LLM: [`roadmap/nivel-2-futuro.md`](./roadmap/nivel-2-futuro.md).
+- **Nivel 2** — filtrar también la **salida** del LLM: [`roadmap/nivel-2-futuro.md`](./roadmap/nivel-2-futuro.md). Estudio previo: [`roadmap/cosas para estudiar - Gemini.md`](./roadmap/cosas%20para%20estudiar%20-%20Gemini.md).
 - **Nivel 3** — firmas registrables / certificación: [`roadmap/nivel-3-futuro.md`](./roadmap/nivel-3-futuro.md).
 
 Regla: no trabajar en esto hasta cerrar Nivel 1.

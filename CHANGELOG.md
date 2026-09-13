@@ -4,6 +4,19 @@ Notable capabilities and releases. Append only on releases or meaningful capabil
 
 The previous `manifest.json` `active_features` ledger (per-flag historical trail) was retired in favor of this file and a slim manifest (`project`, `version`, `state_schema`, `constraints`).
 
+## v2.34.0
+
+Consolidation release & checkpoint (on pause).
+
+### Project status & architecture research
+
+- **Project Status Note:** Public status notice added documenting the project pause, architectural reflections on dimensional filtering, and future vision.
+- **Level 2 & Bidirectional Containment Research:** Added offline research studies in `roadmap/`:
+  - `cosas para estudiar - Gemini.md`: Mathematical exploration for dimensional filtering (Mahalanobis distance, Sparse Autoencoders, Matryoshka representations), multi-scale fractal chunking, high-speed Docker runtimes (Hugging Face TEI / Nomic Embed), and speculative sentence buffering for output streaming.
+  - `cosas para estudiar - Cursor.md`: Conceptual boundary analysis on channel containment vs. weight lobotomy, membership testing vs. kNN similarity, and conformal prediction limitations.
+- **Licensing:** Formalized project under Apache License 2.0 (`LICENSE` and `NOTICE`).
+- **Metadata Alignment:** Standardized repository topics, badges, and metadata table following public project standards.
+
 ---
 
 ## v2.33.1
