@@ -15,7 +15,7 @@ Three independent filters — Noise, Cosine, and Excitation — execute in a use
 
 | | |
 | :--- | :--- |
-| **License** | [Apache-2.0](./LICENSE) · [NOTICE](./NOTICE) © 2026 Hector Andres Bauzan Saavedra |
+| **License** | [Apache-2.0](./LICENSE) · [NOTICE](./NOTICE) © 2026 Héctor Andrés Bauzán Saavedra |
 | **Registration** | DNPI / Registro de Software Nº 226 (04/08/2026, Uruguay) |
 | **Version** | v2.34.0 (Checkpoint / On Pause) |
 | **Embedder** | `BAAI/bge-m3` (1024D Dense + Sparse Lexical) |
@@ -707,11 +707,11 @@ To disable the key, comment out or remove the line from `.env` and restart the b
 ## License & Intellectual Property
 
 Licensed under the **Apache License, Version 2.0** — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE).  
-Copyright © 2026 Hector Andres Bauzan Saavedra.
+Copyright © 2026 Héctor Andrés Bauzán Saavedra.
 
 ### Official Software Registration / Registro Oficial
 * **Obra / Work:** Three-Headed Semantic Firewall
-* **Titular / Author:** Hector Andres Bauzan Saavedra
+* **Titular / Author:** Héctor Andrés Bauzán Saavedra
 * **Número de Inscripción:** Nº 226
 * **Fecha de Inscripción:** 04/08/2026 (August 4, 2026)
 * **Organismo / Registry:** Dirección Nacional de la Propiedad Industrial (DNPI - MIEM) / Registro de Software, República Oriental del Uruguay
