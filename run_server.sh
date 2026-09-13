@@ -3,6 +3,6 @@
 lsof -ti:8000 | xargs kill -9 2>/dev/null
 
 cd backend
-# Tooling: uv (dev-protocol §3.1). No manual venv activation.
+# Tooling: uv. No manual venv activation.
 # Let settings.py handle host/port/reload from .env
 uv run python -m app.main

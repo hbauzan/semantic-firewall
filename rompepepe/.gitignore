@@ -1,7 +1,10 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
 # Rompepepe Vault Storage (runtime sessions, logs, and generated reports)
-vault/sessions/*.json
-vault/reports/*.md
-vault/logs/*.log
+vault/
 rompepepe_context.txt
 __pycache__/
-*.pyc
+*.py[cod]

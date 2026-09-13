@@ -4,7 +4,7 @@
 
 > Objetivo: dejar el sistema andando sin crashes sobre un entorno único y limpio (`uv` + `pnpm`), y el repo **seguro para mostrar**. Antes de pulir nada, en este orden: **frenar la fuga de datos privados**, establecer el entorno, y recién después diagnosticar y arreglar.
 
-> **Autoridad de tooling:** todo lo de Python va con `uv run` (nunca `pip`, nunca `source .venv`). Todo lo de frontend con `pnpm`. Lo manda `dev-protocol.md` en la raíz del repo. Léelo si tenés dudas.
+> **Autoridad de tooling:** todo lo de Python va con `uv run` (nunca `pip`, nunca `source .venv`). Todo lo de frontend con `pnpm`.
 
 ---
 
@@ -52,7 +52,7 @@ Sobre la historia ya limpia, dejar un único camino de ejecución antes de diagn
 - [x] Arreglar **uno por uno**, un commit por fix, nombre descriptivo. Re-correr tests (`uv run pytest tests/`) después de cada uno.
 - [x] Que la suite pase entera.
 
-### Bloque E — Doc-sync (según dev-protocol.md §4)
+### Bloque E — Doc-sync
 - [x] Actualizar `README.md`: comandos correctos (`uv run pytest tests/`, `uv run uvicorn ...`, `pnpm run dev`), sacar referencias a `perform_tests.py`, venv y npm.
 - [x] Actualizar `architecture_spec.md` §11.8 para que diga la verdad sobre el `.gitignore` (una vez arreglado en Bloque A).
 - [x] Reconciliar `CONTEXT.md` vs `context.txt`: decidir si renombrás/regenerás según el propósito que pide el protocolo.
@@ -108,7 +108,7 @@ confirmármelo.
 
 **Migración de tooling (Bloque B):**
 ```
-Leé roadmap/nivel-1/etapa-1-estabilizacion.md, Bloque B, y dev-protocol.md.
+Leé roadmap/nivel-1/etapa-1-estabilizacion.md y Bloque B.
 Con la historia ya limpia, migrá el backend a uv: declarar dependencias en
 backend/pyproject.toml a partir de requirements.txt, generar uv.lock con
 uv sync, y verificar que `uv run pytest -v tests/` y
