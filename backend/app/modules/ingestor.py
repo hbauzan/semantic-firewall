@@ -1,10 +1,12 @@
 import asyncio
+import io
 import logging
 import threading
 import time
-import fitz  # PyMuPDF
 import uuid
 from pydantic import BaseModel
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 from app.modules.embedder import embedder
 from app.modules.storage import storage
 from app.core.settings import settings
@@ -70,16 +72,22 @@ def chunk_text(text: str, chunk_size: int = settings.chunk_size, overlap: int = 
         start += chunk_size - overlap
     return chunks
 
+def _extract_pdf_text(file_bytes: bytes) -> str:
+    """Extract text from PDF bytes using pypdf (BSD-3-Clause)."""
+    reader = PdfReader(io.BytesIO(file_bytes))
+    full_text = ""
+    for page in reader.pages:
+        extracted = page.extract_text() or ""
+        full_text += extracted + "\n"
+    return full_text
+
+
 def _process_pdf_sync(file_bytes: bytes, filename: str, task_id: str):
     import json
-    doc = None
     try:
         logger.info("Starting text extraction for %s", filename)
         tasks.put(task_id, TaskStatus(task_id=task_id, status="processing", progress=10.0, message="Extracting text"))
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
-        full_text = ""
-        for page in doc:
-            full_text += page.get_text() + "\n"
+        full_text = _extract_pdf_text(file_bytes)
 
         tasks.put(task_id, TaskStatus(task_id=task_id, status="processing", progress=30.0, message="Chunking text"))
 
@@ -111,15 +119,12 @@ def _process_pdf_sync(file_bytes: bytes, filename: str, task_id: str):
 
         tasks.put(task_id, TaskStatus(task_id=task_id, status="completed", progress=100.0, message="Ingestion complete"))
         logger.info("Ingestion complete: %s (%d chunks)", filename, len(nodes))
-    except fitz.FileDataError as e:
+    except PdfReadError as e:
         logger.error("Invalid PDF '%s': %s", filename, e)
         tasks.put(task_id, TaskStatus(task_id=task_id, status="failed", progress=0.0, message="Invalid or corrupted PDF file"))
-    except Exception as e:
+    except Exception:
         logger.exception("Ingestion failed for '%s'", filename)
         tasks.put(task_id, TaskStatus(task_id=task_id, status="failed", progress=0.0, message="Processing failed"))
-    finally:
-        if doc is not None:
-            doc.close()
 
 
 _background_tasks = set()
