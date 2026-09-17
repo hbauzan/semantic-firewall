@@ -1,8 +1,10 @@
 # Cosas para estudiar — Contención de canal, no lobotomía del modelo
 
+> **Implementación → [`../pilares/`](../pilares/README.md)** (solo lo del PDF condensado). Este archivo **no se ejecuta**.
+>
 > Estudio independiente. Opinión fría.  
 > Autor / perspectiva: Cursor  
-> Ubicación: `roadmap/cosas para estudiar - Cursor.md`  
+> Ubicación: `roadmap/archivo/2026-09-cursor-estudio.md`  
 > Fecha: 2026-09-12 (ampliado el mismo día con opciones y límites que no estaban en la primera pasada)  
 > No es backlog de implementación. No pisa el Nivel 1 activo.
 

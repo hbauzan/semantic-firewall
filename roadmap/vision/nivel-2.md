@@ -1,6 +1,6 @@
-# Nivel 2 — Bidireccional (futuro plausible)
+# Nivel 2 — Bidireccional
 
-> Solo ideas. No trabajar en esto hasta cerrar el Nivel 1 y que tenga algo de tracción. Esto es "hacia dónde puede ir", no "lo próximo que hago".
+> Visión. El trabajo cortado en tickets está en [`../pilares/`](../pilares/README.md) (PDF de 4 pilares, L01–L12). Este archivo no se ejecuta.
 
 ---
 
@@ -30,15 +30,19 @@ Hoy filtrás la **entrada** al LLM. El Nivel 2 filtra también la **salida**: ve
 
 ---
 
-## Preguntas abiertas para cuando llegue el momento
-- ¿Buffer completo vs. filtrado incremental en el stream?
-- ¿Qué se le muestra al usuario cuando la salida se bloquea a mitad de stream?
-- ¿La región de salida prohibida es la misma que la de entrada, o se configuran por separado?
-- ¿Cómo se audita una respuesta bloqueada sin loguear el contenido sensible que se bloqueó?
+## Preguntas que el pack de pilares ya cortó
+
+| Pregunta | Dónde se responde |
+| :--- | :--- |
+| ¿Buffer completo vs. incremental? | Dual-profile: Compliance = hold (L07); Chat = oración (L08) |
+| ¿Qué ve el usuario en un corte a mitad? | L08: abort SSE + código de perímetro; L07: nada hasta dictamen |
+| ¿Región de salida vs entrada? | AND multi-grano (L04) + INLP (L06) sobre la generación |
+| ¿Auditar sin loguear el secreto? | L07: sniffer hash/last4 |
+
+Análisis previo (no ejecutar): [`../archivo/README.md`](../archivo/README.md).
 
 ---
 
 ## Cuándo abrir este archivo de nuevo
-Cuando el Nivel 1 esté publicado, tenga tracción, y sientas que el siguiente paso natural es la simetría entrada/salida. Ni antes.
 
-Preparación offline (sin implementar en `main`): [`cosas para estudiar - Gemini.md`](./cosas%20para%20estudiar%20-%20Gemini.md). Ahí está el retry dimensional, el chunking multi-escala, el bake-off de embedder y el protocolo de rompepepe a dos vías.
+Para **implementar**, no: tomá un ticket en [`../pilares/`](../pilares/README.md). Volvé acá solo si cambia la visión de Nivel 2 (no el detalle de L0x).

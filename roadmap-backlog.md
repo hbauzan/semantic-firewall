@@ -1,7 +1,8 @@
 # Roadmap backlog — trabajo diferido
 
 > Todo lo que **no** es el trabajo activo de ahora.
-> Activo: [`roadmap.md`](./roadmap.md) (cerrar Etapa 5 — calibración por corpus; benchmark suite ya entregado en branch).
+> Activo Nivel 1: [`roadmap.md`](./roadmap.md) (cerrar Etapa 5 — calibración por corpus; benchmark suite ya entregado en branch).
+> Pack pilares (paralelo): [`roadmap/pilares/README.md`](./roadmap/pilares/README.md).
 > Detalle histórico del Nivel 1: carpeta [`roadmap/`](./roadmap/).
 
 Última alineación de estado: **2026-07-04**. Etapas 1–4 del Nivel 1: **hechas** (checkpoint 4 🟡). Etapa 5: **en progreso**.
@@ -32,12 +33,15 @@ Checklist de “Nivel 1 terminado” (ítems aún abiertos): dataset etiquetado,
 
 ---
 
-## Nivel 2 y 3 — visión (no implementar)
+## Nivel 2 — pack de pilares (tomable en paralelo)
 
-- **Nivel 2** — filtrar también la **salida** del LLM: [`roadmap/nivel-2-futuro.md`](./roadmap/nivel-2-futuro.md). Estudio previo: [`roadmap/cosas para estudiar - Gemini.md`](./roadmap/cosas%20para%20estudiar%20-%20Gemini.md).
-- **Nivel 3** — firmas registrables / certificación: [`roadmap/nivel-3-futuro.md`](./roadmap/nivel-3-futuro.md).
+Tickets y specs: [`roadmap/pilares/README.md`](./roadmap/pilares/README.md). Laboratorio / feature flag; el hot path de producción no se cambia hasta que el ticket lo liste. Visión: [`roadmap/vision/nivel-2.md`](./roadmap/vision/nivel-2.md).
 
-Regla: no trabajar en esto hasta cerrar Nivel 1.
+## Nivel 3 — visión (no implementar)
+
+- Firmas registrables / certificación: [`roadmap/vision/nivel-3.md`](./roadmap/vision/nivel-3.md).
+
+Regla Nivel 3: no trabajarlo hasta cerrar Nivel 1. Los pilares **sí** se pueden tomar ahora.
 
 ---
 

@@ -31,17 +31,17 @@ Esto es lo que ninguna otra herramienta hace así. Llama Guard **clasifica** cat
 ## Los tres niveles
 
 ### Nivel 1 — Sólido, cercano, lanzable. **ES EL FOCO.**
-Firewall de allowlist geométrico, local, auditable, provider-agnóstico, contra cualquier LLM al que controles la entrada. **Ya existe y anda.** Estabilización e instrumentación de trazas (etapas 1–2) están hechas; sigue UX, evidencia, baseline y publicación (etapas 3–9). Detalle en `nivel-1/`.
+Firewall de allowlist geométrico, local, auditable, provider-agnóstico, contra cualquier LLM al que controles la entrada. **Ya existe y anda.** Estabilización e instrumentación de trazas (etapas 1–2) están hechas; sigue UX, evidencia, baseline y publicación (etapas 3–9). Detalle en [`../nivel-1/`](../nivel-1/README.md).
 
 **Claim primario para el lanzamiento:** *allowlist por dominio del corpus* (modo positivo). "Mi RAG responde SOLO sobre mi dominio; todo intento de salirse queda bloqueado y loggeado con un score geométrico duro." Es la afirmación más diferenciada y la que más le habla a un CISO / compliance.
 
 **Claim secundario:** *defensa contra piggybacking vía segmentación de cláusulas*. Estructuralmente único tuyo.
 
 ### Nivel 2 — Bidireccional. Futuro plausible.
-Filtrar también la **salida** del LLM, no solo la entrada. Vectorizás la respuesta y la comparás contra la región prohibida antes de mostrarla. Caso de uso: soberanía de datos, cumplimiento regional (tu ejemplo de China). Misma matemática, otra dirección del flujo. → `nivel-2-futuro.md`.
+Filtrar también la **salida** del LLM, no solo la entrada. Vectorizás la respuesta y la comparás contra la región prohibida antes de mostrarla. Caso de uso: soberanía de datos, cumplimiento regional (tu ejemplo de China). Misma matemática, otra dirección del flujo. Implementación: [`../pilares/`](../pilares/README.md). Visión: [`nivel-2.md`](./nivel-2.md).
 
 ### Nivel 3 — Firmas registrables / certificación. Visión, escala-década.
-Espacios semánticos certificados (filtros seguros para niños, instituciones, regulación tipo UE). **Idea coherente, NO entregable de un dev solo.** Tiene problemas de gobernanza, adopción y mantenimiento que no son técnicos. → `nivel-3-futuro.md`.
+Espacios semánticos certificados (filtros seguros para niños, instituciones, regulación tipo UE). **Idea coherente, NO entregable de un dev solo.** Tiene problemas de gobernanza, adopción y mantenimiento que no son técnicos. → [`nivel-3.md`](./nivel-3.md).
 
 ---
 
