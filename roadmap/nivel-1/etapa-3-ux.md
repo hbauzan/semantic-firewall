@@ -45,7 +45,7 @@ Tu UX tiene un activo único: las **tres cabezas de mono** (una por filtro), los
 
 ## Trampas
 - **No caigas en el pozo del pulido infinito.** El TDAH + perfeccionismo es combinación peligrosa acá. Definí "suficientemente lindo para mostrar" y parate ahí. La belleza extra es post-lanzamiento.
-- **No agregues features nuevas disfrazadas de UX.** Esta etapa es pulir lo que hay, no construir. Si aparece una idea de feature, anotala en `nivel-2-futuro.md` y seguí.
+- **No agregues features nuevas disfrazadas de UX.** Esta etapa es pulir lo que hay, no construir. Si aparece una idea de feature, anotala en [`../vision/nivel-2.md`](../vision/nivel-2.md) y seguí.
 
 ---
 

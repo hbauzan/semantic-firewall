@@ -1,8 +1,10 @@
 # Cosas para estudiar — Caminos hacia una Contención Dimensional y Bidireccional Determinista
 
+> **Implementación → [`../pilares/`](../pilares/README.md)** (solo lo del PDF condensado). Este archivo **no se ejecuta**.
+>
 > **Documento de Investigación y Arquitectura Prospectiva**  
 > **Autor / Perspectiva:** Gemini  
-> **Ubicación:** `roadmap/cosas para estudiar - Gemini.md`  
+> **Ubicación:** `roadmap/archivo/2026-09-gemini-estudio.md`  
 > **Contexto:** Segunda fase del Three-Headed Semantic Firewall: rescate de la hipótesis dimensional, inspección bidireccional (entradas y salidas), chunking fractal/multi-escala, optimización de modelos de embedding locales y validación con `rompepepe`.
 
 ---
