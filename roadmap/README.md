@@ -1,44 +1,39 @@
 # Roadmap — Three-Headed Semantic Firewall
 
-> Carpeta de navegación del proyecto (mapa interno, no docs públicas).
+> Carpeta de navegación. En la raíz de `roadmap/` solo vive este índice. El trabajo tomable está en subcarpetas.
 
 ## Dónde está el trabajo activo
 
 | Archivo | Contenido |
 | :--- | :--- |
-| **[`../roadmap.md`](../roadmap.md)** | **Activo ahora:** benchmark suite / validación geométrica (Youden). |
-| **[`../roadmap-backlog.md`](../roadmap-backlog.md)** | Diferido: etapas 3–9, niveles 2–3, opciones B (sesión corpus) y C (caché provider). Opción A hecha. |
+| **[`../roadmap.md`](../roadmap.md)** | **Activo ahora (Nivel 1):** benchmark / Youden. |
+| **[`pilares/README.md`](./pilares/README.md)** | **Tomable en paralelo:** 4 pilares del PDF (L01–L12). |
+| **[`../roadmap-backlog.md`](../roadmap-backlog.md)** | Diferido: etapas 3–9 Nivel 1, Nivel 3, opciones B/C. |
 
 ---
 
 ## Cómo está organizado esto
 
 ```
-repo root
-├── roadmap.md                    ← ACTIVO (opción A)
-├── roadmap-backlog.md            ← backlog (B, C, etapas 3–9, visión)
-└── roadmap/
-    ├── README.md                 ← estás acá
-    ├── 00-vision-y-niveles.md    ← el "para qué"
-    ├── cosas para estudiar - Gemini.md  ← estudio: retry dimensional + juez bidireccional
-    ├── cosas para estudiar - Cursor.md  ← estudio independiente: canal vs lobotomía, membresía, límites
-    ├── nivel-1/                  ← detalle Nivel 1 (1–2 hechas; 3–9 en backlog)
-    ├── nivel-2-futuro.md
-    └── nivel-3-futuro.md
+roadmap/
+├── README.md      ← estás acá (único .md en la raíz)
+├── pilares/       ← implementación PDF — tomá un Lxx
+├── nivel-1/       ← etapas Nivel 1 — tomá una etapa
+├── vision/        ← para qué; no se implementa
+└── archivo/       ← estudios Cursor/Gemini; no se implementa
 ```
 
 ---
 
-## Estado (2026-07-04)
+## Estado
 
-- **Etapas 1 y 2:** hechas (estabilización, tooling `uv`/`pnpm`, logging NDJSON).
-- **Opción A (RAG rico):** hecha (`rag_top_k` 12/32, multi-cláusula, telemetría).
-- **Siguiente producto:** etapa 3 UX (ver backlog), salvo que B se priorice por dolor de corpus.
-- **Tareas del momento:** [`roadmap.md`](../roadmap.md) — harness offline de benchmark (AdvBench + sweep Youden).
+- **Nivel 1 (2026-07-04):** etapas 1–2 hechas; opción A hecha. Activo: [`roadmap.md`](../roadmap.md).
+- **Pilares (2026-09-17):** specs + tickets L01–L12 en [`pilares/`](./pilares/README.md). Arranque paralelo: L01, L02, L03, L09.
 
-Visión y claims: [`00-vision-y-niveles.md`](./00-vision-y-niveles.md).  
-Secuencia Nivel 1: [`nivel-1/README.md`](./nivel-1/README.md).  
-Estudio (no activo): [`cosas para estudiar - Cursor.md`](./cosas%20para%20estudiar%20-%20Cursor.md) — visión independiente (canal vs lobotomía, membresía, límites de embeddings). También [`cosas para estudiar - Gemini.md`](./cosas%20para%20estudiar%20-%20Gemini.md). Experimentos offline; no pisan el Nivel 1.
+Visión: [`vision/00-vision-y-niveles.md`](./vision/00-vision-y-niveles.md).  
+Nivel 1: [`nivel-1/README.md`](./nivel-1/README.md).  
+Pilares: [`pilares/README.md`](./pilares/README.md).  
+Estudios (no ejecutar): [`archivo/`](./archivo/README.md).
 
 ---
 
@@ -48,4 +43,4 @@ Estudio (no activo): [`cosas para estudiar - Cursor.md`](./cosas%20para%20estudi
 2. Micro-sesiones; un commit, una cosa.
 3. Checkpoints 4 y 8 obligatorios antes de evidencia / lanzamiento.
 4. Tooling: `uv` (backend), `pnpm` (frontend). Doc-sync **condicional**.
-5. No trabajar Nivel 2/3 hasta cerrar Nivel 1.
+5. Nivel 3 no se trabaja hasta cerrar Nivel 1. El pack [`pilares/`](./pilares/) sí se puede tomar en paralelo; no pisa el filtro de producción hasta que el ticket lo pida.

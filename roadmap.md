@@ -1,6 +1,8 @@
 # Roadmap
 
-> Lista de tareas activas. Pendientes diferidos: [`roadmap-backlog.md`](./roadmap-backlog.md). Mapa Nivel 1: [`roadmap/`](./roadmap/).
+> Lista de tareas activas (Nivel 1). Pendientes diferidos: [`roadmap-backlog.md`](./roadmap-backlog.md).
+> Pack paralelo para agentes: [`roadmap/pilares/README.md`](./roadmap/pilares/README.md).
+> Mapa: [`roadmap/`](./roadmap/).
 
 ---
 
