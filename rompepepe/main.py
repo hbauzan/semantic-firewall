@@ -44,9 +44,10 @@ def format_progress(session: SessionState, elapsed_sec: float):
 async def select_model_menu(fw_client: FirewallClient | None = None):
     cfg = get_config()
     print("\n=======================================================")
-    print("   SELECT EXPLORER LLM PROVIDER & MODEL")
+    print("   SELECT EXPLORER LLM PROVIDER, MODEL & RATE LIMIT")
     print("=======================================================")
     print(f" Current Active: \033[1;32m{cfg.explorer_provider}\033[0m (\033[1;36m{cfg.explorer_model}\033[0m)")
+    print(f" Current RPM Limit: \033[1;33m{cfg.explorer_rpm_limit} RPM\033[0m (Requests Per Minute)")
     print("=======================================================")
     print(" [1] Google Gemini — gemini-3.1-flash-lite (Firewall .env Default)")
     print(" [2] Google Gemini — gemini-2.0-flash")
@@ -55,12 +56,13 @@ async def select_model_menu(fw_client: FirewallClient | None = None):
     print(" [5] OpenAI — gpt-4o")
     print(" [6] Ollama — llama3.1 (Local)")
     print(" [7] Auto-Sync from Target Firewall & .env")
-    print(" [8] Custom Provider & Model String")
+    print(" [8] Custom Provider, Model String & RPM Limit")
     print("=======================================================")
 
     choice = input(" Select option [1-8]: ").strip()
     provider = cfg.explorer_provider
     model = cfg.explorer_model
+    rpm_limit = str(cfg.explorer_rpm_limit)
 
     if choice == "1":
         provider, model = "google", "gemini-3.1-flash-lite"
@@ -75,7 +77,6 @@ async def select_model_menu(fw_client: FirewallClient | None = None):
     elif choice == "6":
         provider, model = "ollama", "llama3.1"
     elif choice == "7":
-        # Read from root .env & firewall config
         from rompepepe.config import load_env_file
         root_env = load_env_file(Path(__file__).parent.parent / ".env")
         provider = root_env.get("UPSTREAM_PROVIDER", "google").lower()
@@ -99,17 +100,22 @@ async def select_model_menu(fw_client: FirewallClient | None = None):
     elif choice == "8":
         provider = input(" Enter provider (google/anthropic/openai/ollama): ").strip().lower() or "google"
         model = input(" Enter model ID: ").strip() or "gemini-3.1-flash-lite"
+        custom_rpm = input(f" Enter RPM limit [default: {cfg.explorer_rpm_limit}]: ").strip()
+        if custom_rpm.isdigit():
+            rpm_limit = custom_rpm
 
-    update_env_file({"EXPLORER_PROVIDER": provider, "EXPLORER_MODEL": model})
+    update_env_file({"EXPLORER_PROVIDER": provider, "EXPLORER_MODEL": model, "EXPLORER_RPM_LIMIT": rpm_limit})
     print(f"\n[+] Configuration updated in rompepepe/.env:")
-    print(f"    EXPLORER_PROVIDER = {provider}")
-    print(f"    EXPLORER_MODEL    = {model}")
+    print(f"    EXPLORER_PROVIDER  = {provider}")
+    print(f"    EXPLORER_MODEL     = {model}")
+    print(f"    EXPLORER_RPM_LIMIT = {rpm_limit}")
 
 
 async def run_grid_search(
     fw_client: FirewallClient,
     session_mgr: SessionManager,
     report_gen: ReportGenerator,
+    tier: str = "normal",
     session_id: str | None = None,
     non_interactive: bool = False,
 ):
@@ -119,11 +125,11 @@ async def run_grid_search(
 
     if not session_id:
         from rompepepe.engines.grid_search import generate_config_grid
-        grid = generate_config_grid()
+        grid = generate_config_grid(tier=tier)
         preflight = await engine.estimate_preflight(grid, dataset_size)
 
         print(f"\n=======================================================")
-        print(f" Strategy A: Systematic Matrix Permutation (Grid Search)")
+        print(f" Strategy A: Systematic Matrix Search (Grid Search, Tier: {tier.upper()})")
         print(f"=======================================================")
         print(f" Grid Cells: {preflight['total_grid_cells']}")
         print(f" Seed Dataset Size: {preflight['dataset_size']} queries")
@@ -142,6 +148,7 @@ async def run_grid_search(
     session_mgr.setup_signal_handler()
     session = await engine.run(
         grid=grid,
+        tier=tier,
         session_id=session_id,
         progress_callback=format_progress,
     )
@@ -158,16 +165,23 @@ async def run_adaptive_fuzzing(
     session_mgr: SessionManager,
     report_gen: ReportGenerator,
     iterations: int = 40,
+    tier: str = "normal",
     session_id: str | None = None,
     non_interactive: bool = False,
 ):
+    # Adjust default iteration depth if tier is explicitly specified
+    if tier == "light" and iterations == 40:
+        iterations = 15
+    elif tier == "heavy" and iterations == 40:
+        iterations = 250
+
     engine = AdaptiveFuzzingEngine(fw_client, exp_client, session_mgr)
 
     if not session_id:
         preflight = await engine.estimate_preflight(iterations)
 
         print(f"\n=======================================================")
-        print(f" Strategy B: Closed-Loop Adaptive Exploration (Fuzzing)")
+        print(f" Strategy B: Closed-Loop Adaptive Exploration (Tier: {tier.upper()})")
         print(f"=======================================================")
         print(f" Explorer Model: {exp_client.provider} ({exp_client.model})")
         print(f" Planned Iterations: {preflight['iterations']}")
@@ -250,11 +264,13 @@ async def inspect_lancedb_corpus_menu(fw_client: FirewallClient):
 async def main_async():
     parser = argparse.ArgumentParser(description="rompepepe — Autonomous Stress Testing Engine")
     parser.add_argument("--strategy", choices=["grid", "fuzz"], help="Strategy to run")
+    parser.add_argument("--tier", choices=["light", "normal", "heavy"], default="normal", help="Execution intensity tier (light, normal, heavy)")
     parser.add_argument("--resume", type=str, help="Resume session ID")
     parser.add_argument("--resume-latest", action="store_true", help="Resume latest interrupted session")
     parser.add_argument("--iterations", type=int, default=40, help="Iterations for adaptive fuzzing")
     parser.add_argument("--explorer-provider", type=str, help="Override explorer provider (google, anthropic, openai, ollama)")
     parser.add_argument("--explorer-model", type=str, help="Override explorer model ID")
+    parser.add_argument("--rpm-limit", type=int, help="Override explorer RPM rate limit (default: 15)")
     parser.add_argument("--select-model", action="store_true", help="Open model selector menu")
     parser.add_argument("--sync-corpus", action="store_true", help="Inspect and adapt dataset to active LanceDB corpus")
     parser.add_argument("--build-pack", "--pack", action="store_true", help="Build agent handoff pack (rompepepe_context.txt)")
@@ -269,12 +285,14 @@ async def main_async():
         print(f"[+] Handoff Pack created at: {out_path}")
         return
 
-    if args.explorer_provider or args.explorer_model:
+    if args.explorer_provider or args.explorer_model or args.rpm_limit:
         updates = {}
         if args.explorer_provider:
             updates["EXPLORER_PROVIDER"] = args.explorer_provider
         if args.explorer_model:
             updates["EXPLORER_MODEL"] = args.explorer_model
+        if args.rpm_limit:
+            updates["EXPLORER_RPM_LIMIT"] = str(args.rpm_limit)
         update_env_file(updates)
 
     config = get_config()
@@ -296,6 +314,7 @@ async def main_async():
         provider=config.explorer_provider,
         api_key=config.explorer_api_key,
         model=config.explorer_model,
+        rpm_limit=config.explorer_rpm_limit,
     )
     session_mgr = SessionManager(config.vault_storage_path)
     report_gen = ReportGenerator(config.vault_storage_path / "reports")
@@ -318,15 +337,15 @@ async def main_async():
         session = session_mgr.load_session(session_id_to_resume)
         print(f"[+] Resuming session `{session_id_to_resume}` (Strategy: {session.strategy})")
         if session.strategy == "grid_search":
-            await run_grid_search(fw_client, session_mgr, report_gen, session_id=session_id_to_resume, non_interactive=args.non_interactive)
+            await run_grid_search(fw_client, session_mgr, report_gen, tier=args.tier, session_id=session_id_to_resume, non_interactive=args.non_interactive)
         else:
-            await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen, iterations=session.total_steps, session_id=session_id_to_resume, non_interactive=args.non_interactive)
+            await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen, iterations=session.total_steps, tier=args.tier, session_id=session_id_to_resume, non_interactive=args.non_interactive)
         return
 
     if args.strategy == "grid":
-        await run_grid_search(fw_client, session_mgr, report_gen, non_interactive=args.non_interactive)
+        await run_grid_search(fw_client, session_mgr, report_gen, tier=args.tier, non_interactive=args.non_interactive)
     elif args.strategy == "fuzz":
-        await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen, iterations=args.iterations, non_interactive=args.non_interactive)
+        await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen, iterations=args.iterations, tier=args.tier, non_interactive=args.non_interactive)
     else:
         print("\n==============================================")
         print("  Rompé Pepe! Rompé nomá!!! — Autonomous Stress Engine CLI")

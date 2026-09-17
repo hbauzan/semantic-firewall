@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def generate_config_grid(
+    tier: str = "normal",
     cosine_thresholds: list[float] | None = None,
     excitation_thresholds: list[int] | None = None,
     noise_limits: list[float] | None = None,
@@ -24,15 +25,35 @@ def generate_config_grid(
     filter_toggles: list[tuple[bool, bool, bool]] | None = None,
     orders: list[tuple[int, int, int]] | None = None,
 ) -> list[dict[str, Any]]:
-    cosines = cosine_thresholds or [0.45, 0.5315, 0.65]
-    excitations = excitation_thresholds or [120, 150, 200]
-    noises = noise_limits or [3.0, 4.5]
-    mode_list = modes or ["positive", "negative"]
-    toggles = filter_toggles or [
-        (True, True, True),
-        (False, True, True),
-    ]
-    order_list = orders or [(1, 3, 2), (2, 1, 3)]
+    tier = tier.lower()
+    if tier == "light":
+        cosines = cosine_thresholds or [0.45, 0.65]
+        excitations = excitation_thresholds or [150]
+        noises = noise_limits or [3.0]
+        mode_list = modes or ["positive"]
+        toggles = filter_toggles or [(True, True, True)]
+        order_list = orders or [(1, 3, 2)]
+    elif tier == "heavy":
+        cosines = cosine_thresholds or [0.35, 0.45, 0.5315, 0.60, 0.70]
+        excitations = excitation_thresholds or [100, 150, 180, 220]
+        noises = noise_limits or [2.5, 3.5, 5.0]
+        mode_list = modes or ["positive", "negative"]
+        toggles = filter_toggles or [
+            (True, True, True),
+            (False, True, True),
+            (True, False, True),
+        ]
+        order_list = orders or [(1, 3, 2), (2, 1, 3), (3, 1, 2)]
+    else:  # normal
+        cosines = cosine_thresholds or [0.45, 0.5315, 0.65]
+        excitations = excitation_thresholds or [120, 150, 200]
+        noises = noise_limits or [3.0, 4.5]
+        mode_list = modes or ["positive", "negative"]
+        toggles = filter_toggles or [
+            (True, True, True),
+            (False, True, True),
+        ]
+        order_list = orders or [(1, 3, 2), (2, 1, 3)]
 
     grid = []
     for mode in mode_list:
@@ -57,9 +78,10 @@ def generate_config_grid(
 
 
 class GridSearchEngine:
-    def __init__(self, firewall_client: FirewallClient, session_manager: SessionManager):
+    def __init__(self, firewall_client: FirewallClient, session_manager: SessionManager, concurrency: int = 5):
         self.client = firewall_client
         self.session_manager = session_manager
+        self.concurrency = concurrency
 
     async def estimate_preflight(self, grid: list[dict[str, Any]], dataset_size: int) -> dict[str, Any]:
         total_grid_cells = len(grid)
@@ -77,24 +99,65 @@ class GridSearchEngine:
                 latencies.append(0.05)
 
         avg_latency = sum(latencies) / len(latencies) if latencies else 0.05
-        estimated_seconds = total_tests * avg_latency
+        # Account for concurrency speedup in ETA estimation
+        effective_step_time = avg_latency / max(1, self.concurrency)
+        estimated_seconds = total_tests * effective_step_time
 
         return {
             "total_grid_cells": total_grid_cells,
             "dataset_size": dataset_size,
             "total_tests": total_tests,
             "avg_latency_sec": avg_latency,
+            "concurrency": self.concurrency,
             "estimated_seconds": estimated_seconds,
             "formatted_eta": f"~{int(estimated_seconds // 60)}m {int(estimated_seconds % 60)}s",
         }
 
+    async def _audit_single_query(self, query: str, config_cell: dict[str, Any], current_step: int, sem: asyncio.Semaphore) -> TestResult:
+        async with sem:
+            t0 = time.perf_counter()
+            telemetry = None
+            passed = False
+            breach_reason = None
+
+            for retry in range(3):
+                try:
+                    telemetry = await self.client.audit(query)
+                    duration_ms = (time.perf_counter() - t0) * 1000.0
+                    passed = telemetry.passed
+                    breach_reason = telemetry.breach_reason
+                    break
+                except Exception as e:
+                    duration_ms = (time.perf_counter() - t0) * 1000.0
+                    passed = False
+                    breach_reason = f"HTTP Error: {e}"
+                    if "429" in str(e) and retry < 2:
+                        await asyncio.sleep(1.0 * (retry + 1))
+                    else:
+                        telemetry = TelemetryTrace(passed=False, breach_reason=breach_reason, text="HTTP Error")
+
+            return TestResult(
+                step=current_step,
+                prompt=query,
+                config=config_cell,
+                passed=passed,
+                breach_reason=breach_reason,
+                telemetry=telemetry or TelemetryTrace(passed=False, breach_reason="HTTP Error"),
+                duration_ms=duration_ms,
+            )
+
     async def run(
         self,
         grid: list[dict[str, Any]] | None = None,
+        tier: str = "normal",
+        concurrency: int = 5,
         custom_dataset: list[str] | None = None,
         session_id: str | None = None,
         progress_callback: Callable[[SessionState, float], None] | None = None,
     ) -> SessionState:
+        self.concurrency = concurrency
+        sem = asyncio.Semaphore(concurrency)
+
         # Load test dataset
         corpus_data = load_seed_corpus()
         if custom_dataset:
@@ -104,7 +167,7 @@ class GridSearchEngine:
             test_queries = await build_adapted_corpus(self.client)
 
         if not grid:
-            grid = generate_config_grid()
+            grid = generate_config_grid(tier=tier)
 
         total_steps = len(grid) * len(test_queries)
 
@@ -114,7 +177,6 @@ class GridSearchEngine:
             session.status = "running"
             initial_config = session.initial_target_config
         else:
-            # Capture initial config for safe restoration
             try:
                 initial_config = await self.client.get_config()
             except Exception as e:
@@ -148,54 +210,29 @@ class GridSearchEngine:
                     logger.error(f"Failed to update config cell {config_cell}: {e}")
                     continue
 
+                # Prepare concurrent tasks for all queries in this config cell
+                tasks = []
+                steps_to_run = []
                 for query_idx, query in enumerate(test_queries):
                     current_step = cell_start_step + query_idx + 1
                     if current_step <= completed_step:
                         continue
+                    tasks.append(self._audit_single_query(query, config_cell, current_step, sem))
+                    steps_to_run.append(current_step)
 
-                    t0 = time.perf_counter()
-                    telemetry = None
-                    passed = False
-                    breach_reason = None
+                if tasks:
+                    results = await asyncio.gather(*tasks)
+                    # Sort results by step index to preserve sequence order
+                    results.sort(key=lambda r: r.step)
+                    for r in results:
+                        session.results.append(r)
+                        session.current_step = r.step
+                        completed_step = r.step
+                        if progress_callback:
+                            elapsed = time.time() - start_time
+                            progress_callback(session, elapsed)
 
-                    # Retry up to 3 times on 429 Too Many Requests rate limiting
-                    for retry in range(3):
-                        try:
-                            telemetry = await self.client.audit(query)
-                            duration_ms = (time.perf_counter() - t0) * 1000.0
-                            passed = telemetry.passed
-                            breach_reason = telemetry.breach_reason
-                            break
-                        except Exception as e:
-                            duration_ms = (time.perf_counter() - t0) * 1000.0
-                            passed = False
-                            breach_reason = f"HTTP Error: {e}"
-                            if "429" in str(e) and retry < 2:
-                                await asyncio.sleep(1.0 * (retry + 1))
-                            else:
-                                telemetry = TelemetryTrace(passed=False, breach_reason=breach_reason, text="HTTP Error")
-
-                    result = TestResult(
-                        step=current_step,
-                        prompt=query,
-                        config=config_cell,
-                        passed=passed,
-                        breach_reason=breach_reason,
-                        telemetry=telemetry or TelemetryTrace(passed=False, breach_reason="HTTP Error"),
-                        duration_ms=duration_ms,
-                    )
-                    
-                    session.results.append(result)
-                    session.current_step = current_step
-                    completed_step = current_step
-
-                    # Periodic state save
-                    if current_step % 5 == 0 or current_step == total_steps:
-                        self.session_manager.save_session(session)
-
-                    if progress_callback:
-                        elapsed = time.time() - start_time
-                        progress_callback(session, elapsed)
+                    self.session_manager.save_session(session)
 
             session.status = "completed"
             self.session_manager.save_session(session)

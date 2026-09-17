@@ -25,6 +25,16 @@ def test_generate_config_grid():
     assert grid[0]["firewall_mode"] == "positive"
 
 
+def test_generate_config_grid_tiers():
+    light_grid = generate_config_grid(tier="light")
+    normal_grid = generate_config_grid(tier="normal")
+    heavy_grid = generate_config_grid(tier="heavy")
+
+    assert len(light_grid) < len(normal_grid) < len(heavy_grid)
+    assert len(light_grid) == 2
+    assert len(heavy_grid) > 100
+
+
 @pytest.mark.asyncio
 async def test_grid_search_engine_preflight():
     fw_client = MagicMock()

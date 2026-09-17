@@ -24,6 +24,7 @@ class ReportGenerator:
         passed_count = sum(1 for r in session.results if r.passed)
         blocked_count = total_tests - passed_count
         stability_pct = (passed_count / total_tests * 100.0) if total_tests > 0 else 0.0
+        blocked_pct = (blocked_count / total_tests * 100.0) if total_tests > 0 else 0.0
 
         avg_latency = (
             sum(r.duration_ms for r in session.results) / total_tests
@@ -46,17 +47,23 @@ class ReportGenerator:
         md_lines.append(f"| :--- | :--- |")
         md_lines.append(f"| Total Tests Executed | `{total_tests}` |")
         md_lines.append(f"| Passed Queries (Allowed) | `{passed_count}` ({stability_pct:.1f}%) |")
-        md_lines.append(f"| Blocked Queries (Restricted) | `{blocked_count}` ({100.0 - stability_pct:.1f}%) |")
+        md_lines.append(f"| Blocked Queries (Restricted) | `{blocked_count}` ({blocked_pct:.1f}%) |")
         md_lines.append(f"| Boundary Transition Events | `{boundary_count}` |")
         md_lines.append(f"| Average REST Latency | `{avg_latency:.2f} ms` |")
         md_lines.append(f"| Session Status | `{session.status.upper()}` |\n")
 
-        if stability_pct > 80.0:
+        if session.metadata.get("quota_exhausted") or session.status == "paused":
+            md_lines.append("> [!WARNING]")
+            pause_reason = session.metadata.get("pause_reason", "Token quota / rate limit exhausted.")
+            md_lines.append(f"> **Execution Paused Due to Token Quota Exhaustion:** {pause_reason}")
+            md_lines.append(f"> The session state has been cleanly saved at step **{session.current_step}/{session.total_steps}**.")
+            md_lines.append(f"> You can resume execution anytime by running `./run_rompepepe.sh` option 7 or `python -m rompepepe.main --resume {session.session_id}`.\n")
+        elif stability_pct > 80.0:
             md_lines.append("> [!NOTE]")
             md_lines.append(f"> The system exhibited high operational stability ({stability_pct:.1f}%) under test suite permutations.")
         else:
             md_lines.append("> [!WARNING]")
-            md_lines.append(f"> High boundary restriction level detected ({100.0 - stability_pct:.1f}% blocked). Review filter thresholds.")
+            md_lines.append(f"> High boundary restriction level detected ({blocked_pct:.1f}% blocked). Review filter thresholds.")
 
         md_lines.append("\n## System Behavioral Boundaries & Sensitivity Analysis\n")
         
