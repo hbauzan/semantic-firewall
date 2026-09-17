@@ -36,3 +36,15 @@ def test_firewall_client_init():
     client = FirewallClient(base_url="http://localhost:8000/", api_key="secret123")
     assert client.base_url == "http://localhost:8000"
     assert client.headers["x-api-key"] == "secret123"
+
+
+def test_token_quota_exhausted_error():
+    from rompepepe.client.explorer_client import TokenQuotaExhaustedError
+    err = TokenQuotaExhaustedError("google", "429 Too Many Requests")
+    assert "google" in str(err)
+    assert "429" in str(err)
+
+
+def test_explorer_client_rpm_limit():
+    client = ExplorerClient(provider="google", model="gemini-1.5-flash", rpm_limit=15)
+    assert client.rpm_limit == 15

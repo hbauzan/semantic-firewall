@@ -73,15 +73,33 @@ while true; do
     read -p " Select an option [1-9]: " choice
     case $choice in
         1)
-            echo -e "\n${GREEN}[+] Launching Systematic Matrix Search (Strategy A)...${NC}"
-            run_python_script --strategy grid
+            echo -e "\n${CYAN}Select Intensity Tier:${NC}"
+            echo -e " [1] 🟢 Light (Smoke / Fast, ~10 steps)"
+            echo -e " [2] 🟡 Normal (Standard, ~36 steps)"
+            echo -e " [3] 🔴 Heavy (Exhaustive, ~100+ steps)"
+            read -p " Select tier [1-3, default 2]: " tier_choice
+            case $tier_choice in
+                1) TIER="light" ;;
+                3) TIER="heavy" ;;
+                *) TIER="normal" ;;
+            esac
+            echo -e "\n${GREEN}[+] Launching Systematic Matrix Search (Strategy A, Tier: ${TIER})...${NC}"
+            run_python_script --strategy grid --tier "$TIER"
             read -p "Press Enter to return to menu..."
             ;;
         2)
-            read -p " Enter number of fuzzing iterations [default: 40]: " iters
-            iters=${iters:-40}
-            echo -e "\n${GREEN}[+] Launching Adaptive Exploratory Fuzzing (Strategy B, ${iters} iterations)...${NC}"
-            run_python_script --strategy fuzz --iterations "$iters"
+            echo -e "\n${CYAN}Select Intensity Tier:${NC}"
+            echo -e " [1] 🟢 Light (Smoke / Fast, 15 iterations)"
+            echo -e " [2] 🟡 Normal (Standard, 50 iterations)"
+            echo -e " [3] 🔴 Heavy (Exhaustive / Continuous, 250 iterations)"
+            read -p " Select tier [1-3, default 2]: " tier_choice
+            case $tier_choice in
+                1) TIER="light"; ITERS=15 ;;
+                3) TIER="heavy"; ITERS=250 ;;
+                *) TIER="normal"; ITERS=50 ;;
+            esac
+            echo -e "\n${GREEN}[+] Launching Adaptive Exploratory Fuzzing (Strategy B, Tier: ${TIER}, ${ITERS} iterations)...${NC}"
+            run_python_script --strategy fuzz --tier "$TIER" --iterations "$ITERS"
             read -p "Press Enter to return to menu..."
             ;;
         3)

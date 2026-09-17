@@ -13,6 +13,7 @@ class RompepepeConfig(BaseModel):
     explorer_provider: str = Field(default="google")
     explorer_api_key: str | None = Field(default=None)
     explorer_model: str = Field(default="gemini-1.5-flash")
+    explorer_rpm_limit: int = Field(default=15)
     vault_storage_path: Path = Field(default=Path("./vault"))
 
 
@@ -71,12 +72,19 @@ def get_config(base_dir: Path | None = None) -> RompepepeConfig:
     if not vault_path.is_absolute():
         vault_path = (base_dir / vault_path).resolve()
 
+    rpm_limit_str = get_var("EXPLORER_RPM_LIMIT", "15")
+    try:
+        rpm_limit = int(rpm_limit_str)
+    except ValueError:
+        rpm_limit = 15
+
     return RompepepeConfig(
         firewall_api_base_url=get_var("FIREWALL_API_BASE_URL", "http://localhost:8000").rstrip("/"),
         firewall_x_api_key=os.getenv("FIREWALL_X_API_KEY", merged_vars.get("FIREWALL_X_API_KEY")) or None,
         explorer_provider=provider,
         explorer_api_key=explorer_key or None,
         explorer_model=model,
+        explorer_rpm_limit=rpm_limit,
         vault_storage_path=vault_path,
     )
 

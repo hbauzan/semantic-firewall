@@ -8,7 +8,7 @@ import logging
 import time
 from typing import Any, Callable
 
-from rompepepe.client.explorer_client import ExplorerClient
+from rompepepe.client.explorer_client import ExplorerClient, TokenQuotaExhaustedError
 from rompepepe.client.firewall_client import FirewallClient
 from rompepepe.state.models import BoundaryTrace, SessionState, TestResult, TelemetryTrace
 from rompepepe.state.session_manager import SessionManager
@@ -107,13 +107,37 @@ class AdaptiveFuzzingEngine:
         for step in range(start_step + 1, iterations + 1):
             t0 = time.perf_counter()
 
-            # 1. Synthesize / mutate prompt via Explorer LLM based on telemetry feedback
+            # 1. Synthesize / mutate prompt via Explorer LLM with quota retry & backoff
             if step > 1 and last_telemetry:
-                mutated_prompt = await self.explorer_client.generate_prompt_mutation(
-                    base_prompt=current_prompt,
-                    telemetry_feedback=last_telemetry,
-                    corpus_references=corpus_references,
-                )
+                mutated_prompt = None
+                max_quota_retries = 3
+                for attempt in range(1, max_quota_retries + 1):
+                    try:
+                        mutated_prompt = await self.explorer_client.generate_prompt_mutation(
+                            base_prompt=current_prompt,
+                            telemetry_feedback=last_telemetry,
+                            corpus_references=corpus_references,
+                        )
+                        break
+                    except TokenQuotaExhaustedError as q_err:
+                        if attempt < max_quota_retries:
+                            wait_sec = attempt * 3.0
+                            logger.warning(f"[Quota Limit Attempt {attempt}/{max_quota_retries}] Retrying in {wait_sec}s...")
+                            await asyncio.sleep(wait_sec)
+                        else:
+                            logger.error(f"[!] Token quota limit exhausted after {max_quota_retries} attempts: {q_err}")
+                            session.status = "paused"
+                            session.metadata["quota_exhausted"] = True
+                            session.metadata["pause_reason"] = (
+                                f"Token quota / rate limit exhausted for explorer provider '{self.explorer_client.provider}' "
+                                f"(Model: '{self.explorer_client.model}') after {max_quota_retries} retries."
+                            )
+                            self.session_manager.save_session(session)
+                            print(f"\n\n[!] Execution paused due to token quota exhaustion at step {session.current_step}/{session.total_steps}.")
+                            print(f"[+] Session state cleanly saved. You can resume anytime from the menu.")
+                            return session
+                if not mutated_prompt:
+                    mutated_prompt = current_prompt
             else:
                 mutated_prompt = current_prompt
 
