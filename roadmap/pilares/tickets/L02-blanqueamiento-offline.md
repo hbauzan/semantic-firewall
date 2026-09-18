@@ -1,6 +1,6 @@
 # L02 — Blanqueamiento offline
 
-> **Estado:** pendiente
+> **Estado:** hecho
 > **Ola:** 1
 > **Spec:** [`specs/pilar-1-geometria.md`](../specs/pilar-1-geometria.md)
 
@@ -42,11 +42,11 @@ Nada (puede leer la tabla `knowledge` existente).
 
 ## Tareas
 
-- [ ] Cargar vectores densos de un pack demo (automotive o medical).
-- [ ] Estimar \(\mu\) (1024,) y \(\Sigma\) (1024×1024). Regularizar si \(\Sigma\) es singular (ridge pequeño, documentado).
-- [ ] Implementar `whiten(Q, mu, Sigma) -> Q'`.
-- [ ] Verificar en test: media ~0, varianza por eje ~1 sobre el propio corpus (tolerancia numérica explícita).
-- [ ] Serializar \(\mu,\Sigma\) (o \(\Sigma^{-1/2}\)) a un artefacto de lab versionable (npy/npz), no a git LFS innecesario; documentar cómo regenerarlo.
+- [x] Cargar vectores densos de un pack demo (automotive o medical).
+- [x] Estimar \(\mu\) (1024,) y \(\Sigma\) (1024×1024). Regularizar si \(\Sigma\) es singular (ridge pequeño, documentado).
+- [x] Implementar `whiten(Q, mu, Sigma) -> Q'`.
+- [x] Verificar en test: media ~0, varianza por eje ~1 sobre el propio corpus (tolerancia numérica explícita).
+- [x] Serializar \(\mu,\Sigma\) (o \(\Sigma^{-1/2}\)) a un artefacto de lab versionable (npy/npz), no a git LFS innecesario; documentar cómo regenerarlo.
 
 ## Tests (TDD)
 
@@ -54,14 +54,20 @@ Rojo: `whiten` no existe. Verde: propiedades estadísticas del corpus transforma
 
 ```
 cd backend && uv run pytest -q tests/test_whitening.py
+cd backend && uv run python -m app.modules.geometry.whitening --corpus automotive
 ```
+
+Módulo: [`backend/app/modules/geometry/whitening.py`](../../../backend/app/modules/geometry/whitening.py).  
+Artefacto regenerable (gitignored): `backend/calibration/geometry/whitening_automotive.npz`. Cómo: [`backend/calibration/geometry/README.md`](../../../backend/calibration/geometry/README.md).
+
+`evaluate_clause` / `run_excitation_filter` **no** se tocaron. n≪d en el demo → ridge; la propiedad var~1 por eje se testea en un corpus sintético n≫d.
 
 ## Definición de hecho
 
-- [ ] Función de blanqueamiento testada
-- [ ] Artefacto \(\mu,\Sigma\) regenerable con comando `uv run`
-- [ ] `evaluate_clause` de prod intacto
-- [ ] Fila L02 → `hecho`
+- [x] Función de blanqueamiento testada
+- [x] Artefacto \(\mu,\Sigma\) regenerable con comando `uv run`
+- [x] `evaluate_clause` de prod intacto
+- [x] Fila L02 → `hecho`
 
 ## Trampas
 

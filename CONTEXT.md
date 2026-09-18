@@ -47,6 +47,8 @@
 **Activations** — The count of dimensions where the per-axis delta `|Q_i − C_i|` is within **Noise Tolerance**. The Excitation Filter's metric.
 - _Avoid_: "Resonance" (UI label for the same quantity).
 
+**Whitening** — A lab change of basis \(Q'=(Q-\mu)\Sigma^{-1/2}\) (ZCA) fitted on corpus vectors so each axis has variance ~1. Not a production **Filter**; **Excitation** still counts raw BGE-M3 axes.
+
 **Decision** — The terminal outcome of evaluating a prompt: **PASS** or **BREACH**.
 
 **PASS** — Every **Clause** cleared the **Pipeline**; the request is forwarded to the **Provider**.
