@@ -3,9 +3,10 @@
 Layer order (PDF): normalize homoglyphs, then DLP, INLP seam, reconstructed
 numbers, then L04 AND on sentences. Ingress Noise/Cosine/Excitation is unchanged.
 
-Default ``egress_profile`` is ``chat`` (today's live yield). CDE must set
-``compliance``. Missing pyramid / pack on AND is fail-closed. Missing INLP
-artefact is a documented skip, not a guessed τ.
+Default ``egress_profile`` is ``chat`` (sentence buffer). CDE must set
+``compliance``. Missing pyramid / pack on AND is fail-closed in hold.
+Chat skips AND when no pack is selected. Missing INLP artefact is a
+documented skip, not a guessed τ.
 """
 from __future__ import annotations
 
@@ -118,6 +119,28 @@ def audit_held_response(
         if not _run_and(sentence, pack_id, and_fn):
             return EgressVerdict(passed=False, layer="and", reason="and_membership")
     return EgressVerdict(passed=True, layer=None, reason="unanimous")
+
+
+def audit_chat_sentence(
+    text: str,
+    *,
+    pack_id: str | None = None,
+    and_fn: AndFn | None = None,
+    inlp_fn: InlpFn | None = None,
+) -> EgressVerdict:
+    """Per-sentence gate for ``egress_profile=chat``.
+
+    AND is skipped when no pack is selected so the HUD still talks; DLP /
+    numbers / INLP still run. Compliance hold keeps fail-closed AND.
+    """
+    resolved_and = and_fn if and_fn is not None else _AND_OVERRIDE
+    if resolved_and is None and not pack_id:
+        resolved_and = _skip_and
+    return audit_held_response(text, pack_id=pack_id, and_fn=resolved_and, inlp_fn=inlp_fn)
+
+
+def _skip_and(_sentence: str, _pack_id: str | None) -> bool:
+    return True
 
 
 def _dlp_hits(text: str) -> str | None:

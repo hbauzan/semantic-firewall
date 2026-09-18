@@ -61,7 +61,7 @@ class ConfigState(BaseModel):
     egress_profile: Literal["chat", "compliance"] = Field(
         default="chat",
         description=(
-            "chat: yield generation tokens as they arrive (today's HUD). "
+            "chat: freeze generation on `. ; ?` or newline, evaluate, burst or cut. "
             "compliance: hold the full response and audit DLP/homoglyphs/INLP/numbers/AND "
             "before any generation token reaches the client. CDE must set compliance."
         ),
