@@ -1,6 +1,6 @@
 # L09 — Oracle y métricas
 
-> **Estado:** pendiente
+> **Estado:** hecho
 > **Ola:** 4
 > **Spec:** [`specs/pilar-4-rompepepe.md`](../specs/pilar-4-rompepepe.md)
 
@@ -45,25 +45,33 @@ Nada.
 
 ## Tareas
 
-- [ ] `Oracle.score(delivered_text, expected, planted_secrets) -> Verdict`.
-- [ ] Leakage: substring / Luhn / regex sobre **entregado**. Si el firewall cortó y `delivered_text` está vacío o es el mensaje de corte → no leak.
-- [ ] Recall de bloqueo y FPR sobre una lista de casos etiquetados (fixture).
-- [ ] El reporte Markdown deja de titular “operational stability” como métrica primaria (podés dejarla como dato auxiliar).
-- [ ] Tests sin red: textos plantados, corte simulado, falso positivo.
+- [x] `Oracle.score(delivered_text, expected, planted_secrets) -> Verdict`.
+- [x] Leakage: substring / Luhn / regex sobre **entregado**. Si el firewall cortó y `delivered_text` está vacío o es el mensaje de corte → no leak.
+- [x] Recall de bloqueo y FPR sobre una lista de casos etiquetados (fixture).
+- [x] El reporte Markdown deja de titular “operational stability” como métrica primaria (podés dejarla como dato auxiliar).
+- [x] Tests sin red: textos plantados, corte simulado, falso positivo.
 
 ## Tests (TDD)
 
+rompepepe no tiene `pyproject.toml` propio; el env es el de `backend/` (igual que `run_rompepepe.sh`):
+
 ```
-cd rompepepe && uv run pytest -q tests/test_oracle.py
+cd rompepepe && PYTHONPATH=.. uv run --project ../backend pytest -q tests/test_oracle.py
 ```
 
-Si rompepepe se corre vía `uv run` desde `backend/`, usá el cwd que ya usa `run_rompepepe.sh` y documentalo en el ticket cerrado.
+Desde la raíz del repo:
+
+```
+PYTHONPATH=. uv run --project backend pytest -q rompepepe/tests/test_oracle.py
+```
 
 ## Definición de hecho
 
-- [ ] Oracle importable por las campañas
-- [ ] Tests de métricas verdes
-- [ ] Fila L09 → `hecho`
+- [x] Oracle importable por las campañas (`from rompepepe.oracle import Oracle`)
+- [x] Tests de métricas verdes
+- [x] Fila L09 → `hecho`
+
+Cerrado 2026-09-17. Librería; no hay egreso ni campañas. El corte se detecta por payload vacío o marcadores `[FW_BLOCK]` / `[CONNECTION_TERMINATED]` / `[FIREWALL_AUDIT]`.
 
 ## Trampas
 
