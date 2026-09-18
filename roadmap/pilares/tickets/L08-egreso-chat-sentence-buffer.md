@@ -1,6 +1,6 @@
 # L08 — Egreso perfil Chat (sentence buffering)
 
-> **Estado:** pendiente
+> **Estado:** hecho
 > **Ola:** 3
 > **Spec:** [`specs/pilar-egreso-dual-profile.md`](../specs/pilar-egreso-dual-profile.md) § perfil Chat.
 
@@ -40,11 +40,11 @@ Nada. No empieces L08 si L07 no está `hecho`.
 
 ## Tareas
 
-- [ ] Parser: delimitadores `. ; ? \n`. Oración congelada → eval async.
-- [ ] PASS → flush al cliente. BREACH → abort SSE, tirar buffer, código de corte, log.
-- [ ] Texto sin delimitador final: al `done` del upstream, evaluar el resto como cláusula (no fugar el tail sin gate).
-- [ ] Tests unitarios del acumulador (sin LLM): “hola. mundo” → dos evals; BREACH en la segunda no emite la segunda; PAN cortado por `\n` — **documentá** que este perfil puede emitir la primera mitad (es el motivo de L07). No “arregles” eso acá mezclando hold.
-- [ ] Test de integración del wrapper con upstream mockeado (lista de deltas).
+- [x] Parser: delimitadores `. ; ? \n`. Oración congelada → eval async.
+- [x] PASS → flush al cliente. BREACH → abort SSE, tirar buffer, código de corte, log.
+- [x] Texto sin delimitador final: al `done` del upstream, evaluar el resto como cláusula (no fugar el tail sin gate).
+- [x] Tests unitarios del acumulador (sin LLM): “hola. mundo” → dos evals; BREACH en la segunda no emite la segunda; PAN cortado por `\n` — **documentá** que este perfil puede emitir la primera mitad (es el motivo de L07). No “arregles” eso acá mezclando hold.
+- [x] Test de integración del wrapper con upstream mockeado (lista de deltas).
 
 ## Tests (TDD)
 
@@ -54,10 +54,12 @@ cd backend && uv run pytest -q tests/test_sentence_buffer.py
 
 ## Definición de hecho
 
-- [ ] Perfil chat ≠ perfil compliance
-- [ ] Tail de stream también se evalúa
-- [ ] L07 no regresiona
-- [ ] Fila L08 → `hecho`
+- [x] Perfil chat ≠ perfil compliance
+- [x] Tail de stream también se evalúa
+- [x] L07 no regresiona
+- [x] Fila L08 → `hecho`
+
+Cerrado 2026-09-18. Acumulador `SentenceBuffer` (`. ; ? \\n`), no el splitter de ingress. Tail al `done`. Chat puede emitir la primera mitad de un PAN partido por newline — L07 hold no se mezcló. AND en chat se salta si no hay pack (HUD); DLP/números/INLP sí corren. `firewall.py` intacto.
 
 ## Trampas
 

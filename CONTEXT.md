@@ -98,9 +98,11 @@
 
 **Chat endpoint** — The `POST /chat` surface used by the built-in **HUD**; streams NDJSON with inline firewall telemetry.
 
-**Egress profile** — Whether generation tokens may stream (`chat`) or must wait for a full-response **Egress hold** (`compliance`). Default is `chat`; CDE sets `compliance`.
+**Egress profile** — Whether generation is released by **Sentence buffer** (`chat`) or **Egress hold** (`compliance`). Default is `chat`; CDE sets `compliance`.
 
 **Egress hold** — Buffer of the complete generation, audited by DLP, homoglyph normalization, INLP (optional seam), reconstructed numbers, and **AND multi-grain** before any generation token reaches the client.
+
+**Sentence buffer** — Chat-profile accumulator that freezes output on `. ; ?` or newline, then evaluates that sentence. A PAN split by newline can emit the first half; that is why **Egress hold** exists.
 
 ---
 
