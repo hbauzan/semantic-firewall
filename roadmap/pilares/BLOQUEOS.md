@@ -8,7 +8,7 @@ Murray. El humano duerme. Esto no es un diario: solo lo que **no** se puede merg
 | :--- | :--- | :--- |
 | L03 | https://github.com/hbauzan/semantic-firewall/pull/6 | Pirámide lab. Autor `murray-threepwood`. |
 | L09 | https://github.com/hbauzan/semantic-firewall/pull/7 | Oracle. Autor `murray-threepwood`. |
-| L05 | este PR | Adapter + compose por digest. Tests mock verdes. |
+| L05 | https://github.com/hbauzan/semantic-firewall/pull/8 | Adapter + compose por digest. Tests mock verdes. |
 
 L01 y L02 ya están en `upstream/main` (#4, #5).
 
