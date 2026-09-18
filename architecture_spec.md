@@ -311,6 +311,10 @@ Implements the BaseProvider interface for the Groq API (OpenAI-compatible).
 ### 9.5 Provider Factory
 The `chat_endpoint` and `openai_proxy` resolve the provider lazily at request time via `get_provider(cfg: ConfigState) -> tuple[BaseProvider, str]`. This returns a tuple of the provider instance and the model ID from settings based on the `UPSTREAM_PROVIDER` environment variable. Lazy instantiation means a missing Google API key does not crash the app at import time — it only fails when the `/chat` or proxy endpoint is actually called. This ensures the Semantic Firewall remains provider-agnostic and the system prompt for context-confined operation is injected at the endpoint level (prepended to the messages array) before calling `provider.stream_chat()`.
 
+### 9.6 Egress hold (compliance)
+
+`ConfigState.egress_profile` is `chat` (default: yield generation tokens as they arrive) or `compliance` (absorb the upstream stream, run `audit_held_response`, then burst or cut). Ingress `evaluate_clause` is unchanged. CDE deployments must set `compliance`. `/v1/chat/completions` returns HTTP 403 `EGRESS_HOLD` on cut; `/chat` yields `[FW_BLOCK]`/`[CONNECTION_TERMINATED]` without echoing the generation. Sniffer and chat history persist `hash8:last4` redactions, not raw secrets.
+
 ## 10. Real-Time Semantic Sniffer (RTSS)
 A zero-latency observability layer for the OpenAI V1 Proxy (`/v1/chat/completions`). Captures every firewall decision and LLM response preview without introducing latency to the primary inference stream.
 

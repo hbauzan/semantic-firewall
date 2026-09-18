@@ -20,6 +20,8 @@ from typing import AsyncGenerator, Optional, Literal
 
 from pydantic import BaseModel, Field
 
+from app.modules.egress import redact_for_log
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -264,11 +266,11 @@ def emit_trace(
         timestamp=datetime.now(timezone.utc).isoformat(),
         request=SnifferTraceRequest(
             model=model,
-            last_message=last_message[:200],
+            last_message=redact_for_log(last_message)[:200],
             request_history=request_history or [],
         ),
         firewall=SnifferTraceFirewall(decision=decision, pipeline_trace=stages),
-        response_preview=response_preview[:100],
+        response_preview=redact_for_log(response_preview)[:100],
         response_content="",
         status=resolved_status,
     )
@@ -307,7 +309,7 @@ def update_trace(
         if t.id == trace_id:
             # Pydantic frozen model — rebuild with updated fields
             updated = t.model_copy(update={
-                "response_content": response_content,
+                "response_content": redact_for_log(response_content),
                 "status": status,
             })
             _trace_buffer[i] = updated

@@ -43,6 +43,8 @@ async def update_config(config: ConfigUpdate):
             req_data = config.model_dump()
             if "active_corpus_file" not in config.model_fields_set:
                 req_data["active_corpus_file"] = current.active_corpus_file
+            if "egress_profile" not in config.model_fields_set:
+                req_data["egress_profile"] = current.egress_profile
 
             # --- Phase 2.1-B: Non-Intrusive Smart Calibration ---
             mode_toggled = req_data["firewall_mode"] != current.firewall_mode

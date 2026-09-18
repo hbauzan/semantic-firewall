@@ -68,6 +68,12 @@
             "type": "str",
             "default": "chat",
             "description": "Last active UI tab. Persisted via _last_used profile."
+        },
+        "egress_profile": {
+            "type": "str",
+            "default": "chat",
+            "values": ["chat", "compliance"],
+            "description": "chat = live yield; compliance = full-response hold before any generation token."
         }
     },
     "constraints": {

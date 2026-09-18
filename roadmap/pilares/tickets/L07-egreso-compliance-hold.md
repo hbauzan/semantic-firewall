@@ -1,6 +1,6 @@
 # L07 — Egreso perfil Compliance (full hold)
 
-> **Estado:** pendiente
+> **Estado:** hecho
 > **Ola:** 3
 > **Spec:** [`specs/pilar-egreso-dual-profile.md`](../specs/pilar-egreso-dual-profile.md)
 
@@ -47,14 +47,14 @@ L06 (INLP) se enchufa como capa 3 cuando exista; L07 puede shippear con seam `pr
 
 ## Tareas
 
-- [ ] Buffer cerrado de la generación completa.
-- [ ] Capa 1 DLP rígido: patrones de secreto de prueba (PAN con Luhn, API-key-like). BREACH si pega.
-- [ ] Capa 2 normalización anti-homoglifos antes de DLP/geometría (NFKC / confusables básicos).
-- [ ] Capa 3 subespacio: llamar INLP si L06 está; seam explícito.
-- [ ] Capa 4 verificación determinista de números (la secuencia numérica reconstruida se testea, no solo el string crudo).
-- [ ] Geometría positiva: partir la respuesta en oraciones y correr AND de L04.
-- [ ] Unánime → soltar al cliente de una. Cualquier capa → no emitir payload; log de corte.
-- [ ] Tests: PAN partido con newline no se entrega; respuesta on-corpus limpia sí; homoglifo que esconde dígitos dispara DLP tras normalizar.
+- [x] Buffer cerrado de la generación completa.
+- [x] Capa 1 DLP rígido: patrones de secreto de prueba (PAN con Luhn, API-key-like). BREACH si pega.
+- [x] Capa 2 normalización anti-homoglifos antes de DLP/geometría (NFKC / confusables básicos).
+- [x] Capa 3 subespacio: llamar INLP si L06 está; seam explícito.
+- [x] Capa 4 verificación determinista de números (la secuencia numérica reconstruida se testea, no solo el string crudo).
+- [x] Geometría positiva: partir la respuesta en oraciones y correr AND de L04.
+- [x] Unánime → soltar al cliente de una. Cualquier capa → no emitir payload; log de corte.
+- [x] Tests: PAN partido con newline no se entrega; respuesta on-corpus limpia sí; homoglifo que esconde dígitos dispara DLP tras normalizar.
 
 ## Tests (TDD)
 
@@ -66,10 +66,12 @@ cd backend && uv run pytest -q tests/test_egress_hold.py
 
 ## Definición de hecho
 
-- [ ] Hold cableado en `/chat` (y proxy `/v1` si comparte el wrapper; si no, documentá la deuda en el ticket cerrado)
-- [ ] 4 capas invocadas; INLP opcional vía seam
-- [ ] Sniffer sin secreto en claro
-- [ ] Fila L07 → `hecho`
+- [x] Hold cableado en `/chat` (y proxy `/v1` si comparte el wrapper; si no, documentá la deuda en el ticket cerrado)
+- [x] 4 capas invocadas; INLP opcional vía seam
+- [x] Sniffer sin secreto en claro
+- [x] Fila L07 → `hecho`
+
+Cerrado 2026-09-18. Default `egress_profile=chat` (HUD actual). CDE debe poner `compliance`. Hold en `/chat` (burst NDJSON o `[FW_BLOCK]` sin eco de la generación) y `/v1` (403 `EGRESS_HOLD`). INLP: skip si no hay `inlp_lab.npz`, fail-closed si el artefacto está y falla el load. AND fail-closed sin `pack_id`. Sniffer + chat history: `hash8:last4`. Ingress `evaluate_clause` intacto. L08 no implementado.
 
 ## Trampas
 
