@@ -31,6 +31,7 @@ backend/tests/decision_boundary.png
 backend/tests/db_scaling_metrics.md
 backend/calibration/reports/
 backend/calibration/datasets/auto_*.json
+backend/calibration/geometry/*.npz
 
 # IDE & OS
 .vscode/

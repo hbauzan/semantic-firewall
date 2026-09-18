@@ -6,6 +6,19 @@
 >
 > Análisis histórico (no se ejecuta): [`../archivo/README.md`](../archivo/README.md).
 
+## Dirección de producto (2026-09-17)
+
+El objetivo no es “tres cabezas”. Es un **firewall semántico determinista que funciona** en un deployment.
+
+El pipeline de producción (Noise / Cosine / Excitation) **no se reescribe** hasta que un ticket lo liste. L01–L02 son instrumento + nueva base (z-score), todavía en laboratorio.
+
+Experimento diferido (otra etapa, no mezclar en L03–L06):
+
+1. **Cosine-only** — baseline: solo diferencia de coseno.
+2. **Filtro nuevo** — geometría blanqueada (y lo que L04/L06 agreguen) sobre el mismo dataset y el mismo fingerprint de embedder.
+
+Hasta ese A/B, no se “salva” la excitación cruda ni se la vende como titular.
+
 ---
 
 ## Cómo tomar un ticket
@@ -23,8 +36,8 @@ No implementes nada que no esté en L01–L12. Si parece “útil” y no está 
 
 | ID | Ticket | Ola | Estado | Depende de | Paralelo con |
 | :--- | :--- | :---: | :--- | :--- | :--- |
-| L01 | [Determinismo embedder actual](./tickets/L01-determinismo-embedder-actual.md) | 1 | hecho | — | L02, L03, L09 |
-| L02 | [Blanqueamiento offline](./tickets/L02-blanqueamiento-offline.md) | 1 | pendiente | — | L01, L03, L09 |
+| L01 | [Determinismo embedder actual](./tickets/L01-determinismo-embedder-actual.md) | 1 | pendiente | — | L02, L03, L09 |
+| L02 | [Blanqueamiento offline](./tickets/L02-blanqueamiento-offline.md) | 1 | hecho | — | L01, L03, L09 |
 | L03 | [Ingesta pirámide laboratorio](./tickets/L03-ingesta-piramide-laboratorio.md) | 1 | pendiente | — | L01, L02, L09 |
 | L04 | [AND multi-grano offline](./tickets/L04-and-multigrano-offline.md) | 1 | pendiente | L02, L03 | — |
 | L05 | [Sidecar TEI](./tickets/L05-sidecar-tei.md) | 2 | pendiente | L01 | L04, L06, L09 |
