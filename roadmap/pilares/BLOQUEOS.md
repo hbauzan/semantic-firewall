@@ -12,6 +12,8 @@ Murray. El humano duerme. Esto no es un diario: solo lo que **no** se puede merg
 
 L01 y L02 ya están en `upstream/main` (#4, #5).
 
+Las tres ramas salieron de `upstream/main`: al mergear, esperá conflicto trivial en `roadmap/pilares/README.md` (una fila cada una) y en `CONTEXT.md` (glosario). No es código.
+
 ## No tomables hasta merge
 
 | Ticket | Bloqueo | Siguiente |
