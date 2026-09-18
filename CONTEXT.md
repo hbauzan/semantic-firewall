@@ -26,6 +26,12 @@
 
 **Pack** — One uploaded source document ingested into the **Corpus**, tracked with a chunk count.
 
+**Grain** — Closed set of lab ingest units: `sentence`, `paragraph`, `section`, `document`. Not a production chunk of 512 characters.
+
+**Pyramid** — Four-grain lineage of a pack (parent pointers + **char_span**) stored in the lab LanceDB table `knowledge_pyramid`. Production table `knowledge` stays flat.
+
+**char_span** — Half-open `[start, end)` character offsets of a **Grain** node into the concatenated per-page source text.
+
 ---
 
 ## Evaluation pipeline
