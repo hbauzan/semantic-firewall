@@ -5,7 +5,9 @@ Transforms SessionState into structured Markdown report: rompepepe_report_YYYYMM
 from datetime import datetime
 import logging
 from pathlib import Path
-from rompepepe.state.models import SessionState
+
+from rompepepe.oracle.metrics import ConfusionMatrix, metrics_from_results
+from rompepepe.state.models import SessionState, TestResult
 
 logger = logging.getLogger(__name__)
 
@@ -43,14 +45,28 @@ class ReportGenerator:
         md_lines.append(f"**Target System Base URL:** `{target_base_url}`\n")
 
         md_lines.append("## Executive Summary\n")
-        md_lines.append(f"| Metric | Value |")
-        md_lines.append(f"| :--- | :--- |")
+        defense = metrics_from_results(session.results)
+        if defense is not None:
+            md_lines.extend(_defense_metrics_section(defense))
+        else:
+            md_lines.append(
+                "> Oracle labels (`expected_label`, `delivered_text`) were not recorded. "
+                "Defense recall / FPR / leakage cannot be computed for this session.\n"
+            )
+
+        md_lines.append("## Auxiliary /audit pass rate (not a defense metric)\n")
+        md_lines.append("| Metric | Value |")
+        md_lines.append("| :--- | :--- |")
         md_lines.append(f"| Total Tests Executed | `{total_tests}` |")
-        md_lines.append(f"| Passed Queries (Allowed) | `{passed_count}` ({stability_pct:.1f}%) |")
-        md_lines.append(f"| Blocked Queries (Restricted) | `{blocked_count}` ({blocked_pct:.1f}%) |")
+        md_lines.append(f"| Allowed (`trace.passed`) | `{passed_count}` ({stability_pct:.1f}%) |")
+        md_lines.append(f"| Restricted | `{blocked_count}` ({blocked_pct:.1f}%) |")
         md_lines.append(f"| Boundary Transition Events | `{boundary_count}` |")
         md_lines.append(f"| Average REST Latency | `{avg_latency:.2f} ms` |")
         md_lines.append(f"| Session Status | `{session.status.upper()}` |\n")
+        md_lines.append(
+            "_This /audit allow-rate is a lab instrument readout. It is **not** "
+            "recall de bloqueo, FPR, or egress leakage._\n"
+        )
 
         if session.metadata.get("quota_exhausted") or session.status == "paused":
             md_lines.append("> [!WARNING]")
@@ -58,12 +74,12 @@ class ReportGenerator:
             md_lines.append(f"> **Execution Paused Due to Token Quota Exhaustion:** {pause_reason}")
             md_lines.append(f"> The session state has been cleanly saved at step **{session.current_step}/{session.total_steps}**.")
             md_lines.append(f"> You can resume execution anytime by running `./run_rompepepe.sh` option 7 or `python -m rompepepe.main --resume {session.session_id}`.\n")
-        elif stability_pct > 80.0:
+        elif defense is None:
             md_lines.append("> [!NOTE]")
-            md_lines.append(f"> The system exhibited high operational stability ({stability_pct:.1f}%) under test suite permutations.")
-        else:
-            md_lines.append("> [!WARNING]")
-            md_lines.append(f"> High boundary restriction level detected ({blocked_pct:.1f}% blocked). Review filter thresholds.")
+            md_lines.append(
+                "> No Oracle labels on this session. Do not treat the auxiliary /audit "
+                f"allow-rate ({stability_pct:.1f}%) as defense success.\n"
+            )
 
         md_lines.append("\n## System Behavioral Boundaries & Sensitivity Analysis\n")
         
@@ -134,3 +150,21 @@ class ReportGenerator:
 
         logger.info(f"Generated QA Report at {file_path}")
         return file_path
+
+
+def _defense_metrics_section(defense: ConfusionMatrix) -> list[str]:
+    return [
+        "## Defense metrics (Oracle)\n",
+        "| Metric | Value |",
+        "| :--- | :--- |",
+        f"| Recall de bloqueo | `{defense.recall_block:.3f}` (`{defense.true_positive}/{defense.n_attack}`) |",
+        f"| False positive rate | `{defense.fpr:.3f}` (`{defense.false_positive}/{defense.n_benign}`) |",
+        f"| Egress leakage | `{defense.leakage_rate:.3f}` (`{defense.leaked}/{defense.z_attempts}`) |",
+        "",
+        "### Confusion matrix\n",
+        "|  | Predicted block | Predicted allow |",
+        "| :--- | :---: | :---: |",
+        f"| Attack | `{defense.true_positive}` | `{defense.false_negative}` |",
+        f"| Benign | `{defense.false_positive}` | `{defense.true_negative}` |\n",
+    ]
+
