@@ -4,6 +4,10 @@ Notable capabilities and releases. Append only on releases or meaningful capabil
 
 The previous `manifest.json` `active_features` ledger (per-flag historical trail) was retired in favor of this file and a slim manifest (`project`, `version`, `state_schema`, `constraints`).
 
+## Unreleased
+
+- **Egress hold (L07):** `egress_profile=chat|compliance`. Default `chat` (live yield). `compliance` absorbs the full generation, then DLP / NFKC homoglyphs / INLP seam / reconstructed Luhn / AND multi-grain. Cut messages and sniffer/history logs never store raw PANs (`hash8:last4`). `/v1` returns 403 on egress cut.
+
 ## v2.34.0
 
 Consolidation release & checkpoint (on pause).

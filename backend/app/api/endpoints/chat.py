@@ -13,7 +13,7 @@ import math
 import numpy as np
 import uuid
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from app.modules.storage import storage
 from app.modules.dispatcher import get_dispatcher
@@ -30,6 +30,7 @@ from app.modules.providers.groq import GroqProvider
 from app.api.endpoints._shared import verify_api_key, limiter
 from app.modules.persistence import persist_interaction
 from app.modules.rag_context import accumulate_rag_chunks, join_rag_context
+from app.modules.egress import EGRESS_CUT_MESSAGE, audit_held_response, redact_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -321,55 +322,57 @@ async def chat_endpoint(request: Request, req: ChatRequest):
         async def ui_stream_wrapper():
             full_content = []
             yield json.dumps({"response": telemetry_block}).encode("utf-8") + b"\n"
-            
+
             try:
-                async for chunk in _stream_via_provider(clean_prompt, context, cfg, strict=True):
-                    try:
-                        line = chunk.decode("utf-8").strip()
-                        if line:
-                            payload = json.loads(line)
-                            delta = payload.get("response", "")
-                            if delta:
-                                full_content.append(delta)
-                    except Exception:
-                        pass
-                    yield chunk
+                if cfg.egress_profile == "compliance":
+                    reconstructed = await _absorb_ndjson(
+                        _stream_via_provider(clean_prompt, context, cfg, strict=True)
+                    )
+                else:
+                    async for chunk in _stream_via_provider(clean_prompt, context, cfg, strict=True):
+                        delta = _delta_from_ndjson_chunk(chunk)
+                        if delta:
+                            full_content.append(delta)
+                        yield chunk
+                    reconstructed = "".join(full_content)
             except Exception as e:
-                # Upstream LLM unreachable: surface a readable error, mark the
-                # trace ERROR, and close the stream cleanly (no re-raise).
                 err = _llm_error_text(e)
                 yield json.dumps({"response": err}).encode("utf-8") + b"\n"
                 update_trace(trace_id, status="ERROR", response_content=err)
                 return
 
-            reconstructed = "".join(full_content)
-            update_trace(trace_id, response_content=reconstructed, status="COMPLETED")
+            ok, payload, log_text = _gate_generation(reconstructed, cfg)
+            if cfg.egress_profile == "compliance":
+                yield json.dumps({"response": payload}).encode("utf-8") + b"\n"
+            update_trace(
+                trace_id,
+                response_content=log_text,
+                status="COMPLETED" if ok else "EGRESS_BREACH",
+            )
+            await asyncio.to_thread(persist_interaction, clean_prompt, log_text)
 
-            await asyncio.to_thread(persist_interaction, clean_prompt, reconstructed)
-            
         return StreamingResponse(ui_stream_wrapper(), media_type="application/x-ndjson")
 
     async def no_fw_stream_wrapper():
         full_content = []
         try:
-            async for chunk in _stream_via_provider(clean_prompt, context, cfg):
-                try:
-                    line = chunk.decode("utf-8").strip()
-                    if line:
-                        payload = json.loads(line)
-                        delta = payload.get("response", "")
-                        if delta:
-                            full_content.append(delta)
-                except Exception:
-                    pass
-                yield chunk
+            if cfg.egress_profile == "compliance":
+                reconstructed = await _absorb_ndjson(_stream_via_provider(clean_prompt, context, cfg))
+            else:
+                async for chunk in _stream_via_provider(clean_prompt, context, cfg):
+                    delta = _delta_from_ndjson_chunk(chunk)
+                    if delta:
+                        full_content.append(delta)
+                    yield chunk
+                reconstructed = "".join(full_content)
         except Exception as e:
-            # Upstream LLM unreachable: surface a readable error and close clean.
             yield json.dumps({"response": _llm_error_text(e)}).encode("utf-8") + b"\n"
             return
 
-        reconstructed = "".join(full_content)
-        await asyncio.to_thread(persist_interaction, clean_prompt, reconstructed)
+        ok, payload, log_text = _gate_generation(reconstructed, cfg)
+        if cfg.egress_profile == "compliance":
+            yield json.dumps({"response": payload}).encode("utf-8") + b"\n"
+        await asyncio.to_thread(persist_interaction, clean_prompt, log_text)
 
     return StreamingResponse(
         no_fw_stream_wrapper(), media_type="application/x-ndjson"
@@ -382,6 +385,57 @@ def _llm_error_text(e: Exception) -> str:
         f"🔴 [LLM_ERROR] Cannot reach the language model. "
         f"Ensure the inference server is running. {e}"
     )
+
+
+def _delta_from_ndjson_chunk(chunk: bytes) -> str:
+    try:
+        line = chunk.decode("utf-8").strip()
+        if not line:
+            return ""
+        payload = json.loads(line)
+        return str(payload.get("response", "") or "")
+    except Exception:
+        return ""
+
+
+def _delta_from_sse_line(chunk: str) -> str:
+    if not chunk.startswith("data: ") or chunk.strip() == "data: [DONE]":
+        return ""
+    try:
+        payload = json.loads(chunk[6:])
+        return str(payload.get("choices", [{}])[0].get("delta", {}).get("content", "") or "")
+    except (json.JSONDecodeError, IndexError, KeyError, TypeError):
+        return ""
+
+
+async def _absorb_ndjson(agen) -> str:
+    parts: list[str] = []
+    async for chunk in agen:
+        delta = _delta_from_ndjson_chunk(chunk)
+        if delta:
+            parts.append(delta)
+    return "".join(parts)
+
+
+async def _absorb_sse(agen) -> str:
+    parts: list[str] = []
+    async for chunk in agen:
+        delta = _delta_from_sse_line(chunk)
+        if delta:
+            parts.append(delta)
+    return "".join(parts)
+
+
+def _gate_generation(reconstructed: str, cfg: ConfigState) -> tuple[bool, str, str]:
+    """Return (passed, client_payload, log_payload). Chat profile never holds."""
+    log_text = redact_for_log(reconstructed)
+    if cfg.egress_profile != "compliance":
+        return True, reconstructed, log_text
+    verdict = audit_held_response(reconstructed, pack_id=cfg.active_corpus_file)
+    if verdict.passed:
+        return True, reconstructed, log_text
+    logger.info("egress hold cut layer=%s reason=%s", verdict.layer, verdict.reason)
+    return False, EGRESS_CUT_MESSAGE, log_text
 
 
 async def _stream_via_provider(prompt: str, context: str, cfg: ConfigState, strict: bool = False):
@@ -620,29 +674,68 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
 
     # 4. Async Stream Wrapper — non-blocking token buffering for FPI
     provider, _ = get_provider(cfg)
+    gen = provider.stream_chat(config.model, [m.model_dump() for m in config.messages])
+    tid = trace_id if fw_on else None
 
-    async def stream_wrapper(gen, tid):
-        """Pass-through generator that buffers response tokens for sniffer reconstruction."""
-        full_content = []
+    if cfg.egress_profile == "compliance":
         try:
-            async for chunk in gen:
-                # Extract content from SSE data line for buffering
-                if chunk.startswith("data: ") and chunk.strip() != "data: [DONE]":
-                    try:
-                        payload = json.loads(chunk[6:])
-                        delta = payload.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                        if delta:
-                            full_content.append(delta)
-                    except (json.JSONDecodeError, IndexError, KeyError):
-                        pass
-                yield chunk
+            reconstructed = await _absorb_sse(gen)
         except Exception as e:
-            # Upstream LLM unreachable: emit an OpenAI-style error chunk so the
-            # client gets a structured response instead of an empty stream, mark
-            # the trace ERROR, and close the stream cleanly (no re-raise).
             logger.error("Proxy upstream connection failed: %s", e)
             if tid:
                 update_trace(tid, status="ERROR", response_content=_llm_error_text(e))
+            return Response(
+                content=json.dumps({
+                    "error": {
+                        "message": _llm_error_text(e),
+                        "type": "upstream_error",
+                        "code": "502",
+                    }
+                }),
+                status_code=502,
+                media_type="application/json",
+            )
+        ok, payload, log_text = _gate_generation(reconstructed, cfg)
+        if tid:
+            update_trace(
+                tid,
+                response_content=log_text,
+                status="COMPLETED" if ok else "EGRESS_BREACH",
+            )
+        await asyncio.to_thread(persist_interaction, last_msg, log_text)
+        if not ok:
+            return Response(
+                content=json.dumps({
+                    "error": {
+                        "message": "[FW_BLOCK] egress hold",
+                        "type": "security_breach",
+                        "code": "403",
+                        "breach_type": "EGRESS_HOLD",
+                    }
+                }),
+                status_code=403,
+                media_type="application/json",
+            )
+
+        async def burst():
+            yield f"data: {json.dumps({'choices': [{'delta': {'content': payload}}]})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(burst(), media_type="text/event-stream")
+
+    async def stream_wrapper(upstream, trace_id_for_update):
+        """Pass-through generator that buffers response tokens for sniffer reconstruction."""
+        full_content = []
+        try:
+            async for chunk in upstream:
+                delta = _delta_from_sse_line(chunk)
+                if delta:
+                    full_content.append(delta)
+                yield chunk
+        except Exception as e:
+            logger.error("Proxy upstream connection failed: %s", e)
+            if trace_id_for_update:
+                update_trace(trace_id_for_update, status="ERROR", response_content=_llm_error_text(e))
             err_payload = {
                 "error": {
                     "message": _llm_error_text(e),
@@ -653,20 +746,14 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
             yield f"data: {json.dumps(err_payload)}\n\n"
             yield "data: [DONE]\n\n"
             return
-        # Post-stream: fire-and-forget trace update with reconstructed response
         reconstructed = "".join(full_content)
-        if tid:
-            update_trace(tid, response_content=reconstructed, status="COMPLETED")
-        
-        # Unification: save history for proxy
-        await asyncio.to_thread(persist_interaction, last_msg, reconstructed)
+        log_text = redact_for_log(reconstructed)
+        if trace_id_for_update:
+            update_trace(trace_id_for_update, response_content=log_text, status="COMPLETED")
+        await asyncio.to_thread(persist_interaction, last_msg, log_text)
 
-    # 5. Forward to Provider (wrapped for FPI)
     return StreamingResponse(
-        stream_wrapper(
-            provider.stream_chat(config.model, [m.model_dump() for m in config.messages]),
-            trace_id if fw_on else None,
-        ),
+        stream_wrapper(gen, tid),
         media_type="text/event-stream"
     )
 

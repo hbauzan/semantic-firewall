@@ -6,6 +6,8 @@ import asyncio
 import uuid
 import threading
 
+from app.modules.egress import redact_for_log
+
 logger = logging.getLogger(__name__)
 
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
@@ -27,8 +29,8 @@ def persist_interaction(user_content: str, assistant_content: str) -> None:
                     logger.warning("Failed to load chat history for persistence: %s", e)
                     history = []
             
-            history.append({"id": str(uuid.uuid4()), "role": "user", "content": user_content})
-            history.append({"id": str(uuid.uuid4()), "role": "assistant", "content": assistant_content})
+            history.append({"id": str(uuid.uuid4()), "role": "user", "content": redact_for_log(user_content)})
+            history.append({"id": str(uuid.uuid4()), "role": "assistant", "content": redact_for_log(assistant_content)})
             
             payload = json.dumps(history[-_MAX_MESSAGES:], indent=2)
             CHAT_HISTORY_FILE.write_text(payload, encoding="utf-8")

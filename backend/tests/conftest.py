@@ -84,4 +84,5 @@ def reset_config_after_test():
         active_tab="chat",
         active_corpus_file=None,
         calibration_coverage="recommended",
+        egress_profile="chat",
     )

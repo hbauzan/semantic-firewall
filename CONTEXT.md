@@ -32,7 +32,7 @@
 
 **char_span** — Half-open `[start, end)` character offsets of a **Grain** node into the concatenated per-page source text.
 
-**AND multi-grain** — Lab positive-mode conjunction: micro (sentence 1-NN) ∩ meso (parent paragraph) ∩ lexical (sparse overlap). No blend α. Not a production **Filter**.
+**AND multi-grain** — Conjunction micro (sentence 1-NN) ∩ meso (parent paragraph) ∩ lexical (sparse overlap). No blend α. Used by compliance **Egress hold**; not an ingress **Filter**.
 
 ---
 
@@ -97,6 +97,10 @@
 **Transparent Proxy** — The `POST /v1/chat/completions` surface implementing the OpenAI spec, so any OpenAI-compatible client gains firewall interception with no code change. Returns `403` on **BREACH**.
 
 **Chat endpoint** — The `POST /chat` surface used by the built-in **HUD**; streams NDJSON with inline firewall telemetry.
+
+**Egress profile** — Whether generation tokens may stream (`chat`) or must wait for a full-response **Egress hold** (`compliance`). Default is `chat`; CDE sets `compliance`.
+
+**Egress hold** — Buffer of the complete generation, audited by DLP, homoglyph normalization, INLP (optional seam), reconstructed numbers, and **AND multi-grain** before any generation token reaches the client.
 
 ---
 
