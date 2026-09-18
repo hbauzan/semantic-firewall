@@ -8,7 +8,8 @@ import threading
 from dataclasses import dataclass
 from typing import Any
 
-from app.modules.mlx_embedder import EmbeddingOutput, create_hybrid_embedder
+from app.modules.mlx_embedder import EmbeddingOutput
+from app.modules.tei_embedder import create_runtime_embedder
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class UnifiedInferenceDispatcher:
   """Serializes embedding calls — dedicated actor thread only for MLX/Metal backends."""
 
   def __init__(self, embedder: Any | None = None) -> None:
-    self._embedder = embedder or create_hybrid_embedder()
+    self._embedder = embedder or create_runtime_embedder()
     self._queue: queue.Queue[_InferenceTask | None] = queue.Queue()
     self._thread: threading.Thread | None = None
     self._loop: asyncio.AbstractEventLoop | None = None

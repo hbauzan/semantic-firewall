@@ -102,6 +102,24 @@ class Settings(BaseSettings):
         default="BAAI/bge-m3",
         description="HuggingFace embedding model ID.",
     )
+    tei_enabled: bool = Field(
+        default=False,
+        description="If true, embeddings go to the TEI sidecar instead of in-process SentenceTransformer.",
+    )
+    tei_url: str = Field(
+        default="http://127.0.0.1:8080",
+        description="TEI HTTP base URL (no trailing slash required).",
+    )
+    tei_image_digest: str = Field(
+        default="sha256:2614a26fcdefcd4e8b2d1265cdfb8d0144b591fe7f7e9db922a38056f7c47ca2",
+        description="Pinned TEI image digest (must match deploy/tei/docker-compose.yml).",
+    )
+    tei_timeout_s: float = Field(
+        default=5.0,
+        ge=0.1,
+        le=60.0,
+        description="HTTP timeout in seconds for TEI embed calls.",
+    )
 
     # --- RAG ---
     rag_top_k: int = Field(

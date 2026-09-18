@@ -1,0 +1,33 @@
+# L05 — Hugging Face Text Embeddings Inference sidecar.
+# Image is pinned by digest. Never use :latest (ticket + spec).
+#
+# Digest resolved 2026-09-17 from GHCR tag cpu-arm64-latest (content digest pinned below).
+# (numbered cpu-arm64-1.9 is documented but unpublished: huggingface/text-embeddings-inference#900).
+# linux/arm64 CPU. No Metal/MPS inside Docker.
+#
+#   docker compose -f deploy/tei/docker-compose.yml up -d
+#   TEI_ENABLED=true  (backend .env)
+#
+# Model id must match settings.embedding_model (BAAI/bge-m3). Public model; do not
+# commit a Hugging Face token. Optional HF_TOKEN in the environment for Hub rate limits.
+services:
+  tei:
+    image: ghcr.io/huggingface/text-embeddings-inference@sha256:2614a26fcdefcd4e8b2d1265cdfb8d0144b591fe7f7e9db922a38056f7c47ca2
+    platform: linux/arm64
+    ports:
+      - "8080:80"
+    volumes:
+      - tei_model_cache:/data
+    environment:
+      HF_HUB_ENABLE_HF_TRANSFER: "0"
+    command:
+      - --model-id
+      - BAAI/bge-m3
+      - --dtype
+      - float32
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  tei_model_cache:
