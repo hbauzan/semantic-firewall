@@ -55,6 +55,12 @@
 
 **Whitening** — A lab change of basis \(Q'=(Q-\mu)\Sigma^{-1/2}\) (ZCA) fitted on corpus vectors so each axis has variance ~1. Not a production **Filter**; **Excitation** still counts raw BGE-M3 axes.
 
+**INLP** — Lab estimate of a forbidden-theme subspace \(P\). Not a production **Filter**; not DLP of identifiers.
+
+**Projection energy** — \(\|\Pi_P(Y)\|^2\) of an already-whitened vector \(Y\) onto \(P\).
+
+**τ** — Cut on **Projection energy**, calibrated for 0 FPR on 100 benigns and maximum recall on 100 evasions of that theme.
+
 **Decision** — The terminal outcome of evaluating a prompt: **PASS** or **BREACH**.
 
 **PASS** — Every **Clause** cleared the **Pipeline**; the request is forwarded to the **Provider**.
