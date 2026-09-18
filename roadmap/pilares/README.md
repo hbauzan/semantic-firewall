@@ -45,7 +45,7 @@ No implementes nada que no esté en L01–L12. Si parece “útil” y no está 
 | L07 | [Egreso compliance hold](./tickets/L07-egreso-compliance-hold.md) | 3 | hecho | L04, L05 | L06, L09 |
 | L08 | [Egreso chat sentence buffer](./tickets/L08-egreso-chat-sentence-buffer.md) | 3 | hecho | L07 | — |
 | L09 | [Oracle y métricas](./tickets/L09-oraculo-y-metricas.md) | 4 | hecho | — | L01, L02, L03 |
-| L10 | [Campaña Z exfil](./tickets/L10-campana-Z-exfil.md) | 4 | pendiente | L07, L09 | L11 |
+| L10 | [Campaña Z exfil](./tickets/L10-campana-Z-exfil.md) | 4 | hecho | L07, L09 | L11 |
 | L11 | [Campaña S desvío](./tickets/L11-campana-S-desvio.md) | 4 | pendiente | L04, L07, L09 | L10 |
 | L12 | [Campaña fragmentación](./tickets/L12-campana-fragmentacion.md) | 4 | pendiente | L08, L09 | — |
 

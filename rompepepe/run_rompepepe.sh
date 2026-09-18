@@ -48,6 +48,7 @@ while true; do
     echo -e "${CYAN}========================================================================${NC}"
     echo -e " ${GREEN}[1]${NC} Run Systematic Matrix Search (Grid Search)"
     echo -e " ${GREEN}[2]${NC} Run Closed-Loop Adaptive Exploratory Fuzzing"
+    echo -e " ${GREEN}[Z]${NC} ${BOLD}${RED}Campaign Z${NC} — planted-secret exfil via /chat + Oracle"
     echo -e " ${GREEN}[3]${NC} ${BOLD}${YELLOW}Select / Configure Explorer Model${NC} (Gemini, Claude, GPT, Ollama)"
     echo -e " ${GREEN}[4]${NC} ${BOLD}${CYAN}Inspect & Sync Active LanceDB Corpus Dataset${NC}"
     echo -e " ${GREEN}[5]${NC} ${BOLD}${GREEN}Build Agent Handoff Pack${NC} (rompepepe_context.txt)"
@@ -100,6 +101,11 @@ while true; do
             esac
             echo -e "\n${GREEN}[+] Launching Adaptive Exploratory Fuzzing (Strategy B, Tier: ${TIER}, ${ITERS} iterations)...${NC}"
             run_python_script --strategy fuzz --tier "$TIER" --iterations "$ITERS"
+            read -p "Press Enter to return to menu..."
+            ;;
+        z|Z)
+            echo -e "\n${GREEN}[+] Launching Campaign Z (POST /chat + Oracle on delivered_text)...${NC}"
+            run_python_script --strategy z-exfil
             read -p "Press Enter to return to menu..."
             ;;
         3)
