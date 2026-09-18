@@ -43,7 +43,7 @@ Marcás el Nivel 1 como hecho cuando se cumplen **todas**:
 - [ ] Tenés un **dataset etiquetado** (on-corpus que debe pasar / off-corpus + adversarial que debe bloquear).
 - [ ] Tenés un **número primario**: la performance de tu claim primario (allowlist) sobre ese dataset, reproducible.
 - [ ] Tenés ese mismo número para **al menos un baseline** (Llama Guard 3 o Prompt Guard).
-- [ ] Demostraste **determinismo**: el mismo prompt da el mismo score en N corridas en tu máquina.
+- [x] Demostraste **determinismo**: el mismo prompt da el mismo score en N corridas en tu máquina. — L01, ver `backend/tests/embedder_determinism_report.md`.
 - [ ] Tenés un **writeup** en inglés con hipótesis / método / resultados / **limitaciones explícitas** / link al repo.
 - [ ] Tenés un **plan de publicación** con orden de canales y material listo.
 

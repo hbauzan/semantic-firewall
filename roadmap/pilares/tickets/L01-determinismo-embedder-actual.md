@@ -1,6 +1,6 @@
 # L01 — Determinismo del embedder actual
 
-> **Estado:** pendiente
+> **Estado:** hecho
 > **Ola:** 1
 > **Spec:** [`specs/pilar-3-tei-determinismo.md`](../specs/pilar-3-tei-determinismo.md)
 
@@ -41,11 +41,11 @@ Nada.
 
 ## Tareas
 
-- [ ] Embeber el mismo string N=100 veces vía el backend actual (`embed_full` o dispatcher).
-- [ ] Hash / igualdad de vectores; si no son bit-idénticos, reportar max |Δ| por coordenada y en norma.
-- [ ] Repetir decisión PASS/BREACH del firewall para un prompt fijo + corpus fijo (si el test puede cargar pack demo sin red).
-- [ ] Fingerprint: `embedding_model`, `sentence-transformers`, `torch`, device (`mps|cuda|cpu`), versiones relevantes.
-- [ ] Documentar el comando exacto: `cd backend && uv run pytest …` o `uv run python tests/…`.
+- [x] Embeber el mismo string N=100 veces vía el backend actual (`embed_full` o dispatcher).
+- [x] Hash / igualdad de vectores; si no son bit-idénticos, reportar max |Δ| por coordenada y en norma.
+- [x] Repetir decisión PASS/BREACH del firewall para un prompt fijo + corpus fijo (si el test puede cargar pack demo sin red).
+- [x] Fingerprint: `embedding_model`, `sentence-transformers`, `torch`, device (`mps|cuda|cpu`), versiones relevantes.
+- [x] Documentar el comando exacto: `cd backend && uv run pytest …` o `uv run python tests/…`.
 
 ## Tests (TDD)
 
@@ -53,19 +53,29 @@ El test falla (o el script exit≠0) si no puede embeber. La **inestabilidad** n
 
 ```
 cd backend && uv run pytest -q tests/test_embedder_determinism.py
+cd backend && uv run python tests/embedder_determinism.py --runs 100
+cd backend && RUN_EMBEDDER_DETERMINISM=1 uv run pytest -q tests/test_embedder_determinism.py
 ```
+
+Informe: [`backend/tests/embedder_determinism_report.md`](../../../backend/tests/embedder_determinism_report.md). Harness con stubs siempre corre en la suite; el N=100 live **no** entra en `./run_tests.sh`.
 
 ## Definición de hecho
 
-- [ ] Comando documentado, N=100 corrido, magnitudes en el informe
-- [ ] Fingerprint escrito
-- [ ] L05 puede citar este informe como baseline
-- [ ] Fila L01 en [`README.md`](../README.md) → `hecho`
+- [x] Comando documentado, N=100 corrido, magnitudes en el informe
+- [x] Fingerprint escrito
+- [x] L05 puede citar este informe como baseline
+- [x] Fila L01 en [`README.md`](../README.md) → `hecho`
 
 ## Trampas
 
 - No uses un segundo proceso con distinta semilla de OpenMP y lo llames “el mismo runtime” sin decirlo.
 - No subas vectores ni texto de corpus privado.
+
+## Resultado (Darwin arm64 / MPS / torch 2.10.0 / ST 5.3.0 / BGE-M3)
+
+- Vectores densos **bit-idénticos** en N=100 (max_abs_delta=0, unique_hashes=1) para on-corpus y off-topic.
+- PASS/BREACH **estable** (flip_count=0). On-corpus: BREACH por excitación contra un chunk de 512 chars (calibración, no jitter). Off-topic: BREACH por coseno.
+- Path medido: singleton `embedder.embed_full`. El dispatcher tiene **otra** instancia ST.
 
 ## Prompt copiable
 

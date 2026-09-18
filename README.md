@@ -461,6 +461,18 @@ The suite is partitioned across `tests/test_engine.py` (pure firewall math), `te
 | **Security** | Prompt length limits, API key enforcement |
 | **Proxy** | OpenAI v1 spec compliance, firewall interception on proxy, SSE streaming, graceful upstream-failure handling |
 | **Health** | Health check endpoint response shape |
+| **Embedder determinism (L01)** | Harness with stubs in `tests/test_embedder_determinism.py`. Live N=100 probe is **not** in `./run_tests.sh`. |
+
+Live in-process BGE-M3 probe (fingerprint + vector spread + PASS/BREACH vs frozen demo chunk):
+
+```bash
+cd backend
+uv run python tests/embedder_determinism.py --runs 100
+# or
+RUN_EMBEDDER_DETERMINISM=1 uv run pytest -q tests/test_embedder_determinism.py
+```
+
+Report: [`backend/tests/embedder_determinism_report.md`](./backend/tests/embedder_determinism_report.md). Jitter is recorded, not a CI failure. Cross-host bit-exactness is not claimed.
 
 ### Load Testing
 

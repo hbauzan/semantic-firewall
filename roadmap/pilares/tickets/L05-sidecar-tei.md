@@ -27,7 +27,7 @@ Correr Text Embeddings Inference como contenedor con **digest SHA256 pinneado**,
 - [`backend/app/modules/mlx_embedder.py`](../../../backend/app/modules/mlx_embedder.py) — `EmbeddingOutput`
 - [`backend/app/core/settings.py`](../../../backend/app/core/settings.py)
 - [`setup-fw.sh`](../../../setup-fw.sh) (línea “Docker not used”)
-- L01 informe
+- L01 informe: [`backend/tests/embedder_determinism_report.md`](../../../backend/tests/embedder_determinism_report.md)
 
 ## Archivos a tocar
 
