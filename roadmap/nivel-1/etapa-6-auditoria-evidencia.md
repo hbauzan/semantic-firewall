@@ -21,10 +21,10 @@ Un número sin reproducibilidad ni baseline no es evidencia, es marketing. Y la 
 
 ### Bloque A — Determinismo (la base de toda la auditabilidad)
 Tu narrativa entera es "auditable y trazable". Eso exige determinismo. Hay que **probarlo**, no asumirlo.
-- [ ] Embebé el mismo prompt N veces (ej. 100) en tu Mac. Confirmá que el vector es idéntico (o dentro de tolerancia fp).
-- [ ] Confirmá que la decisión PASS/BREACH es estable: mismo prompt + mismo corpus + mismos thresholds = mismo veredicto, siempre.
-- [ ] Documentá el "fingerprint" del entorno donde es determinista: versión de BGE-M3, `sentence-transformers`, `torch`, device (MPS), precisión. Esto es la semilla de la "firma" del Nivel 3 — anotalo, no lo construyas.
-- [ ] (Nota honesta) El determinismo **cross-hardware** (otra Mac, una GPU NVIDIA) NO está garantizado y probablemente no se sostenga. Para el Nivel 1 alcanza con determinismo **en tu deployment**. Decilo explícito en el writeup; es una limitación honesta, no una debilidad.
+- [x] Embebé el mismo prompt N veces (ej. 100) en tu Mac. Confirmá que el vector es idéntico (o dentro de tolerancia fp). — L01: bit-idéntico en Darwin/arm64/MPS, ver `backend/tests/embedder_determinism_report.md`.
+- [x] Confirmá que la decisión PASS/BREACH es estable: mismo prompt + mismo corpus + mismos thresholds = mismo veredicto, siempre. — estable; on-corpus es BREACH estable por excitación (calibración, no jitter).
+- [x] Documentá el "fingerprint" del entorno donde es determinista: versión de BGE-M3, `sentence-transformers`, `torch`, device (MPS), precisión. Esto es la semilla de la "firma" del Nivel 3 — anotalo, no lo construyas.
+- [x] (Nota honesta) El determinismo **cross-hardware** (otra Mac, una GPU NVIDIA) NO está garantizado y probablemente no se sostenga. Para el Nivel 1 alcanza con determinismo **en tu deployment**. Decilo explícito en el writeup; es una limitación honesta, no una debilidad.
 
 ### Bloque B — Reportes reproducibles
 - [ ] Para cada corpus: reporte con métricas estándar (precisión, recall, F1, FPR, curva ROC, AUC) sobre el dataset etiquetado.
@@ -40,7 +40,7 @@ Tu narrativa entera es "auditable y trazable". Eso exige determinismo. Hay que *
 ---
 
 ## Definición de "Etapa 6 terminada"
-- [ ] Determinismo probado y documentado (con fingerprint de entorno y la limitación cross-hardware explícita).
+- [x] Determinismo probado y documentado (con fingerprint de entorno y la limitación cross-hardware explícita).
 - [ ] Reportes reproducibles para ≥2 corpus, con métricas estándar.
 - [ ] Claim primario y secundario cuantificados.
 - [ ] Comando exacto + dataset versionado para que cualquiera reproduzca.

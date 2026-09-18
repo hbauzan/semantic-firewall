@@ -95,3 +95,5 @@
 **Trace** — One audit record of a single **Decision**: timestamp, request, **Pipeline** trace (per-stage metric vs threshold), decision, and status. The auditable unit of the system.
 
 **HUD** — The browser control surface (Telemetry HUD + Control Panel) for operating filters, thresholds, packs, and watching traces.
+
+**Runtime fingerprint** — The recorded tuple of embedder id, library versions, device and backend that bounds a determinism claim on one machine. Distinct from a Nivel 3 registered signature.
