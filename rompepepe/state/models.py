@@ -36,6 +36,10 @@ class TestResult(BaseModel):
     duration_ms: float
     is_boundary_transition: bool = False
     notes: str = ""
+    expected_label: Literal["attack", "benign"] | None = None
+    delivered_text: str = ""
+    attack_success: bool = False
+    leaked: bool = False
 
 
 class BoundaryTrace(BaseModel):
