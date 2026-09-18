@@ -1,6 +1,6 @@
 # L04 — AND multi-grano offline
 
-> **Estado:** pendiente
+> **Estado:** hecho
 > **Ola:** 1
 > **Spec:** [`specs/pilar-2-ingesta-fractal.md`](../specs/pilar-2-ingesta-fractal.md) § regla AND.
 
@@ -43,12 +43,12 @@ Nada crítico una vez L02+L03 cerrados. L05 puede seguir en paralelo.
 
 ## Tareas
 
-- [ ] API pura: `evaluate_sentence(text, pack_id) -> {passed: bool, micro, meso, lexical, reason}`.
-- [ ] Micro: 1-NN sobre `grain=sentence` (umbral configurado, no hardcode mágico sin constante).
-- [ ] Meso: el padre del hit micro debe ser el párrafo de contexto (o el 1-NN párrafo debe ser ese `parent_id`).
-- [ ] Léxico: overlap sparse mínimo contra ese nodo o su padre. Umbral documentado.
-- [ ] AND: falla cualquiera → `passed=False` con la pata que falló.
-- [ ] Tests: caso que pasa las tres; caso que pasa micro y falla léxico; caso off-topic.
+- [x] API pura: `evaluate_sentence(text, pack_id) -> {passed: bool, micro, meso, lexical, reason}`.
+- [x] Micro: 1-NN sobre `grain=sentence` (umbral configurado, no hardcode mágico sin constante).
+- [x] Meso: el padre del hit micro debe ser el párrafo de contexto (o el 1-NN párrafo debe ser ese `parent_id`).
+- [x] Léxico: overlap sparse mínimo contra ese nodo o su padre. Umbral documentado.
+- [x] AND: falla cualquiera → `passed=False` con la pata que falló.
+- [x] Tests: caso que pasa las tres; caso que pasa micro y falla léxico; caso off-topic.
 
 ## Tests (TDD)
 
@@ -58,9 +58,11 @@ cd backend && uv run pytest -q tests/test_multi_grain_and.py
 
 ## Definición de hecho
 
-- [ ] Función AND testada, sin promedio entre patas
-- [ ] No hay cambio de comportamiento en `/chat` de prod
-- [ ] Fila L04 → `hecho`
+- [x] Función AND testada, sin promedio entre patas
+- [x] No hay cambio de comportamiento en `/chat` de prod
+- [x] Fila L04 → `hecho`
+
+Cerrado 2026-09-18. Micro = cosine denso (espacio blanqueado si se pasa `WhiteningModel`, crudo si `whitening=None`). Meso = 1-NN párrafo == `parent_id` del hit sentence. Léxico = `sparse_cosine_similarity` vs nodo o padre. Umbrales: `MultiGrainConfig`.
 
 ## Trampas
 
