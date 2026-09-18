@@ -371,10 +371,10 @@ run_custom_cleanup() {
 inspect_stale_instances() {
     print_header
     echo -e "\n${CYAN}=== Instance Inspector ===${NC}"
-    echo -e "${YELLOW}Scanning bare-metal processes (Docker not used in this project).${NC}\n"
+    echo -e "${YELLOW}Scanning processes. Optional TEI sidecar lives in deploy/tei/docker-compose.yml (digest-pinned; never :latest).${NC}\n"
     local bare_found=false
-    local ports=(8000 5173 11434)
-    local labels=("Backend (FastAPI)" "Frontend (Vite)" "Ollama")
+    local ports=(8000 5173 11434 8080)
+    local labels=("Backend (FastAPI)" "Frontend (Vite)" "Ollama" "TEI (optional)")
     for i in "${!ports[@]}"; do
         local port=${ports[$i]}
         local pids

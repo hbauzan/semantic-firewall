@@ -1,7 +1,8 @@
 """Embedding singleton — delegates to MLX hybrid backend when available."""
 import logging
 
-from app.modules.mlx_embedder import EmbeddingOutput, create_hybrid_embedder
+from app.modules.mlx_embedder import EmbeddingOutput
+from app.modules.tei_embedder import create_runtime_embedder
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class Embedder:
     return cls._instance
 
   def initialize(self) -> None:
-    self._backend = create_hybrid_embedder()
+    self._backend = create_runtime_embedder()
     self.device = self._backend.device
     self.model = self._backend.model
 

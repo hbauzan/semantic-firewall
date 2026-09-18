@@ -97,3 +97,5 @@
 **HUD** — The browser control surface (Telemetry HUD + Control Panel) for operating filters, thresholds, packs, and watching traces.
 
 **Runtime fingerprint** — The recorded tuple of embedder id, library versions, device and backend that bounds a determinism claim on one machine. Distinct from a Nivel 3 registered signature.
+
+**TEI sidecar** — Optional Hugging Face Text Embeddings Inference container addressed by HTTP. The image is pinned by SHA256 digest, not a floating tag. Off by default; in-process SentenceTransformer remains the fallback.
