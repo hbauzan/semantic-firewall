@@ -10,7 +10,7 @@ L01, L02, L03, L05, L09. PRs #4–#8, autor `murray-threepwood`.
 
 | Ticket | Estado |
 | :--- | :--- |
-| **L04** AND multi-grano | Este PR. Lab. No toca `/chat`. |
+| **L04** AND multi-grano | PR #9. Lab. No toca `/chat`. |
 | **L06** INLP + τ | Libre en paralelo (L02+L09 en main). |
 
 ## No empezar
