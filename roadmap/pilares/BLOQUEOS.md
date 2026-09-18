@@ -1,37 +1,31 @@
-# Bloqueos (2026-09-17 noche, UTC-3)
+# Bloqueos
 
-Murray. El humano duerme. Esto no es un diario: solo lo que **no** se puede mergear o correr sin Héctor.
+Actualizado 2026-09-18 (tras merge L01–L03, L05, L09).
 
-## PRs abiertos (review mañana)
+## Hecho en main
 
-| Ticket | PR | Notas |
-| :--- | :--- | :--- |
-| L03 | https://github.com/hbauzan/semantic-firewall/pull/6 | Pirámide lab. Autor `murray-threepwood`. |
-| L09 | https://github.com/hbauzan/semantic-firewall/pull/7 | Oracle. Autor `murray-threepwood`. |
-| L05 | https://github.com/hbauzan/semantic-firewall/pull/8 | Adapter + compose por digest. Tests mock verdes. |
+L01, L02, L03, L05, L09. PRs #4–#8, autor `murray-threepwood`.
 
-L01 y L02 ya están en `upstream/main` (#4, #5).
+## Tomable
 
-Las tres ramas salieron de `upstream/main`: al mergear, esperá conflicto trivial en `roadmap/pilares/README.md` (una fila cada una) y en `CONTEXT.md` (glosario). No es código.
+| Ticket | Estado |
+| :--- | :--- |
+| **L04** AND multi-grano | Este PR. Lab. No toca `/chat`. |
+| **L06** INLP + τ | Libre en paralelo (L02+L09 en main). |
 
-## No tomables hasta merge
+## No empezar
 
-| Ticket | Bloqueo | Siguiente |
-| :--- | :--- | :--- |
-| **L04** AND multi-grano | `BLOQUEADO-por: L03 PR #6` (y usa whitening de L02, que **sí** está en main) | Mergear L03, rama nueva desde `upstream/main`. |
-| **L06** INLP + τ | `BLOQUEADO-por: L09 PR #7` (L02 ya en main) | Mergear L09. Golden set 100+100 puede nacer entonces. |
-| **L07** egreso hold | L04 + L05 en main | No empezar. |
-| **L08** sentence buffer | L07 | No empezar. |
-| **L10–L12** campañas | grafo del README de pilares | No empezar. |
+| Ticket | Hasta |
+| :--- | :--- |
+| **L07** egreso hold | L04 en main (L05 ya está) |
+| **L08** | L07 |
+| **L10–L12** | grafo del README de pilares |
 
-## L05 live sidecar
+## L05 live sidecar (operador)
 
-- Docker **client** 29.6.1 está instalado. El **daemon** no contestó (`desktop-linux` sin server). No hubo `docker pull`.
-- Compose pinneado: `ghcr.io/huggingface/text-embeddings-inference@sha256:2614a26fcdefcd4e8b2d1265cdfb8d0144b591fe7f7e9db922a38056f7c47ca2` (contenido de `cpu-arm64-latest` al 2026-09-17; el tag `cpu-arm64-1.9` no existe, issue upstream #900).
-- Suite default: `cd backend && uv run pytest -q tests/test_tei_adapter.py` (mock). Integration skip sin `RUN_TEI_INTEGRATION=1`.
-- Para correr el sidecar mañana: arrancar Docker Desktop, `docker compose -f deploy/tei/docker-compose.yml up -d`, `TEI_ENABLED=true`, después el marker de integration. Comparar `max_abs_delta` contra `backend/tests/embedder_determinism_report.md` (L01: 0 en esta Mac, ST singleton).
+Docker Desktop es el daemon del sidecar TEI, **no** el semantic-firewall. El firewall sigue bare-metal (`setup-fw.sh`). `TEI_ENABLED=false` por default.
 
-## Preguntas de producto (no adiviné)
+## Producto (no adivinar)
 
-- ¿Enchufar whitening a prod? No. Lab hasta que un ticket lo liste.
-- ¿A/B cosine-only vs filtro nuevo? Diferido. No codeado.
+- Whitening / AND / INLP no se enchufan a prod hasta que un ticket lo liste.
+- A/B cosine-only vs geometría blanqueada: diferido, no codeado.

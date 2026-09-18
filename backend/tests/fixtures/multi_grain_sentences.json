@@ -1,0 +1,22 @@
+{
+  "pack_id": "lab-automotive",
+  "notes": "L04 golden set. Labels are expected failing AND-leg, or pass. Not production /chat.",
+  "cases": [
+    {
+      "id": "on_corpus",
+      "text": "The rear axle nominal PSI is 32 when tires are cold.",
+      "expect": "pass"
+    },
+    {
+      "id": "lexical_fail",
+      "text": "The rear axle nominal PSI is 32 when tires are cold.",
+      "expect": "lexical",
+      "sparse_override": "disjoint"
+    },
+    {
+      "id": "off_topic",
+      "text": "What are the best mutual fund allocations for retirement planning?",
+      "expect": "micro"
+    }
+  ]
+}

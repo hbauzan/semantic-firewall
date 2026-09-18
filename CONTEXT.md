@@ -32,6 +32,8 @@
 
 **char_span** — Half-open `[start, end)` character offsets of a **Grain** node into the concatenated per-page source text.
 
+**AND multi-grain** — Lab positive-mode conjunction: micro (sentence 1-NN) ∩ meso (parent paragraph) ∩ lexical (sparse overlap). No blend α. Not a production **Filter**.
+
 ---
 
 ## Evaluation pipeline
