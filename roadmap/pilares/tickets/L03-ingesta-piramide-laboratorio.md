@@ -1,6 +1,6 @@
 # L03 — Ingesta pirámide (laboratorio)
 
-> **Estado:** pendiente
+> **Estado:** hecho
 > **Ola:** 1
 > **Spec:** [`specs/pilar-2-ingesta-fractal.md`](../specs/pilar-2-ingesta-fractal.md)
 
@@ -43,11 +43,11 @@ Nada.
 
 ## Tareas
 
-- [ ] Extraer texto **por página** (hoy se concatena y se pierde `page`).
-- [ ] Segmentar: oraciones, párrafos, secciones (headings / saltos de página como proxy de sección si el PDF no trae outline), centroide documento (media de vectores o embed del texto agregado — documentá cuál y por qué).
-- [ ] Asignar `node_id`, `pack_id`, `grain`, `parent_id`, `section_id`, `page`, `char_span`, `text`, `vector`, `sparse`.
-- [ ] Insertar en tabla lab. Tests: cada `sentence` tiene `parent_id` que existe como `paragraph`; `char_span` apunta a substring real; `grain` ∈ set cerrado.
-- [ ] Comando: ingerir el PDF automotive de demo a la tabla lab.
+- [x] Extraer texto **por página** (hoy se concatena y se pierde `page`).
+- [x] Segmentar: oraciones, párrafos, secciones (headings / saltos de página como proxy de sección si el PDF no trae outline), centroide documento (media de vectores o embed del texto agregado — documentá cuál y por qué).
+- [x] Asignar `node_id`, `pack_id`, `grain`, `parent_id`, `section_id`, `page`, `char_span`, `text`, `vector`, `sparse`.
+- [x] Insertar en tabla lab. Tests: cada `sentence` tiene `parent_id` que existe como `paragraph`; `char_span` apunta a substring real; `grain` ∈ set cerrado.
+- [x] Comando: ingerir el PDF automotive de demo a la tabla lab.
 
 ## Tests (TDD)
 
@@ -59,10 +59,12 @@ cd backend && uv run pytest -q tests/test_fractal_ingest.py
 
 ## Definición de hecho
 
-- [ ] 4 granos persistidos con schema del spec
-- [ ] Tabla `knowledge` intacta
-- [ ] L04 puede leer nodos lab
-- [ ] Fila L03 → `hecho`
+- [x] 4 granos persistidos con schema del spec
+- [x] Tabla `knowledge` intacta
+- [x] L04 puede leer nodos lab (`load_pyramid`)
+- [x] Fila L03 → `hecho`
+
+Cerrado 2026-09-17. Módulo `app.modules.fractal_ingest`. Tabla fija `knowledge_pyramid`. Grano `document` = media de vectores `sentence` (mismo espacio que la inspección micro; no `embed` del PDF concatenado). Secciones = un nodo por página (proxy; los demo PDF no traen outline). Si el PDF no está en disco, el CLI usa `generate_demo_corpora.py`. L04: `load_pyramid(db_path, pack_id=...)`.
 
 ## Trampas
 
