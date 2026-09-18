@@ -1,31 +1,26 @@
 # Bloqueos
 
-Actualizado 2026-09-18 (tras merge L01–L03, L05, L09).
+Actualizado 2026-09-18 (L01–L07, L09 en curso de review).
 
 ## Hecho en main
 
-L01, L02, L03, L05, L09. PRs #4–#8, autor `murray-threepwood`.
+L01–L06, L09. PRs #4–#10.
 
-## Tomable
+## Este PR
 
 | Ticket | Estado |
 | :--- | :--- |
-| **L04** AND multi-grano | PR #9. Lab. No toca `/chat`. |
-| **L06** INLP + τ | Libre en paralelo (L02+L09 en main). |
+| **L07** egreso compliance hold | Este PR. Default `egress_profile=chat`. CDE: `compliance`. |
 
 ## No empezar
 
 | Ticket | Hasta |
 | :--- | :--- |
-| **L07** egreso hold | L04 en main (L05 ya está) |
-| **L08** | L07 |
+| **L08** sentence buffer | L07 en main |
 | **L10–L12** | grafo del README de pilares |
-
-## L05 live sidecar (operador)
-
-Docker Desktop es el daemon del sidecar TEI, **no** el semantic-firewall. El firewall sigue bare-metal (`setup-fw.sh`). `TEI_ENABLED=false` por default.
 
 ## Producto (no adivinar)
 
-- Whitening / AND / INLP no se enchufan a prod hasta que un ticket lo liste.
-- A/B cosine-only vs geometría blanqueada: diferido, no codeado.
+- Ingress Noise / Cosine / Excitation no se reescribe.
+- A/B cosine-only vs geometría blanqueada: diferido.
+- CDE no streamea: hay que poner `egress_profile=compliance` (el default `chat` conserva el HUD de hoy).

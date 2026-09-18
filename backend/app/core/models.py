@@ -58,6 +58,14 @@ class ConfigState(BaseModel):
         default="recommended",
         description="Dataset coverage mode for automatic corpus calibration",
     )
+    egress_profile: Literal["chat", "compliance"] = Field(
+        default="chat",
+        description=(
+            "chat: yield generation tokens as they arrive (today's HUD). "
+            "compliance: hold the full response and audit DLP/homoglyphs/INLP/numbers/AND "
+            "before any generation token reaches the client. CDE must set compliance."
+        ),
+    )
 
     @model_validator(mode='after')
     def validate_unique_orders(self):
@@ -91,6 +99,7 @@ class ConfigUpdate(BaseModel):
     upstream_provider: Literal["ollama", "google", "openai", "anthropic", "groq"] = Field(default="ollama")
     active_corpus_file: str | None = Field(default=None)
     calibration_coverage: Literal["fast", "recommended", "exhaustive"] = Field(default="recommended")
+    egress_profile: Literal["chat", "compliance"] = Field(default="chat")
 
 
 # Max prompt length to prevent memory exhaustion before vectorization
