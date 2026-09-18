@@ -1,6 +1,6 @@
 # L06 — INLP y umbral τ
 
-> **Estado:** pendiente
+> **Estado:** hecho
 > **Ola:** 3
 > **Spec:** [`specs/pilar-1-geometria.md`](../specs/pilar-1-geometria.md) § subespacio ortogonal.
 
@@ -43,11 +43,11 @@ Estimar el subespacio prohibido \(P\), calcular \(\|\Pi_P(Y)\|^2\) para un texto
 
 ## Tareas
 
-- [ ] A partir de embeddings de ejemplos de la clase prohibida (tema, no PAN suelto), estimar \(P\) (INLP / proyección a las direcciones discriminativas). Documentá el procedimiento (autovectores de la clase vs complemento, o INLP iterativo) en el docstring / comentario de módulo, no en un ensayo.
-- [ ] `projection_energy(y) -> float` = \(\|\Pi_P(Y)\|^2\) sobre \(Y\) ya blanqueado.
-- [ ] Calibrar \(\tau\): 0 FPR sobre los 100 benignos del set de calibración, máximo recall sobre las 100 evasiones. Guardar el valor y el comando.
-- [ ] `should_cut(y, tau) -> bool`.
-- [ ] Tests sintéticos: vector en \(P\) → energía alta; vector ortogonal → energía ~0.
+- [x] A partir de embeddings de ejemplos de la clase prohibida (tema, no PAN suelto), estimar \(P\) (INLP / proyección a las direcciones discriminativas). Documentá el procedimiento (autovectores de la clase vs complemento, o INLP iterativo) en el docstring / comentario de módulo, no en un ensayo.
+- [x] `projection_energy(y) -> float` = \(\|\Pi_P(Y)\|^2\) sobre \(Y\) ya blanqueado.
+- [x] Calibrar \(\tau\): 0 FPR sobre los 100 benignos del set de calibración, máximo recall sobre las 100 evasiones. Guardar el valor y el comando.
+- [x] `should_cut(y, tau) -> bool`.
+- [x] Tests sintéticos: vector en \(P\) → energía alta; vector ortogonal → energía ~0.
 
 ## Tests (TDD)
 
@@ -57,9 +57,11 @@ cd backend && uv run pytest -q tests/test_inlp.py
 
 ## Definición de hecho
 
-- [ ] Energía de proyección testada
-- [ ] \(\tau\) calibrado y serializado con el set 100+100 (estático o L09)
-- [ ] Fila L06 → `hecho`
+- [x] Energía de proyección testada
+- [x] \(\tau\) calibrado y serializado con el set 100+100 (estático o L09)
+- [x] Fila L06 → `hecho`
+
+Cerrado 2026-09-18. INLP iterativo = diferencia de medias en espacio blanqueado (LDA identidad), luego proyección al complemento. \(\tau\) = máximo de energía benigna (corte estricto `>` → 0 FPR). Golden set estático `benign|evasion` (tema *investment_advice*, no PAN). Oracle L09 no etiqueta tema; no se usó un generador de ataques como etiqueta. CLI: `cd backend && uv run python -m app.modules.geometry.inlp --fixture tests/fixtures/inlp_calibration_100x100.json`. Artefacto live gitignored. `evaluate_clause` intacto.
 
 ## Trampas
 
