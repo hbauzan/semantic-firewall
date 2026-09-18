@@ -36,9 +36,9 @@ No implementes nada que no esté en L01–L12. Si parece “útil” y no está 
 
 | ID | Ticket | Ola | Estado | Depende de | Paralelo con |
 | :--- | :--- | :---: | :--- | :--- | :--- |
-| L01 | [Determinismo embedder actual](./tickets/L01-determinismo-embedder-actual.md) | 1 | pendiente | — | L02, L03, L09 |
+| L01 | [Determinismo embedder actual](./tickets/L01-determinismo-embedder-actual.md) | 1 | hecho | — | L02, L03, L09 |
 | L02 | [Blanqueamiento offline](./tickets/L02-blanqueamiento-offline.md) | 1 | hecho | — | L01, L03, L09 |
-| L03 | [Ingesta pirámide laboratorio](./tickets/L03-ingesta-piramide-laboratorio.md) | 1 | pendiente | — | L01, L02, L09 |
+| L03 | [Ingesta pirámide laboratorio](./tickets/L03-ingesta-piramide-laboratorio.md) | 1 | hecho | — | L01, L02, L09 |
 | L04 | [AND multi-grano offline](./tickets/L04-and-multigrano-offline.md) | 1 | pendiente | L02, L03 | — |
 | L05 | [Sidecar TEI](./tickets/L05-sidecar-tei.md) | 2 | pendiente | L01 | L04, L06, L09 |
 | L06 | [INLP y τ](./tickets/L06-inlp-y-tau.md) | 3 | pendiente | L02, L09 | L05, L07 |
