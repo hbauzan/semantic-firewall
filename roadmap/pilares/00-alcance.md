@@ -18,6 +18,8 @@ Fecha: 2026-09-17. Cubre **solo** lo condensado en el PDF de 4 pilares.
 
 Perímetro determinista (mismo texto + mismo embedder pinneado → mismo vector en ese runtime) con inspección **bidireccional**: el prompt y la generación se pueden cortar. El LLM de nube o local es un generador; la política vive en el firewall.
 
+No es el claim de “tres filtros de producción”. Cosine-only vs filtro nuevo (espacio blanqueado) es un experimento **posterior**, con L01 como fingerprint del instrumento.
+
 ---
 
 ## Qué no entra (otra etapa)

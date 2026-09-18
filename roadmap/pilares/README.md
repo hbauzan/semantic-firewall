@@ -6,6 +6,19 @@
 >
 > Análisis histórico (no se ejecuta): [`../archivo/README.md`](../archivo/README.md).
 
+## Dirección de producto (2026-09-17)
+
+El objetivo no es “tres cabezas”. Es un **firewall semántico determinista que funciona** en un deployment.
+
+El pipeline de producción (Noise / Cosine / Excitation) **no se reescribe** hasta que un ticket lo liste. L01–L02 son instrumento + nueva base (z-score), todavía en laboratorio.
+
+Experimento diferido (otra etapa, no mezclar en L03–L06):
+
+1. **Cosine-only** — baseline: solo diferencia de coseno.
+2. **Filtro nuevo** — geometría blanqueada (y lo que L04/L06 agreguen) sobre el mismo dataset y el mismo fingerprint de embedder.
+
+Hasta ese A/B, no se “salva” la excitación cruda ni se la vende como titular.
+
 ---
 
 ## Cómo tomar un ticket
