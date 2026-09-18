@@ -30,7 +30,8 @@ from app.modules.providers.groq import GroqProvider
 from app.api.endpoints._shared import verify_api_key, limiter
 from app.modules.persistence import persist_interaction
 from app.modules.rag_context import accumulate_rag_chunks, join_rag_context
-from app.modules.egress import EGRESS_CUT_MESSAGE, audit_held_response, redact_for_log
+from app.modules.egress import EGRESS_CUT_MESSAGE, audit_chat_sentence, audit_held_response, redact_for_log
+from app.modules.sentence_buffer import SentenceBuffer
 
 logger = logging.getLogger(__name__)
 
@@ -320,30 +321,30 @@ async def chat_endpoint(request: Request, req: ChatRequest):
         )
         
         async def ui_stream_wrapper():
-            full_content = []
             yield json.dumps({"response": telemetry_block}).encode("utf-8") + b"\n"
-
             try:
                 if cfg.egress_profile == "compliance":
                     reconstructed = await _absorb_ndjson(
                         _stream_via_provider(clean_prompt, context, cfg, strict=True)
                     )
+                    ok, payload, log_text = _gate_generation(reconstructed, cfg)
+                    yield json.dumps({"response": payload}).encode("utf-8") + b"\n"
                 else:
-                    async for chunk in _stream_via_provider(clean_prompt, context, cfg, strict=True):
-                        delta = _delta_from_ndjson_chunk(chunk)
-                        if delta:
-                            full_content.append(delta)
-                        yield chunk
-                    reconstructed = "".join(full_content)
+                    ok, reconstructed, log_text = True, "", ""
+                    async for item in _gated_chat_ndjson(
+                        _stream_via_provider(clean_prompt, context, cfg, strict=True),
+                        cfg,
+                    ):
+                        if item[0] == "chunk":
+                            yield item[1]
+                        else:
+                            ok, reconstructed, log_text = item[1]
             except Exception as e:
                 err = _llm_error_text(e)
                 yield json.dumps({"response": err}).encode("utf-8") + b"\n"
                 update_trace(trace_id, status="ERROR", response_content=err)
                 return
 
-            ok, payload, log_text = _gate_generation(reconstructed, cfg)
-            if cfg.egress_profile == "compliance":
-                yield json.dumps({"response": payload}).encode("utf-8") + b"\n"
             update_trace(
                 trace_id,
                 response_content=log_text,
@@ -354,24 +355,25 @@ async def chat_endpoint(request: Request, req: ChatRequest):
         return StreamingResponse(ui_stream_wrapper(), media_type="application/x-ndjson")
 
     async def no_fw_stream_wrapper():
-        full_content = []
         try:
             if cfg.egress_profile == "compliance":
                 reconstructed = await _absorb_ndjson(_stream_via_provider(clean_prompt, context, cfg))
+                _ok, payload, log_text = _gate_generation(reconstructed, cfg)
+                yield json.dumps({"response": payload}).encode("utf-8") + b"\n"
             else:
-                async for chunk in _stream_via_provider(clean_prompt, context, cfg):
-                    delta = _delta_from_ndjson_chunk(chunk)
-                    if delta:
-                        full_content.append(delta)
-                    yield chunk
-                reconstructed = "".join(full_content)
+                log_text = ""
+                async for item in _gated_chat_ndjson(
+                    _stream_via_provider(clean_prompt, context, cfg),
+                    cfg,
+                ):
+                    if item[0] == "chunk":
+                        yield item[1]
+                    else:
+                        log_text = item[1][2]
         except Exception as e:
             yield json.dumps({"response": _llm_error_text(e)}).encode("utf-8") + b"\n"
             return
 
-        ok, payload, log_text = _gate_generation(reconstructed, cfg)
-        if cfg.egress_profile == "compliance":
-            yield json.dumps({"response": payload}).encode("utf-8") + b"\n"
         await asyncio.to_thread(persist_interaction, clean_prompt, log_text)
 
     return StreamingResponse(
@@ -427,7 +429,7 @@ async def _absorb_sse(agen) -> str:
 
 
 def _gate_generation(reconstructed: str, cfg: ConfigState) -> tuple[bool, str, str]:
-    """Return (passed, client_payload, log_payload). Chat profile never holds."""
+    """Return (passed, client_payload, log_payload). Only the compliance hold."""
     log_text = redact_for_log(reconstructed)
     if cfg.egress_profile != "compliance":
         return True, reconstructed, log_text
@@ -436,6 +438,83 @@ def _gate_generation(reconstructed: str, cfg: ConfigState) -> tuple[bool, str, s
         return True, reconstructed, log_text
     logger.info("egress hold cut layer=%s reason=%s", verdict.layer, verdict.reason)
     return False, EGRESS_CUT_MESSAGE, log_text
+
+
+async def _gated_chat_ndjson(agen, cfg: ConfigState):
+    """Yield NDJSON sentence bursts; final item is ('done', (ok, delivered, log))."""
+    buffer = SentenceBuffer()
+    parts: list[str] = []
+    cut = False
+    async for chunk in agen:
+        delta = _delta_from_ndjson_chunk(chunk)
+        if not delta:
+            continue
+        for sentence in buffer.push(delta):
+            verdict = audit_chat_sentence(sentence, pack_id=cfg.active_corpus_file)
+            if not verdict.passed:
+                cut = True
+                break
+            parts.append(sentence)
+            yield ("chunk", json.dumps({"response": sentence}).encode("utf-8") + b"\n")
+        if cut:
+            break
+    if not cut:
+        tail = buffer.flush_tail()
+        if tail:
+            verdict = audit_chat_sentence(tail, pack_id=cfg.active_corpus_file)
+            if verdict.passed:
+                parts.append(tail)
+                yield ("chunk", json.dumps({"response": tail}).encode("utf-8") + b"\n")
+            else:
+                cut = True
+    delivered = "".join(parts)
+    if cut:
+        yield ("chunk", json.dumps({"response": EGRESS_CUT_MESSAGE}).encode("utf-8") + b"\n")
+    yield ("done", (not cut, delivered, redact_for_log(delivered)))
+
+
+async def _gated_chat_sse(agen, cfg: ConfigState):
+    """Yield OpenAI SSE sentence bursts; final item is ('done', (ok, delivered, log))."""
+    buffer = SentenceBuffer()
+    parts: list[str] = []
+    cut = False
+    async for chunk in agen:
+        delta = _delta_from_sse_line(chunk)
+        if not delta:
+            continue
+        for sentence in buffer.push(delta):
+            verdict = audit_chat_sentence(sentence, pack_id=cfg.active_corpus_file)
+            if not verdict.passed:
+                cut = True
+                break
+            parts.append(sentence)
+            payload = {"choices": [{"delta": {"content": sentence}}]}
+            yield ("chunk", f"data: {json.dumps(payload)}\n\n")
+        if cut:
+            break
+    if not cut:
+        tail = buffer.flush_tail()
+        if tail:
+            verdict = audit_chat_sentence(tail, pack_id=cfg.active_corpus_file)
+            if verdict.passed:
+                parts.append(tail)
+                payload = {"choices": [{"delta": {"content": tail}}]}
+                yield ("chunk", f"data: {json.dumps(payload)}\n\n")
+            else:
+                cut = True
+    delivered = "".join(parts)
+    if cut:
+        err = {
+            "error": {
+                "message": "[FW_BLOCK] egress sentence",
+                "type": "security_breach",
+                "code": "403",
+                "breach_type": "EGRESS_SENTENCE",
+            }
+        }
+        yield ("chunk", f"data: {json.dumps(err)}\n\n")
+    yield ("chunk", "data: [DONE]\n\n")
+    yield ("done", (not cut, delivered, redact_for_log(delivered)))
 
 
 async def _stream_via_provider(prompt: str, context: str, cfg: ConfigState, strict: bool = False):
@@ -724,14 +803,14 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
         return StreamingResponse(burst(), media_type="text/event-stream")
 
     async def stream_wrapper(upstream, trace_id_for_update):
-        """Pass-through generator that buffers response tokens for sniffer reconstruction."""
-        full_content = []
+        """Chat profile: freeze on `. ; ? \\n`, eval, burst or abort."""
         try:
-            async for chunk in upstream:
-                delta = _delta_from_sse_line(chunk)
-                if delta:
-                    full_content.append(delta)
-                yield chunk
+            ok, reconstructed, log_text = True, "", ""
+            async for item in _gated_chat_sse(upstream, cfg):
+                if item[0] == "chunk":
+                    yield item[1]
+                else:
+                    ok, reconstructed, log_text = item[1]
         except Exception as e:
             logger.error("Proxy upstream connection failed: %s", e)
             if trace_id_for_update:
@@ -746,10 +825,12 @@ async def openai_proxy(request: Request, config: OpenAIConfig):
             yield f"data: {json.dumps(err_payload)}\n\n"
             yield "data: [DONE]\n\n"
             return
-        reconstructed = "".join(full_content)
-        log_text = redact_for_log(reconstructed)
         if trace_id_for_update:
-            update_trace(trace_id_for_update, response_content=log_text, status="COMPLETED")
+            update_trace(
+                trace_id_for_update,
+                response_content=log_text,
+                status="COMPLETED" if ok else "EGRESS_BREACH",
+            )
         await asyncio.to_thread(persist_interaction, last_msg, log_text)
 
     return StreamingResponse(

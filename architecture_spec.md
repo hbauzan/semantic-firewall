@@ -313,7 +313,11 @@ The `chat_endpoint` and `openai_proxy` resolve the provider lazily at request ti
 
 ### 9.6 Egress hold (compliance)
 
-`ConfigState.egress_profile` is `chat` (default: yield generation tokens as they arrive) or `compliance` (absorb the upstream stream, run `audit_held_response`, then burst or cut). Ingress `evaluate_clause` is unchanged. CDE deployments must set `compliance`. `/v1/chat/completions` returns HTTP 403 `EGRESS_HOLD` on cut; `/chat` yields `[FW_BLOCK]`/`[CONNECTION_TERMINATED]` without echoing the generation. Sniffer and chat history persist `hash8:last4` redactions, not raw secrets.
+`ConfigState.egress_profile` is `chat` or `compliance`. `compliance` absorbs the upstream stream, runs `audit_held_response`, then bursts or cuts. Ingress `evaluate_clause` is unchanged. CDE deployments must set `compliance`. `/v1/chat/completions` returns HTTP 403 `EGRESS_HOLD` on cut; `/chat` yields `[FW_BLOCK]`/`[CONNECTION_TERMINATED]` without echoing the generation. Sniffer and chat history persist `hash8:last4` redactions, not raw secrets.
+
+### 9.7 Sentence buffer (chat)
+
+With `egress_profile=chat`, `SentenceBuffer` freezes output on `. ; ?` or newline (not the ingress `segment()` splitter). Each frozen sentence (and the undelimited tail at upstream done) is gated by `audit_chat_sentence`. PASS bursts that sentence; BREACH aborts, discards the rest, and emits the perimeter cut. A PAN split by newline can emit the first half — that is why compliance hold exists. AND is skipped when no pack is selected so the HUD still talks; DLP / numbers / INLP still run.
 
 ## 10. Real-Time Semantic Sniffer (RTSS)
 A zero-latency observability layer for the OpenAI V1 Proxy (`/v1/chat/completions`). Captures every firewall decision and LLM response preview without introducing latency to the primary inference stream.
