@@ -1,0 +1,17 @@
+---
+description: Murray-only git and PR attribution. Never Cursor co-author or Made with Cursor.
+alwaysApply: true
+---
+
+# Attribution
+
+Commits: `GIT_AUTHOR_*` / `GIT_COMMITTER_*` = Murray only. Never add `Co-authored-by: Cursor`.
+
+PRs: body must not contain `Made with Cursor` or `Made-with: Cursor`. After `gh pr create`, immediately:
+
+1. Read `gh pr view N --json body`
+2. Strip those lines
+3. `gh pr edit N --body-file` with the cleaned text
+4. Confirm the body is clean before pasting the URL
+
+Do not rewrite already-merged history to strip old footers.

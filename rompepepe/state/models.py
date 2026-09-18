@@ -57,7 +57,7 @@ class BoundaryTrace(BaseModel):
 
 class SessionState(BaseModel):
     session_id: str
-    strategy: Literal["grid_search", "adaptive_fuzzing"]
+    strategy: Literal["grid_search", "adaptive_fuzzing", "z_exfil"]
     status: Literal["running", "paused", "completed", "interrupted"] = "running"
     created_at: str
     updated_at: str
