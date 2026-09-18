@@ -1,6 +1,6 @@
 # L05 — Sidecar TEI
 
-> **Estado:** pendiente
+> **Estado:** hecho
 > **Ola:** 2
 > **Spec:** [`specs/pilar-3-tei-determinismo.md`](../specs/pilar-3-tei-determinismo.md)
 
@@ -46,12 +46,12 @@ Correr Text Embeddings Inference como contenedor con **digest SHA256 pinneado**,
 
 ## Tareas
 
-- [ ] Compose con digest pinneado y modelo alineado al de `settings.embedding_model`.
-- [ ] Adapter HTTP local; timeouts; sin secrets en logs.
-- [ ] Flag: TEI on → dispatcher usa adapter; off → ST.
-- [ ] Test unitario del adapter con httpx mock: mismo shape que `EmbeddingOutput`.
-- [ ] Script o test: 100× el mismo string contra TEI (si integration) y comparar dispersión vs L01.
-- [ ] Actualizar la frase de `setup-fw.sh` / README de run cuando Docker pase a ser el path de embed.
+- [x] Compose con digest pinneado y modelo alineado al de `settings.embedding_model`.
+- [x] Adapter HTTP local; timeouts; sin secrets en logs.
+- [x] Flag: TEI on → dispatcher usa adapter; off → ST.
+- [x] Test unitario del adapter con httpx mock: mismo shape que `EmbeddingOutput`.
+- [x] Script o test: 100× el mismo string contra TEI (si integration) y comparar dispersión vs L01.
+- [x] Actualizar la frase de `setup-fw.sh` / README de run cuando Docker pase a ser el path de embed.
 
 ## Tests (TDD)
 
@@ -62,16 +62,18 @@ cd backend && uv run pytest -q tests/test_tei_adapter.py
 Integración (no default CI si no hay Docker):
 
 ```
-cd backend && uv run pytest -q tests/test_tei_adapter.py -m integration
+cd backend && RUN_TEI_INTEGRATION=1 uv run pytest -q tests/test_tei_adapter.py -m integration
 ```
 
 ## Definición de hecho
 
-- [ ] Contenedor documentado por digest, no por tag flotante
-- [ ] Seam único: negocio no llama TEI ad-hoc
-- [ ] Tests sin Docker verdes (mock)
-- [ ] Fallback ST intacto
-- [ ] Fila L05 → `hecho`
+- [x] Contenedor documentado por digest, no por tag flotante
+- [x] Seam único: negocio no llama TEI ad-hoc (`create_runtime_embedder`)
+- [x] Tests sin Docker verdes (mock)
+- [x] Fallback ST intacto (`TEI_ENABLED=false`)
+- [x] Fila L05 → `hecho`
+
+Cerrado 2026-09-17. Live 100× **no** corrido: Docker Desktop no tenía daemon. Ver [`BLOQUEOS.md`](../BLOQUEOS.md). Dtype del sidecar: `float32` (CPU ARM, declarado). TEI BGE-M3 es dense-only; sparse sigue en ST.
 
 ## Trampas
 

@@ -205,6 +205,10 @@ cp .env.example .env
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API endpoint. |
 | `OLLAMA_MODEL` | `llama3.1` | LLM model name for inference. |
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | HuggingFace embedding model ID. Change only if you reindex the corpus. |
+| `TEI_ENABLED` | `false` | If true, embeddings go to the TEI sidecar instead of in-process SentenceTransformer. |
+| `TEI_URL` | `http://127.0.0.1:8080` | TEI HTTP base URL. |
+| `TEI_IMAGE_DIGEST` | `sha256:2614a26f…` | Must match `deploy/tei/docker-compose.yml`. Never a floating tag. |
+| `TEI_TIMEOUT_S` | `5.0` | HTTP timeout for TEI embed calls (seconds). |
 | `MAX_UPLOAD_MB` | `50` | Maximum PDF upload size in megabytes (1–500). |
 | `CHUNK_SIZE` | `2048` | PDF chunking size in characters (100–10000). |
 | `CHUNK_OVERLAP` | `200` | Overlap between consecutive chunks (0–2000). |
@@ -293,6 +297,17 @@ ollama serve
 ```
 
 Open `http://localhost:5173` in your browser.
+
+### Optional TEI sidecar (embeddings)
+
+Default embeddings stay in-process (`BAAI/bge-m3` via SentenceTransformer). To serve the same model from Hugging Face Text Embeddings Inference, the image is pinned by **digest** in `deploy/tei/docker-compose.yml` — never `:latest`.
+
+```bash
+docker compose -f deploy/tei/docker-compose.yml up -d
+# then set TEI_ENABLED=true in `.env`
+```
+
+`TEI_ENABLED=false` keeps the ST fallback (tests without Docker). Live TEI dispersion vs L01: `cd backend && RUN_TEI_INTEGRATION=1 uv run pytest -q tests/test_tei_adapter.py -m integration`.
 
 ---
 
