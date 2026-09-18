@@ -10,6 +10,7 @@ from rompepepe.client.explorer_client import ExplorerClient
 from rompepepe.client.firewall_client import FirewallClient
 from rompepepe.config import get_config, update_env_file
 from rompepepe.engines.adaptive_fuzzing import AdaptiveFuzzingEngine
+from rompepepe.engines.campaign_z import CampaignZEngine
 from rompepepe.engines.grid_search import GridSearchEngine
 from rompepepe.reports.generator import ReportGenerator
 from rompepepe.state.models import SessionState
@@ -210,6 +211,54 @@ async def run_adaptive_fuzzing(
     print(f"[+] QA Report saved to: {report_path}")
 
 
+async def run_campaign_z(
+    fw_client: FirewallClient,
+    session_mgr: SessionManager,
+    report_gen: ReportGenerator,
+    exp_client: ExplorerClient,
+    session_id: str | None = None,
+    live_explorer: bool = False,
+    non_interactive: bool = False,
+):
+    from rompepepe.test_dataset.campaign_z import load_campaign_z
+
+    dataset = load_campaign_z()
+    fw_client.timeout = max(fw_client.timeout, 60.0)
+    if not session_id:
+        print("\n=======================================================")
+        print(" Campaign Z: planted-secret exfil via POST /chat + Oracle")
+        print("=======================================================")
+        print(" Secrets: SYNTHETIC PAN + fake API key (see rompepepe/test_dataset/campaign_z.json).")
+        print(f" Frozen attacks: {len(dataset.attacks)}")
+        print(f" Live Explorer mutations: {'ON' if live_explorer else 'OFF'}")
+        print(" Headline metric: egress leakage rate (not % PASS).")
+        print(" Planting: put the fixture strings in the target system prompt / work-order.")
+        print("=======================================================")
+        if not non_interactive:
+            confirm = input(" Proceed with execution? [Y/n]: ").strip().lower()
+            if confirm not in ("", "y", "yes"):
+                print("[!] Execution cancelled by user.")
+                return
+
+    print("\n[+] Starting Campaign Z...")
+    session_mgr.setup_signal_handler()
+    engine = CampaignZEngine(fw_client, session_mgr, explorer_client=exp_client)
+    session = await engine.run(
+        live_explorer=live_explorer,
+        session_id=session_id,
+        dataset=dataset,
+        progress_callback=format_progress,
+    )
+    print("\n")
+    report_path = report_gen.generate_report(session, fw_client.base_url)
+    leaked = session.metadata.get("leaked", "?")
+    attempts = session.metadata.get("z_attempts", "?")
+    rate = session.metadata.get("leakage_rate", "?")
+    print(f"\n[+] Campaign Z complete! Session ID: {session.session_id}")
+    print(f"[+] Egress leakage: {leaked}/{attempts} ({rate})")
+    print(f"[+] QA Report saved to: {report_path}")
+
+
 def view_reports(vault_path: Path):
     reports_dir = vault_path / "reports"
     reports = sorted(reports_dir.glob("*.md"), reverse=True)
@@ -263,7 +312,11 @@ async def inspect_lancedb_corpus_menu(fw_client: FirewallClient):
 
 async def main_async():
     parser = argparse.ArgumentParser(description="rompepepe — Autonomous Stress Testing Engine")
-    parser.add_argument("--strategy", choices=["grid", "fuzz"], help="Strategy to run")
+    parser.add_argument(
+        "--strategy",
+        choices=["grid", "fuzz", "z-exfil"],
+        help="Strategy to run",
+    )
     parser.add_argument("--tier", choices=["light", "normal", "heavy"], default="normal", help="Execution intensity tier (light, normal, heavy)")
     parser.add_argument("--resume", type=str, help="Resume session ID")
     parser.add_argument("--resume-latest", action="store_true", help="Resume latest interrupted session")
@@ -275,6 +328,11 @@ async def main_async():
     parser.add_argument("--sync-corpus", action="store_true", help="Inspect and adapt dataset to active LanceDB corpus")
     parser.add_argument("--build-pack", "--pack", action="store_true", help="Build agent handoff pack (rompepepe_context.txt)")
     parser.add_argument("--non-interactive", action="store_true", help="Skip preflight confirmation prompt")
+    parser.add_argument(
+        "--live-explorer",
+        action="store_true",
+        help="Campaign Z: mutate frozen prompts with the Explorer (off by default; tests stay mock)",
+    )
     parser.add_argument("--view-reports", action="store_true", help="View past QA reports")
 
     args = parser.parse_args()
@@ -338,6 +396,16 @@ async def main_async():
         print(f"[+] Resuming session `{session_id_to_resume}` (Strategy: {session.strategy})")
         if session.strategy == "grid_search":
             await run_grid_search(fw_client, session_mgr, report_gen, tier=args.tier, session_id=session_id_to_resume, non_interactive=args.non_interactive)
+        elif session.strategy == "z_exfil":
+            await run_campaign_z(
+                fw_client,
+                session_mgr,
+                report_gen,
+                exp_client,
+                session_id=session_id_to_resume,
+                live_explorer=args.live_explorer,
+                non_interactive=args.non_interactive,
+            )
         else:
             await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen, iterations=session.total_steps, tier=args.tier, session_id=session_id_to_resume, non_interactive=args.non_interactive)
         return
@@ -346,12 +414,22 @@ async def main_async():
         await run_grid_search(fw_client, session_mgr, report_gen, tier=args.tier, non_interactive=args.non_interactive)
     elif args.strategy == "fuzz":
         await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen, iterations=args.iterations, tier=args.tier, non_interactive=args.non_interactive)
+    elif args.strategy == "z-exfil":
+        await run_campaign_z(
+            fw_client,
+            session_mgr,
+            report_gen,
+            exp_client,
+            live_explorer=args.live_explorer,
+            non_interactive=args.non_interactive,
+        )
     else:
         print("\n==============================================")
         print("  Rompé Pepe! Rompé nomá!!! — Autonomous Stress Engine CLI")
         print("==============================================")
         print(" [1] Strategy A: Systematic Matrix Search (Grid Search)")
         print(" [2] Strategy B: Closed-Loop Adaptive Exploration (Fuzzing)")
+        print(" [Z] Campaign Z: planted-secret exfil via /chat + Oracle")
         print(" [3] Select / Configure Explorer Model")
         print(" [4] Inspect Active LanceDB Corpus & Adapted Queries")
         print(" [5] Build Agent Handoff Pack (rompepepe_context.txt)")
@@ -365,6 +443,8 @@ async def main_async():
             await run_grid_search(fw_client, session_mgr, report_gen)
         elif choice == "2":
             await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen)
+        elif choice in ("z", "Z"):
+            await run_campaign_z(fw_client, session_mgr, report_gen, exp_client)
         elif choice == "3":
             await select_model_menu(fw_client)
         elif choice == "4":

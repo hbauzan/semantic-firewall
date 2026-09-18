@@ -6,22 +6,37 @@ import logging
 from typing import Any
 import httpx
 
+from rompepepe.client.chat_ndjson import ChatDelivery, parse_chat_ndjson
 from rompepepe.state.models import TelemetryTrace, TelemetryTraceItem
 
 logger = logging.getLogger(__name__)
 
 
 class FirewallClient:
-    def __init__(self, base_url: str = "http://localhost:8000", api_key: str | None = None, timeout: float = 15.0):
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8000",
+        api_key: str | None = None,
+        timeout: float = 15.0,
+        transport: httpx.BaseTransport | httpx.AsyncBaseTransport | None = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
+        self._transport = transport
         self.headers = {"Content-Type": "application/json"}
         if self.api_key:
             self.headers["x-api-key"] = self.api_key
 
     def _get_client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(base_url=self.base_url, headers=self.headers, timeout=self.timeout)
+        kwargs: dict[str, Any] = {
+            "base_url": self.base_url,
+            "headers": self.headers,
+            "timeout": self.timeout,
+        }
+        if self._transport is not None:
+            kwargs["transport"] = self._transport
+        return httpx.AsyncClient(**kwargs)
 
     async def get_health(self) -> dict[str, Any]:
         async with self._get_client() as client:
@@ -100,11 +115,16 @@ class FirewallClient:
                 noise_entropy=noise_val,
             )
 
-    async def chat(self, prompt: str) -> dict[str, Any]:
+    async def chat(self, prompt: str) -> ChatDelivery:
+        """Consume `/chat` NDJSON. Returns generation the user saw, not `resp.json()`."""
         async with self._get_client() as client:
-            resp = await client.post("/chat", json={"prompt": prompt})
-            resp.raise_for_status()
-            return resp.json()
+            async with client.stream("POST", "/chat", json={"prompt": prompt}) as resp:
+                resp.raise_for_status()
+                lines: list[str] = []
+                async for line in resp.aiter_lines():
+                    if line:
+                        lines.append(line)
+                return parse_chat_ndjson(lines)
 
     async def get_profiles(self) -> list[str]:
         async with self._get_client() as client:
