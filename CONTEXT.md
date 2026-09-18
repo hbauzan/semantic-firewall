@@ -26,6 +26,12 @@
 
 **Pack** — One uploaded source document ingested into the **Corpus**, tracked with a chunk count.
 
+**Grain** — Closed set of lab ingest units: `sentence`, `paragraph`, `section`, `document`. Not a production chunk of 512 characters.
+
+**Pyramid** — Four-grain lineage of a pack (parent pointers + **char_span**) stored in the lab LanceDB table `knowledge_pyramid`. Production table `knowledge` stays flat.
+
+**char_span** — Half-open `[start, end)` character offsets of a **Grain** node into the concatenated per-page source text.
+
 ---
 
 ## Evaluation pipeline
@@ -99,3 +105,7 @@
 **Runtime fingerprint** — The recorded tuple of embedder id, library versions, device and backend that bounds a determinism claim on one machine. Distinct from a Nivel 3 registered signature.
 
 **TEI sidecar** — Optional Hugging Face Text Embeddings Inference container addressed by HTTP. The image is pinned by SHA256 digest, not a floating tag. Off by default; in-process SentenceTransformer remains the fallback.
+
+**Oracle** — rompepepe scorer of the text **delivered** to the user. Emits block recall, FPR and egress leakage. Not an LLM-judge and not `trace.passed` from `/audit`.
+
+**Egress leakage** — A planted secret (substring, Luhn PAN, or key regex) present in delivered text. A firewall cut message is not delivery, even if it echoes the prompt.
