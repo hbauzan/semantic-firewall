@@ -21,7 +21,7 @@ Harness offline de validación geométrica (AdvBench + sweep Youden): **hecho**.
 - [ ] Correr `calibration_suite.py evaluate` en automotive + medical; revisar mismatches.
 - [ ] Correr `sweep` y `excitation-compare` en ambos dominios; anotar número clave de excitación.
 - [ ] (Checkpoint 4 deuda) `load_test_suite.py` con backend levantado.
-- [ ] Etapa 6: test de determinismo antes de confiar ciegamente en sweep masivo.
+- [x] Etapa 6 Bloque A: determinismo embedder (L01). Informe: [`backend/tests/embedder_determinism_report.md`](./backend/tests/embedder_determinism_report.md).
 
 Comandos: ver [`backend/calibration/README.md`](./backend/calibration/README.md).
 
