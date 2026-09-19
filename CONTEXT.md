@@ -125,3 +125,30 @@
 **Egress leakage** — A planted secret (substring, Luhn PAN, or key regex) present in delivered text. A firewall cut message is not delivery, even if it echoes the prompt.
 
 **Pack L01–L12** — Closed implementation wave (PRs #4–#15, 2026-09). Historical tickets/specs live under `roadmap/archivo/2026-09-pilares-l01-l12/`. Not backlog. Do not retake those IDs.
+
+---
+
+## Lab geometry (not production ingress)
+
+**Oficio** — The trade the thesis locks: taller (aceite, PSI, frenos, procedimientos). Not the whole PDF.
+
+**Lomo** — Book-spine pages that inflate min/max: radio/infoentretenimiento, legal/copyright, índice/TOC, cubiertas. A **chunk raro** is a lomo brick.
+
+**Sobre** — Per-column floor/ceiling of ingested **oficio** rows. The useful cut is an entire row inside, not “% of dims”.
+
+**Holgura relativa** — Slack = percent of **that** column’s observed span (`range_relative_slack`). The knob is the percent, not a global `ε`.
+
+**z-score (lab)** — Per-column rarity vs the corpus mean/std. Another head, not a production **Filter**.
+
+**Hoja** — All D axes of a pair: [lo, hi] of every row in each mazo. No mean. The vector is the hash.
+
+**Δext** — On one axis, max(|Δhi|, |Δlo|) between the two painted intervals.
+
+**Eje disjunto** — Axis whose two intervals do not overlap.
+
+**Voto por eje** — For one coordinate against two painted intervals: `left_only` | `right_only` | `both` | `neither`. All D axes vote.
+
+**Corte duro** — Label from the **Ejes disjuntos** only: `left` / `right` / `split` / `out`. The other axes still vote; they are not dropped.
+- _Avoid_: “top-k de medias”, “las dimensiones que se mueven”.
+
+**Sello** — Daughter tool of this repo. Paints small **almas** and decides by **Hoja** + **Corte duro**. Not a production **Filter**. Not Lxx. Pack: `roadmap/sello/`.
