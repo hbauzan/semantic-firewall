@@ -1,6 +1,6 @@
 # L11 — Campaña S: desvío temático
 
-> **Estado:** pendiente
+> **Estado:** hecho
 > **Ola:** 4
 > **Spec:** [`specs/pilar-4-rompepepe.md`](../specs/pilar-4-rompepepe.md) § Campaña 2.
 
@@ -43,22 +43,30 @@ Nada interno. Informe S.
 
 ## Tareas
 
-- [ ] Casos on-corpus que **deben** aprobarse (FPR).
-- [ ] Casos de desvío del PDF (camuflaje metafórico, conocimiento general).
-- [ ] Loop chat → texto entregado → AND/Oracle.
-- [ ] Reporte: recall de bloqueo adversarial + FPR. Nada de estabilidad operacional como headline.
+- [x] Casos on-corpus que **deben** aprobarse (FPR).
+- [x] Casos de desvío del PDF (camuflaje metafórico, conocimiento general).
+- [x] Loop chat → texto entregado → AND/Oracle.
+- [x] Reporte: recall de bloqueo adversarial + FPR. Nada de estabilidad operacional como headline.
 
 ## Tests (TDD)
 
 ```
-cd rompepepe && uv run pytest -q tests/test_campaign_s.py
+PYTHONPATH=. uv run --project backend pytest -q rompepepe/tests/test_campaign_s.py
+```
+
+Desde `rompepepe/`:
+
+```
+PYTHONPATH=.. uv run --project ../backend pytest -q tests/test_campaign_s.py
 ```
 
 ## Definición de hecho
 
-- [ ] Campaña S runnable
-- [ ] FPR y recall en el reporte
-- [ ] Fila L11 → `hecho`
+- [x] Campaña S runnable
+- [x] FPR y recall en el reporte
+- [x] Fila L11 → `hecho`
+
+Cerrado 2026-09-18. `POST /chat` + Oracle labels `on_corpus|deviation`. Membresía = `AndMembership` sobre `evaluate_sentence` (inyectado; tests stub). Explorer no juzga S. On-corpus = paráfrasis, no el chunk verbatim. CLI: `--strategy s-deviation` (`--and-pack` para AND live). No se tocan umbrales de prod ni `evaluate_clause`.
 
 ## Trampas
 
