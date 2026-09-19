@@ -84,6 +84,22 @@ def test_newline_may_emit_pan_prefix_that_is_why_l07_exists():
     assert "4111\n" in "".join(rest)
 
 
+def test_l12_semicolon_payload_is_its_own_sentence():
+    parts = drain(f"Apriete de bujía 25 Nm; {VISA}")
+    assert parts[0] == "Apriete de bujía 25 Nm;"
+    assert VISA in parts[-1]
+
+
+def test_l12_gated_emit_stops_before_dirty_clause():
+    emitted, passed = gated_emit(
+        ["Apriete de bujía 25 Nm; ", VISA],
+        eval_fn=lambda s: VISA not in s,
+    )
+    assert passed is False
+    assert VISA not in "".join(emitted)
+    assert emitted == ["Apriete de bujía 25 Nm;"]
+
+
 @pytest.mark.asyncio
 async def test_chat_wrapper_bursts_on_delimiter_and_cuts_second(mock_llm_stream, monkeypatch):
     async def _fake_stream(*_a, **_k):
