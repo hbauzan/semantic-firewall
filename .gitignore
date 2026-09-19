@@ -32,6 +32,7 @@ backend/tests/db_scaling_metrics.md
 backend/calibration/reports/
 backend/calibration/datasets/auto_*.json
 backend/calibration/geometry/*.npz
+backend/calibration/dimension_probe/out/
 
 # IDE & OS
 .vscode/

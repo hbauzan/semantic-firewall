@@ -2,6 +2,12 @@
 
 Si llegás a este repo a laburar el firewall semántico, leé esto **antes** de tomar un ticket o de tocar `evaluate_clause`.
 
+## Pack Sello: vivo
+
+Herramienta hija (hoja 1024 + corte duro). Tickets **S01–S06**.  
+Puerta: [`roadmap/sello/README.md`](./roadmap/sello/README.md).  
+No toca `evaluate_clause`. No es Lxx.
+
 ## Pack L01–L12: cerrado
 
 Implementado y mergeado en `main` (2026-09-18/19, PRs #4–#15).  
@@ -27,10 +33,11 @@ Puerta: [`roadmap/pilares/README.md`](./roadmap/pilares/README.md).
 
 ## Roadmaps
 
+- [`roadmap/sello/`](./roadmap/sello/) — pack **vivo** (herramienta hija). Tomá Sxx.
 - [`roadmap/archivo/`](./roadmap/archivo/) — estudios 2026-09 y el pack de pilares **cerrado**. No se ejecuta.
-- [`roadmap/nivel-1/`](./roadmap/nivel-1/) — línea de producto/evidencia (etapas 5–9). Distinta del pack de pilares. Fechas viejas; no es Lxx.
+- [`roadmap/nivel-1/`](./roadmap/nivel-1/) — línea de producto/evidencia (etapas 5–9). Distinta de Sello y de pilares. Fechas viejas; no es Lxx.
 - [`roadmap/vision/`](./roadmap/vision/) — para qué. No implementar desde ahí.
-- [`roadmap.md`](./roadmap.md) — checklist Nivel 1 (Etapa 5). No es backlog de pilares.
+- [`roadmap.md`](./roadmap.md) — checklist Nivel 1 (Etapa 5). No es backlog de Sello ni de pilares.
 
 ## Invariantes
 
