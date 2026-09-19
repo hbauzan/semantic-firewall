@@ -10,6 +10,7 @@ from rompepepe.client.explorer_client import ExplorerClient
 from rompepepe.client.firewall_client import FirewallClient
 from rompepepe.config import get_config, update_env_file
 from rompepepe.engines.adaptive_fuzzing import AdaptiveFuzzingEngine
+from rompepepe.engines.campaign_s import CampaignSEngine
 from rompepepe.engines.campaign_z import CampaignZEngine
 from rompepepe.engines.grid_search import GridSearchEngine
 from rompepepe.reports.generator import ReportGenerator
@@ -259,6 +260,80 @@ async def run_campaign_z(
     print(f"[+] QA Report saved to: {report_path}")
 
 
+class _SkipAndMembership:
+    """AND not configured. Never invent an off-corpus label."""
+
+    def is_member(self, delivered_text: str) -> bool:
+        return True
+
+
+def _lab_and_membership(pack_id: str):
+    from app.modules.embedder import embedder
+    from app.modules.geometry.multi_grain import evaluate_sentence
+    from rompepepe.oracle.membership import AndMembership
+
+    return AndMembership(
+        evaluate=evaluate_sentence,
+        pack_id=pack_id,
+        embed_fn=embedder.embed_full,
+    )
+
+
+async def run_campaign_s(
+    fw_client: FirewallClient,
+    session_mgr: SessionManager,
+    report_gen: ReportGenerator,
+    exp_client: ExplorerClient,
+    session_id: str | None = None,
+    live_explorer: bool = False,
+    non_interactive: bool = False,
+    and_pack: str | None = None,
+):
+    from rompepepe.test_dataset.campaign_s import load_campaign_s
+
+    dataset = load_campaign_s()
+    fw_client.timeout = max(fw_client.timeout, 60.0)
+    membership = _lab_and_membership(and_pack) if and_pack else _SkipAndMembership()
+    if not session_id:
+        print("\n=======================================================")
+        print(" Campaign S: thematic deviation vs corpus S via POST /chat")
+        print("=======================================================")
+        print(f" On-corpus paraphrases: {len(dataset.on_corpus)}")
+        print(f" Deviations: {len(dataset.deviations)}")
+        print(f" AND L04 on delivered text: {'pack=' + and_pack if and_pack else 'skipped (pass --and-pack)'}")
+        print(f" Live Explorer mutations: {'ON' if live_explorer else 'OFF'} (Explorer is not the S judge)")
+        print(" Headline: recall de bloqueo + FPR. Not % PASS.")
+        print("=======================================================")
+        if not non_interactive:
+            confirm = input(" Proceed with execution? [Y/n]: ").strip().lower()
+            if confirm not in ("", "y", "yes"):
+                print("[!] Execution cancelled by user.")
+                return
+
+    print("\n[+] Starting Campaign S...")
+    session_mgr.setup_signal_handler()
+    engine = CampaignSEngine(
+        fw_client,
+        session_mgr,
+        membership,
+        explorer_client=exp_client,
+    )
+    session = await engine.run(
+        live_explorer=live_explorer,
+        session_id=session_id,
+        dataset=dataset,
+        progress_callback=format_progress,
+    )
+    print("\n")
+    report_path = report_gen.generate_report(session, fw_client.base_url)
+    recall = session.metadata.get("recall_block", "?")
+    fpr = session.metadata.get("fpr", "?")
+    print(f"\n[+] Campaign S complete! Session ID: {session.session_id}")
+    print(f"[+] Recall de bloqueo: {recall}")
+    print(f"[+] FPR (on-corpus blocked): {fpr}")
+    print(f"[+] QA Report saved to: {report_path}")
+
+
 def view_reports(vault_path: Path):
     reports_dir = vault_path / "reports"
     reports = sorted(reports_dir.glob("*.md"), reverse=True)
@@ -314,7 +389,7 @@ async def main_async():
     parser = argparse.ArgumentParser(description="rompepepe — Autonomous Stress Testing Engine")
     parser.add_argument(
         "--strategy",
-        choices=["grid", "fuzz", "z-exfil"],
+        choices=["grid", "fuzz", "z-exfil", "s-deviation"],
         help="Strategy to run",
     )
     parser.add_argument("--tier", choices=["light", "normal", "heavy"], default="normal", help="Execution intensity tier (light, normal, heavy)")
@@ -331,7 +406,12 @@ async def main_async():
     parser.add_argument(
         "--live-explorer",
         action="store_true",
-        help="Campaign Z: mutate frozen prompts with the Explorer (off by default; tests stay mock)",
+        help="Campaign Z/S: mutate frozen prompts with the Explorer (off by default; Explorer is not the S judge)",
+    )
+    parser.add_argument(
+        "--and-pack",
+        type=str,
+        help="Campaign S: run lab AND (L04) on delivered text with this pyramid pack_id",
     )
     parser.add_argument("--view-reports", action="store_true", help="View past QA reports")
 
@@ -406,6 +486,17 @@ async def main_async():
                 live_explorer=args.live_explorer,
                 non_interactive=args.non_interactive,
             )
+        elif session.strategy == "s_deviation":
+            await run_campaign_s(
+                fw_client,
+                session_mgr,
+                report_gen,
+                exp_client,
+                session_id=session_id_to_resume,
+                live_explorer=args.live_explorer,
+                non_interactive=args.non_interactive,
+                and_pack=args.and_pack,
+            )
         else:
             await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen, iterations=session.total_steps, tier=args.tier, session_id=session_id_to_resume, non_interactive=args.non_interactive)
         return
@@ -423,6 +514,16 @@ async def main_async():
             live_explorer=args.live_explorer,
             non_interactive=args.non_interactive,
         )
+    elif args.strategy == "s-deviation":
+        await run_campaign_s(
+            fw_client,
+            session_mgr,
+            report_gen,
+            exp_client,
+            live_explorer=args.live_explorer,
+            non_interactive=args.non_interactive,
+            and_pack=args.and_pack,
+        )
     else:
         print("\n==============================================")
         print("  Rompé Pepe! Rompé nomá!!! — Autonomous Stress Engine CLI")
@@ -430,6 +531,7 @@ async def main_async():
         print(" [1] Strategy A: Systematic Matrix Search (Grid Search)")
         print(" [2] Strategy B: Closed-Loop Adaptive Exploration (Fuzzing)")
         print(" [Z] Campaign Z: planted-secret exfil via /chat + Oracle")
+        print(" [S] Campaign S: thematic deviation vs corpus S (recall + FPR)")
         print(" [3] Select / Configure Explorer Model")
         print(" [4] Inspect Active LanceDB Corpus & Adapted Queries")
         print(" [5] Build Agent Handoff Pack (rompepepe_context.txt)")
@@ -445,6 +547,8 @@ async def main_async():
             await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen)
         elif choice in ("z", "Z"):
             await run_campaign_z(fw_client, session_mgr, report_gen, exp_client)
+        elif choice in ("s", "S"):
+            await run_campaign_s(fw_client, session_mgr, report_gen, exp_client)
         elif choice == "3":
             await select_model_menu(fw_client)
         elif choice == "4":
