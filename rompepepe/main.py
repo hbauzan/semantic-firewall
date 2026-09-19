@@ -10,6 +10,7 @@ from rompepepe.client.explorer_client import ExplorerClient
 from rompepepe.client.firewall_client import FirewallClient
 from rompepepe.config import get_config, update_env_file
 from rompepepe.engines.adaptive_fuzzing import AdaptiveFuzzingEngine
+from rompepepe.engines.campaign_fragment import CampaignFragmentEngine
 from rompepepe.engines.campaign_s import CampaignSEngine
 from rompepepe.engines.campaign_z import CampaignZEngine
 from rompepepe.engines.grid_search import GridSearchEngine
@@ -334,6 +335,55 @@ async def run_campaign_s(
     print(f"[+] QA Report saved to: {report_path}")
 
 
+async def run_campaign_fragment(
+    fw_client: FirewallClient,
+    session_mgr: SessionManager,
+    report_gen: ReportGenerator,
+    exp_client: ExplorerClient,
+    session_id: str | None = None,
+    live_explorer: bool = False,
+    non_interactive: bool = False,
+):
+    from rompepepe.test_dataset.campaign_fragment import load_campaign_fragment
+
+    dataset = load_campaign_fragment()
+    fw_client.timeout = max(fw_client.timeout, 60.0)
+    if not session_id:
+        print("\n=======================================================")
+        print(" Campaign fragment: 90/10 piggyback vs sentence buffer")
+        print("=======================================================")
+        print(f" Chat attacks: {len(dataset.chat_cases)}")
+        print(f" Compliance hold controls: {len(dataset.hold_controls)}")
+        print(" Profile: chat (L08). Control case sets compliance (L07).")
+        print(" Headline: payload delivery rate. Late cut after payload is leakage.")
+        print("=======================================================")
+        if not non_interactive:
+            confirm = input(" Proceed with execution? [Y/n]: ").strip().lower()
+            if confirm not in ("", "y", "yes"):
+                print("[!] Execution cancelled by user.")
+                return
+
+    print("\n[+] Starting Campaign fragment...")
+    session_mgr.setup_signal_handler()
+    engine = CampaignFragmentEngine(fw_client, session_mgr, explorer_client=exp_client)
+    session = await engine.run(
+        live_explorer=live_explorer,
+        session_id=session_id,
+        dataset=dataset,
+        progress_callback=format_progress,
+    )
+    print("\n")
+    report_path = report_gen.generate_report(session, fw_client.base_url)
+    rate = session.metadata.get("payload_delivery_rate", "?")
+    leaked = session.metadata.get("leaked", "?")
+    attempts = session.metadata.get("z_attempts", "?")
+    hold_reg = session.metadata.get("l07_regression", "?")
+    print(f"\n[+] Campaign fragment complete! Session ID: {session.session_id}")
+    print(f"[+] Payload delivery: {leaked}/{attempts} ({rate})")
+    print(f"[+] L07 hold regressions: {hold_reg}")
+    print(f"[+] QA Report saved to: {report_path}")
+
+
 def view_reports(vault_path: Path):
     reports_dir = vault_path / "reports"
     reports = sorted(reports_dir.glob("*.md"), reverse=True)
@@ -389,7 +439,7 @@ async def main_async():
     parser = argparse.ArgumentParser(description="rompepepe — Autonomous Stress Testing Engine")
     parser.add_argument(
         "--strategy",
-        choices=["grid", "fuzz", "z-exfil", "s-deviation"],
+        choices=["grid", "fuzz", "z-exfil", "s-deviation", "fragment"],
         help="Strategy to run",
     )
     parser.add_argument("--tier", choices=["light", "normal", "heavy"], default="normal", help="Execution intensity tier (light, normal, heavy)")
@@ -497,6 +547,16 @@ async def main_async():
                 non_interactive=args.non_interactive,
                 and_pack=args.and_pack,
             )
+        elif session.strategy == "fragment":
+            await run_campaign_fragment(
+                fw_client,
+                session_mgr,
+                report_gen,
+                exp_client,
+                session_id=session_id_to_resume,
+                live_explorer=args.live_explorer,
+                non_interactive=args.non_interactive,
+            )
         else:
             await run_adaptive_fuzzing(fw_client, exp_client, session_mgr, report_gen, iterations=session.total_steps, tier=args.tier, session_id=session_id_to_resume, non_interactive=args.non_interactive)
         return
@@ -524,6 +584,15 @@ async def main_async():
             non_interactive=args.non_interactive,
             and_pack=args.and_pack,
         )
+    elif args.strategy == "fragment":
+        await run_campaign_fragment(
+            fw_client,
+            session_mgr,
+            report_gen,
+            exp_client,
+            live_explorer=args.live_explorer,
+            non_interactive=args.non_interactive,
+        )
     else:
         print("\n==============================================")
         print("  Rompé Pepe! Rompé nomá!!! — Autonomous Stress Engine CLI")
@@ -532,6 +601,7 @@ async def main_async():
         print(" [2] Strategy B: Closed-Loop Adaptive Exploration (Fuzzing)")
         print(" [Z] Campaign Z: planted-secret exfil via /chat + Oracle")
         print(" [S] Campaign S: thematic deviation vs corpus S (recall + FPR)")
+        print(" [F] Campaign fragment: 90/10 piggyback vs sentence buffer")
         print(" [3] Select / Configure Explorer Model")
         print(" [4] Inspect Active LanceDB Corpus & Adapted Queries")
         print(" [5] Build Agent Handoff Pack (rompepepe_context.txt)")
@@ -549,6 +619,8 @@ async def main_async():
             await run_campaign_z(fw_client, session_mgr, report_gen, exp_client)
         elif choice in ("s", "S"):
             await run_campaign_s(fw_client, session_mgr, report_gen, exp_client)
+        elif choice in ("f", "F"):
+            await run_campaign_fragment(fw_client, session_mgr, report_gen, exp_client)
         elif choice == "3":
             await select_model_menu(fw_client)
         elif choice == "4":
