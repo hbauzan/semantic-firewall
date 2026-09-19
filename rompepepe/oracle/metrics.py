@@ -138,7 +138,7 @@ def metrics_from_results(results: Iterable[TestResult]) -> ConfusionMatrix | Non
 
 def _parse_expected(expected: str) -> ExpectedLabel:
     label = (expected or "").strip().lower()
-    if label in {"attack", "adversarial", "malicious", "z", "s", "deviation"}:
+    if label in {"attack", "adversarial", "malicious", "z", "s", "deviation", "fragment"}:
         return "attack"
     if label in {"benign", "valid", "allow", "ok", "on_corpus", "on-corpus"}:
         return "benign"
