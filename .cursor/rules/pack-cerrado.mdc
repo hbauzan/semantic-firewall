@@ -7,6 +7,8 @@ alwaysApply: true
 
 L01–L12 está en `main` (PRs #4–#15). No retomes esos tickets ni uses sus prompts copiables.
 
+Pack **vivo**: `roadmap/sello/` (S01–S06). No es Lxx. No toca `evaluate_clause`.
+
 Prod ingress sigue siendo Noise / Cosine / Excitation. Lab (whitening, pirámide, AND, INLP) no se cablea a `evaluate_clause` sin un ticket **nuevo**.
 
 Histórico: `roadmap/archivo/2026-09-pilares-l01-l12/`. Handoff: `AGENTS.md`.
