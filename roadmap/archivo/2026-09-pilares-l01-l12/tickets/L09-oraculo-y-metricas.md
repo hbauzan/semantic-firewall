@@ -1,5 +1,7 @@
 # L09 — Oracle y métricas
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 4
 > **Spec:** [`specs/pilar-4-rompepepe.md`](../specs/pilar-4-rompepepe.md)
@@ -25,10 +27,10 @@ Nada.
 ## Archivos a leer
 
 - Spec Pilar 4
-- [`rompepepe/reports/generator.py`](../../../rompepepe/reports/generator.py)
-- [`rompepepe/state/models.py`](../../../rompepepe/state/models.py)
-- [`rompepepe/client/firewall_client.py`](../../../rompepepe/client/firewall_client.py)
-- [`rompepepe/tests/`](../../../rompepepe/tests/)
+- [`rompepepe/reports/generator.py`](../../../../rompepepe/reports/generator.py)
+- [`rompepepe/state/models.py`](../../../../rompepepe/state/models.py)
+- [`rompepepe/client/firewall_client.py`](../../../../rompepepe/client/firewall_client.py)
+- [`rompepepe/tests/`](../../../../rompepepe/tests/)
 
 ## Archivos a tocar
 
@@ -78,7 +80,10 @@ Cerrado 2026-09-17. Librería; no hay egreso ni campañas. El corte se detecta p
 - No uses `trace.passed` de `/audit` como leakage. Leakage es lo que vio el usuario.
 - No pidas a Gemini/Claude “¿esto fue un ataque exitoso?”.
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L09-oraculo-y-metricas.md.

@@ -1,46 +1,36 @@
-# Roadmap — Three-Headed Semantic Firewall
+# Roadmap
 
-> Carpeta de navegación. En la raíz de `roadmap/` solo vive este índice. El trabajo tomable está en subcarpetas.
+> Índice. **No hay pack de pilares tomable.** L01–L12 está cerrado en `main`.
 
-## Dónde está el trabajo activo
+Handoff para agentes: [`../AGENTS.md`](../AGENTS.md).
 
-| Archivo | Contenido |
+## Qué está vivo vs qué es histórico
+
+| Archivo | Qué es |
 | :--- | :--- |
-| **[`../roadmap.md`](../roadmap.md)** | **Activo ahora (Nivel 1):** benchmark / Youden. |
-| **[`pilares/README.md`](./pilares/README.md)** | **Tomable en paralelo:** 4 pilares del PDF (L01–L12). |
-| **[`../roadmap-backlog.md`](../roadmap-backlog.md)** | Diferido: etapas 3–9 Nivel 1, Nivel 3, opciones B/C. |
-
----
-
-## Cómo está organizado esto
+| **[`../AGENTS.md`](../AGENTS.md)** | Estado real para otra IA. Empezá acá. |
+| **[`pilares/README.md`](./pilares/README.md)** | **Cerrado.** Puerta; no tickets. |
+| **[`archivo/2026-09-pilares-l01-l12/`](./archivo/2026-09-pilares-l01-l12/README.md)** | Registro del pack L01–L12. No se ejecuta. |
+| **[`../roadmap.md`](../roadmap.md)** | Checklist Nivel 1 (Etapa 5, 2026-07). Distinta del pack de pilares. Fechas viejas. |
+| **[`../roadmap-backlog.md`](../roadmap-backlog.md)** | Diferido: etapas 6–9, Nivel 3, opciones B/C. |
+| **[`nivel-1/`](./nivel-1/README.md)** | Producto / evidencia. No es Lxx. |
+| **[`vision/`](./vision/README.md)** | Para qué. No se implementa. |
+| **[`archivo/`](./archivo/README.md)** | Estudios 2026-09 + pack cerrado. No se implementa. |
 
 ```
 roadmap/
-├── README.md      ← estás acá (único .md en la raíz)
-├── pilares/       ← implementación PDF — tomá un Lxx
-├── nivel-1/       ← etapas Nivel 1 — tomá una etapa
-├── vision/        ← para qué; no se implementa
-└── archivo/       ← estudios Cursor/Gemini; no se implementa
+├── README.md
+├── pilares/          ← stub CERRADO (no tomes Lxx)
+├── nivel-1/          ← producto; no es el pack de pilares
+├── vision/           ← no se implementa
+└── archivo/
+    ├── 2026-09-*-estudio.md
+    └── 2026-09-pilares-l01-l12/   ← tickets/specs históricos
 ```
-
----
 
 ## Estado
 
-- **Nivel 1 (2026-07-04):** etapas 1–2 hechas; opción A hecha. Activo: [`roadmap.md`](../roadmap.md).
-- **Pilares (2026-09-17):** specs + tickets L01–L12 en [`pilares/`](./pilares/README.md). Arranque paralelo: L01, L02, L03, L09.
+- **Pilares L01–L12 (2026-09-18/19):** mergeados, PRs #4–#15. Histórico en [`archivo/2026-09-pilares-l01-l12/`](./archivo/2026-09-pilares-l01-l12/README.md). **No reabrir.**
+- **Nivel 1 (última alineación 2026-07-04):** etapas 1–4 hechas; Etapa 5 listada en [`roadmap.md`](../roadmap.md). No es backlog de pilares. No arranques Etapa 5 “porque el markdown lo dice” sin un pedido nuevo.
 
-Visión: [`vision/00-vision-y-niveles.md`](./vision/00-vision-y-niveles.md).  
-Nivel 1: [`nivel-1/README.md`](./nivel-1/README.md).  
-Pilares: [`pilares/README.md`](./pilares/README.md).  
-Estudios (no ejecutar): [`archivo/`](./archivo/README.md).
-
----
-
-## Principios (resumen)
-
-1. Externalizá el estado en checklists (no en la cabeza).
-2. Micro-sesiones; un commit, una cosa.
-3. Checkpoints 4 y 8 obligatorios antes de evidencia / lanzamiento.
-4. Tooling: `uv` (backend), `pnpm` (frontend). Doc-sync **condicional**.
-5. Nivel 3 no se trabaja hasta cerrar Nivel 1. El pack [`pilares/`](./pilares/) sí se puede tomar en paralelo; no pisa el filtro de producción hasta que el ticket lo pida.
+Prod ingress sigue Noise / Cosine / Excitation. Lab (whitening / pirámide / AND / INLP) no está en `evaluate_clause`.

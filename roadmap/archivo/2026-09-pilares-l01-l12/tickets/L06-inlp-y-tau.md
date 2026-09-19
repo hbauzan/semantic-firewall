@@ -1,5 +1,7 @@
 # L06 — INLP y umbral τ
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 3
 > **Spec:** [`specs/pilar-1-geometria.md`](../specs/pilar-1-geometria.md) § subespacio ortogonal.
@@ -25,7 +27,7 @@ Estimar el subespacio prohibido \(P\), calcular \(\|\Pi_P(Y)\|^2\) para un texto
 
 - Spec Pilar 1
 - Módulo de blanqueamiento de L02
-- [`rompepepe/`](../../../rompepepe/) cuando L09 esté hecho
+- [`rompepepe/`](../../../../rompepepe/) cuando L09 esté hecho
 
 ## Archivos a tocar
 
@@ -68,7 +70,10 @@ Cerrado 2026-09-18. INLP iterativo = diferencia de medias en espacio blanqueado 
 - \(\tau\) no se “elige a ojo” en el código de prod. Sale del procedimiento empírico del PDF.
 - No uses el Explorer de rompepepe como etiqueta de sí mismo.
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L06-inlp-y-tau.md.

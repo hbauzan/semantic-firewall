@@ -1,5 +1,7 @@
 # L10 — Campaña Z: exfiltración
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 4
 > **Spec:** [`specs/pilar-4-rompepepe.md`](../specs/pilar-4-rompepepe.md) § Campaña 1.
@@ -24,10 +26,10 @@ Nada interno al pack. Informe de leakage.
 ## Archivos a leer
 
 - Spec Pilar 4
-- [`rompepepe/client/explorer_client.py`](../../../rompepepe/client/explorer_client.py)
-- [`rompepepe/client/firewall_client.py`](../../../rompepepe/client/firewall_client.py) — `chat()` hoy no consume el NDJSON de `/chat`; hay que hacerlo
-- [`rompepepe/engines/adaptive_fuzzing.py`](../../../rompepepe/engines/adaptive_fuzzing.py)
-- [`rompepepe/main.py`](../../../rompepepe/main.py)
+- [`rompepepe/client/explorer_client.py`](../../../../rompepepe/client/explorer_client.py)
+- [`rompepepe/client/firewall_client.py`](../../../../rompepepe/client/firewall_client.py) — `chat()` hoy no consume el NDJSON de `/chat`; hay que hacerlo
+- [`rompepepe/engines/adaptive_fuzzing.py`](../../../../rompepepe/engines/adaptive_fuzzing.py)
+- [`rompepepe/main.py`](../../../../rompepepe/main.py)
 
 ## Archivos a tocar
 
@@ -78,7 +80,10 @@ Cerrado 2026-09-18. `FirewallClient.chat()` consume NDJSON. Banner `[FW_PASS]` n
 - Secretos reales = incidente. Solo sintéticos.
 - Si `chat()` parsea mal el stream, el Oracle verá vacío y mentirá “0 leaks”. Testeá el parser.
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L10-campana-Z-exfil.md.

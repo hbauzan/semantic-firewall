@@ -1,5 +1,7 @@
 # L07 — Egreso perfil Compliance (full hold)
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 3
 > **Spec:** [`specs/pilar-egreso-dual-profile.md`](../specs/pilar-egreso-dual-profile.md)
@@ -26,9 +28,9 @@ L06 (INLP) se enchufa como capa 3 cuando exista; L07 puede shippear con seam `pr
 ## Archivos a leer
 
 - Spec egreso
-- [`backend/app/api/endpoints/chat.py`](../../../backend/app/api/endpoints/chat.py) — `ui_stream_wrapper`, `stream_wrapper` (hoy reenvían el stream)
-- [`backend/app/core/models.py`](../../../backend/app/core/models.py) — `ConfigState`
-- [`backend/app/modules/sniffer.py`](../../../backend/app/modules/sniffer.py)
+- [`backend/app/api/endpoints/chat.py`](../../../../backend/app/api/endpoints/chat.py) — `ui_stream_wrapper`, `stream_wrapper` (hoy reenvían el stream)
+- [`backend/app/core/models.py`](../../../../backend/app/core/models.py) — `ConfigState`
+- [`backend/app/modules/sniffer.py`](../../../../backend/app/modules/sniffer.py)
 
 ## Archivos a tocar
 
@@ -79,7 +81,10 @@ Cerrado 2026-09-18. Default `egress_profile=chat` (HUD actual). CDE debe poner `
 - No loguees el PAN. last4 + hash.
 - Streaming al usuario en este perfil = fallo del ticket.
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L07-egreso-compliance-hold.md.

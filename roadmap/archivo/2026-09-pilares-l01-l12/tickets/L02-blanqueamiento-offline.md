@@ -1,5 +1,7 @@
 # L02 — Blanqueamiento offline
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 1
 > **Spec:** [`specs/pilar-1-geometria.md`](../specs/pilar-1-geometria.md)
@@ -24,8 +26,8 @@ Nada (puede leer la tabla `knowledge` existente).
 ## Archivos a leer
 
 - Spec Pilar 1
-- [`backend/app/modules/storage.py`](../../../backend/app/modules/storage.py) — cómo se leen vectores
-- [`backend/app/core/firewall.py`](../../../backend/app/core/firewall.py) — excitación actual (solo para no copiarla en crudo)
+- [`backend/app/modules/storage.py`](../../../../backend/app/modules/storage.py) — cómo se leen vectores
+- [`backend/app/core/firewall.py`](../../../../backend/app/core/firewall.py) — excitación actual (solo para no copiarla en crudo)
 - Packs demo: `backend/demo_corpus/`
 
 ## Archivos a tocar
@@ -57,8 +59,8 @@ cd backend && uv run pytest -q tests/test_whitening.py
 cd backend && uv run python -m app.modules.geometry.whitening --corpus automotive
 ```
 
-Módulo: [`backend/app/modules/geometry/whitening.py`](../../../backend/app/modules/geometry/whitening.py).  
-Artefacto regenerable (gitignored): `backend/calibration/geometry/whitening_automotive.npz`. Cómo: [`backend/calibration/geometry/README.md`](../../../backend/calibration/geometry/README.md).
+Módulo: [`backend/app/modules/geometry/whitening.py`](../../../../backend/app/modules/geometry/whitening.py).  
+Artefacto regenerable (gitignored): `backend/calibration/geometry/whitening_automotive.npz`. Cómo: [`backend/calibration/geometry/README.md`](../../../../backend/calibration/geometry/README.md).
 
 `evaluate_clause` / `run_excitation_filter` **no** se tocaron. n≪d en el demo → ridge; la propiedad var~1 por eje se testea en un corpus sintético n≫d.
 
@@ -75,7 +77,10 @@ Artefacto regenerable (gitignored): `backend/calibration/geometry/whitening_auto
 - No inviertas \(\Sigma\) a mano si está mal condicionada; ridge y documentalo.
 - Numpy/scipy vía `uv add` si hace falta, no `pip`.
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L02-blanqueamiento-offline.md.

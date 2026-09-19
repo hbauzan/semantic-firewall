@@ -38,7 +38,7 @@ Firewall de allowlist geométrico, local, auditable, provider-agnóstico, contra
 **Claim secundario:** *defensa contra piggybacking vía segmentación de cláusulas*. Estructuralmente único tuyo.
 
 ### Nivel 2 — Bidireccional. Futuro plausible.
-Filtrar también la **salida** del LLM, no solo la entrada. Vectorizás la respuesta y la comparás contra la región prohibida antes de mostrarla. Caso de uso: soberanía de datos, cumplimiento regional (tu ejemplo de China). Misma matemática, otra dirección del flujo. Implementación: [`../pilares/`](../pilares/README.md). Visión: [`nivel-2.md`](./nivel-2.md).
+Filtrar también la **salida** del LLM, no solo la entrada. Vectorizás la respuesta y la comparás contra la región prohibida antes de mostrarla. Caso de uso: soberanía de datos, cumplimiento regional (tu ejemplo de China). Misma matemática, otra dirección del flujo. Implementación (pack **cerrado**): [`../pilares/`](../pilares/README.md). Histórico: [`../archivo/2026-09-pilares-l01-l12/`](../archivo/2026-09-pilares-l01-l12/README.md). Visión: [`nivel-2.md`](./nivel-2.md).
 
 ### Nivel 3 — Firmas registrables / certificación. Visión, escala-década.
 Espacios semánticos certificados (filtros seguros para niños, instituciones, regulación tipo UE). **Idea coherente, NO entregable de un dev solo.** Tiene problemas de gobernanza, adopción y mantenimiento que no son técnicos. → [`nivel-3.md`](./nivel-3.md).

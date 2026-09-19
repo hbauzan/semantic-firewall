@@ -1,5 +1,7 @@
 # L05 — Sidecar TEI
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 2
 > **Spec:** [`specs/pilar-3-tei-determinismo.md`](../specs/pilar-3-tei-determinismo.md)
@@ -22,12 +24,12 @@ Correr Text Embeddings Inference como contenedor con **digest SHA256 pinneado**,
 
 ## Archivos a leer
 
-- [`backend/app/modules/embedder.py`](../../../backend/app/modules/embedder.py)
-- [`backend/app/modules/dispatcher.py`](../../../backend/app/modules/dispatcher.py)
-- [`backend/app/modules/mlx_embedder.py`](../../../backend/app/modules/mlx_embedder.py) — `EmbeddingOutput`
-- [`backend/app/core/settings.py`](../../../backend/app/core/settings.py)
-- [`setup-fw.sh`](../../../setup-fw.sh) (línea “Docker not used”)
-- L01 informe: [`backend/tests/embedder_determinism_report.md`](../../../backend/tests/embedder_determinism_report.md)
+- [`backend/app/modules/embedder.py`](../../../../backend/app/modules/embedder.py)
+- [`backend/app/modules/dispatcher.py`](../../../../backend/app/modules/dispatcher.py)
+- [`backend/app/modules/mlx_embedder.py`](../../../../backend/app/modules/mlx_embedder.py) — `EmbeddingOutput`
+- [`backend/app/core/settings.py`](../../../../backend/app/core/settings.py)
+- [`setup-fw.sh`](../../../../setup-fw.sh) (línea “Docker not used”)
+- L01 informe: [`backend/tests/embedder_determinism_report.md`](../../../../backend/tests/embedder_determinism_report.md)
 
 ## Archivos a tocar
 
@@ -81,7 +83,10 @@ Cerrado 2026-09-17. Live 100× **no** corrido: Docker Desktop no tenía daemon. 
 - No pongas API keys de Hugging Face en el compose commiteado si el pull de modelo las necesita: env.
 - Dependencias: `uv add httpx` si no está; nunca pip.
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L05-sidecar-tei.md.

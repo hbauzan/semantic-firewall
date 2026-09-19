@@ -1,9 +1,9 @@
 # Roadmap backlog — trabajo diferido
 
-> Todo lo que **no** es el trabajo activo de ahora.
-> Activo Nivel 1: [`roadmap.md`](./roadmap.md) (cerrar Etapa 5 — calibración por corpus; benchmark suite ya entregado en branch).
-> Pack pilares (paralelo): [`roadmap/pilares/README.md`](./roadmap/pilares/README.md).
-> Detalle histórico del Nivel 1: carpeta [`roadmap/`](./roadmap/).
+> Trabajo diferido. **No es un pack tomable de Lxx.**
+> L01–L12 cerrado: [`AGENTS.md`](./AGENTS.md), [`roadmap/pilares/README.md`](./roadmap/pilares/README.md).
+> Checklist Nivel 1 (fechas 2026-07): [`roadmap.md`](./roadmap.md).
+> Detalle: [`roadmap/`](./roadmap/).
 
 Última alineación de estado: **2026-07-04**. Etapas 1–4 del Nivel 1: **hechas** (checkpoint 4 🟡). Etapa 5: **en progreso**.
 **Opción A (RAG más rico por request): hecha** — multi-cláusula, `rag_top_k` default 12 / máx 32, telemetría de chunks.
@@ -33,15 +33,17 @@ Checklist de “Nivel 1 terminado” (ítems aún abiertos): dataset etiquetado,
 
 ---
 
-## Nivel 2 — pack de pilares (tomable en paralelo)
+## Nivel 2 — pack de pilares (cerrado)
 
-Tickets y specs: [`roadmap/pilares/README.md`](./roadmap/pilares/README.md). Laboratorio / feature flag; el hot path de producción no se cambia hasta que el ticket lo liste. Visión: [`roadmap/vision/nivel-2.md`](./roadmap/vision/nivel-2.md).
+L01–L12 está en `main` (PRs #4–#15). Registro: [`roadmap/archivo/2026-09-pilares-l01-l12/`](./roadmap/archivo/2026-09-pilares-l01-l12/README.md). Puerta: [`roadmap/pilares/README.md`](./roadmap/pilares/README.md). Visión: [`roadmap/vision/nivel-2.md`](./roadmap/vision/nivel-2.md).
+
+No reabrir Lxx. Cablear lab a prod o A/B cosine es **otro** pack.
 
 ## Nivel 3 — visión (no implementar)
 
 - Firmas registrables / certificación: [`roadmap/vision/nivel-3.md`](./roadmap/vision/nivel-3.md).
 
-Regla Nivel 3: no trabajarlo hasta cerrar Nivel 1. Los pilares **sí** se pueden tomar ahora.
+Regla Nivel 3: no trabajarlo hasta cerrar Nivel 1. El pack de pilares **ya se tomó**; no lo retomes.
 
 ---
 

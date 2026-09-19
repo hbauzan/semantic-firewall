@@ -1,8 +1,10 @@
 # Pilar 1 — Blanqueamiento e INLP
 
+> **Snapshot histórico del pack L01–L12 (cerrado 2026-09-18/19).** La verdad es el código en `main`. Estas specs describen el destino del pack; varias líneas “código hoy” quedaron viejas a propósito. No reimplementar.
+
 > Fuente: PDF, Pilar 1 y Parte 2.1.
 > Tickets: [L02](../tickets/L02-blanqueamiento-offline.md), [L06](../tickets/L06-inlp-y-tau.md).
-> Código hoy: [`backend/app/core/firewall.py`](../../../backend/app/core/firewall.py) (`run_excitation_filter`: conteo \(|Q_i-C_i|\le\varepsilon\) en la base canónica de BGE-M3).
+> Código hoy: [`backend/app/core/firewall.py`](../../../../backend/app/core/firewall.py) (`run_excitation_filter`: conteo \(|Q_i-C_i|\le\varepsilon\) en la base canónica de BGE-M3).
 
 ---
 

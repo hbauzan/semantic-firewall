@@ -1,10 +1,12 @@
-# Archivo — estudios, no backlog
+# Archivo — no es backlog
 
-Análisis histórico (Cursor / Gemini, 2026-09). **No se ejecuta.** Las palancas de estos textos que el PDF no promovió no se implementan desde acá.
+Análisis y packs **cerrados**. **No se ejecuta.** No tomes tickets desde acá.
 
-Trabajo tomable: [`../pilares/README.md`](../pilares/README.md).
+Puerta del pack de pilares (cerrado): [`../pilares/README.md`](../pilares/README.md).  
+Handoff: [`../../AGENTS.md`](../../AGENTS.md).
 
-| Archivo | Origen |
+| Archivo | Qué es |
 | :--- | :--- |
-| [`2026-09-cursor-estudio.md`](./2026-09-cursor-estudio.md) | Estudio independiente Cursor |
-| [`2026-09-gemini-estudio.md`](./2026-09-gemini-estudio.md) | Estudio Gemini |
+| [`2026-09-pilares-l01-l12/`](./2026-09-pilares-l01-l12/README.md) | Pack L01–L12 mergeado (PRs #4–#15). Specs + tickets históricos. |
+| [`2026-09-cursor-estudio.md`](./2026-09-cursor-estudio.md) | Estudio independiente Cursor. Ideas no promovidas por el PDF: no implementar desde acá. |
+| [`2026-09-gemini-estudio.md`](./2026-09-gemini-estudio.md) | Estudio Gemini. Idem. |

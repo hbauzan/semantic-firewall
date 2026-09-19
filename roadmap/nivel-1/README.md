@@ -1,8 +1,10 @@
 # Nivel 1 — Producto de texto, lanzable
 
-> El foco real. Todo lo de esta carpeta es para llevar el firewall de "anda en mi máquina" a "lanzado públicamente con evidencia que se defiende sola".
+> Línea de **producto / evidencia**. **No es el pack de pilares L01–L12** (ese está cerrado).
+> Última alineación de estas etapas: **2026-07-04**. Las fechas están viejas. No arranques una etapa “porque el markdown dice en progreso” sin un pedido nuevo.
+> Handoff: [`../../AGENTS.md`](../../AGENTS.md).
 
-**Estado (2026-07-04):** etapas **1–4 hechas** (checkpoint 🟡). Etapa **5 en progreso** (datasets + harness).
+**Estado (2026-07-04):** etapas **1–4 hechas** (checkpoint 🟡). Etapa **5** listada como en progreso (datasets + harness).
 
 **Opción A (RAG más rico):** hecha.  
 **Pendiente de producto y opciones B/C:** [`../../roadmap-backlog.md`](../../roadmap-backlog.md).  

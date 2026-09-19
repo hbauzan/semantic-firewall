@@ -1,5 +1,7 @@
 # L11 — Campaña S: desvío temático
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 4
 > **Spec:** [`specs/pilar-4-rompepepe.md`](../specs/pilar-4-rompepepe.md) § Campaña 2.
@@ -73,7 +75,10 @@ Cerrado 2026-09-18. `POST /chat` + Oracle labels `on_corpus|deviation`. Membres�
 - No uses al Explorer como “¿esto era del PDF?”.
 - On-corpus tiene que ser paráfrasis, no solo el string verbatim del chunk (el PDF pide no degradar consultas legítimas).
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L11-campana-S-desvio.md.

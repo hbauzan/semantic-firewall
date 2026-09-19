@@ -6,6 +6,7 @@ The previous `manifest.json` `active_features` ledger (per-flag historical trail
 
 ## Unreleased
 
+- **Pack L01–L12 cerrado:** tickets/specs movidos a `roadmap/archivo/2026-09-pilares-l01-l12/`. `roadmap/pilares/` es un stub. Handoff en `AGENTS.md`. No reabrir Lxx.
 - **Egress hold (L07):** `egress_profile=chat|compliance`. Default `chat`. `compliance` absorbs the full generation, then DLP / NFKC homoglyphs / INLP seam / reconstructed Luhn / AND multi-grain. Cut messages and sniffer/history logs never store raw PANs (`hash8:last4`). `/v1` returns 403 on egress cut.
 - **Sentence buffer (L08):** `chat` freezes on `. ; ? \\n`, evaluates the sentence, bursts or cuts. Tail at upstream done is gated. Split-PAN prefix can be emitted (L07's reason). Compliance hold unchanged.
 

@@ -1,8 +1,10 @@
 # Pilar 2 — Ingesta fractal y pirámide en LanceDB
 
+> **Snapshot histórico del pack L01–L12 (cerrado 2026-09-18/19).** La verdad es el código en `main`. Estas specs describen el destino del pack; varias líneas “código hoy” quedaron viejas a propósito. No reimplementar.
+
 > Fuente: PDF, Documento 1.
 > Tickets: [L03](../tickets/L03-ingesta-piramide-laboratorio.md), [L04](../tickets/L04-and-multigrano-offline.md).
-> Código hoy: [`backend/app/modules/ingestor.py`](../../../backend/app/modules/ingestor.py) (`chunk_text` 512/50 chars), [`backend/app/modules/storage.py`](../../../backend/app/modules/storage.py) (tabla `knowledge`, metadata `filename` + `chunk_index`).
+> Código hoy: [`backend/app/modules/ingestor.py`](../../../../backend/app/modules/ingestor.py) (`chunk_text` 512/50 chars), [`backend/app/modules/storage.py`](../../../../backend/app/modules/storage.py) (tabla `knowledge`, metadata `filename` + `chunk_index`).
 
 ---
 
