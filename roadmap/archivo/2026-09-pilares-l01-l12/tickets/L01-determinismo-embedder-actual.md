@@ -1,5 +1,7 @@
 # L01 — Determinismo del embedder actual
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 1
 > **Spec:** [`specs/pilar-3-tei-determinismo.md`](../specs/pilar-3-tei-determinismo.md)
@@ -24,9 +26,9 @@ Nada.
 
 ## Archivos a leer
 
-- [`backend/app/modules/mlx_embedder.py`](../../../backend/app/modules/mlx_embedder.py) — `embed_full`
-- [`backend/app/modules/embedder.py`](../../../backend/app/modules/embedder.py)
-- [`backend/app/modules/dispatcher.py`](../../../backend/app/modules/dispatcher.py)
+- [`backend/app/modules/mlx_embedder.py`](../../../../backend/app/modules/mlx_embedder.py) — `embed_full`
+- [`backend/app/modules/embedder.py`](../../../../backend/app/modules/embedder.py)
+- [`backend/app/modules/dispatcher.py`](../../../../backend/app/modules/dispatcher.py)
 - Etapa 6 Bloque A
 
 ## Archivos a tocar
@@ -57,7 +59,7 @@ cd backend && uv run python tests/embedder_determinism.py --runs 100
 cd backend && RUN_EMBEDDER_DETERMINISM=1 uv run pytest -q tests/test_embedder_determinism.py
 ```
 
-Informe: [`backend/tests/embedder_determinism_report.md`](../../../backend/tests/embedder_determinism_report.md). Harness con stubs siempre corre en la suite; el N=100 live **no** entra en `./run_tests.sh`.
+Informe: [`backend/tests/embedder_determinism_report.md`](../../../../backend/tests/embedder_determinism_report.md). Harness con stubs siempre corre en la suite; el N=100 live **no** entra en `./run_tests.sh`.
 
 ## Definición de hecho
 
@@ -77,7 +79,10 @@ Informe: [`backend/tests/embedder_determinism_report.md`](../../../backend/tests
 - PASS/BREACH **estable** (flip_count=0). On-corpus: BREACH por excitación contra un chunk de 512 chars (calibración, no jitter). Off-topic: BREACH por coseno.
 - Path medido: singleton `embedder.embed_full`. El dispatcher tiene **otra** instancia ST.
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L01-determinismo-embedder-actual.md.

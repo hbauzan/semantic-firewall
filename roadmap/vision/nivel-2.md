@@ -1,6 +1,6 @@
 # Nivel 2 — Bidireccional
 
-> Visión. El trabajo cortado en tickets está en [`../pilares/`](../pilares/README.md) (PDF de 4 pilares, L01–L12). Este archivo no se ejecuta.
+> Visión. El pack L01–L12 **ya está en `main`** (cerrado). Puerta: [`../pilares/`](../pilares/README.md). Histórico: [`../archivo/2026-09-pilares-l01-l12/`](../archivo/2026-09-pilares-l01-l12/README.md). Este archivo no se ejecuta.
 
 ---
 

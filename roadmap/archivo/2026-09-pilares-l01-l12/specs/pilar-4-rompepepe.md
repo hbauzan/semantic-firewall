@@ -1,8 +1,10 @@
 # Pilar 4 — rompepepe bidireccional
 
+> **Snapshot histórico del pack L01–L12 (cerrado 2026-09-18/19).** La verdad es el código en `main`. Estas specs describen el destino del pack; varias líneas “código hoy” quedaron viejas a propósito. No reimplementar.
+
 > Fuente: PDF, Documento 3.
 > Tickets: [L09](../tickets/L09-oraculo-y-metricas.md), [L10](../tickets/L10-campana-Z-exfil.md), [L11](../tickets/L11-campana-S-desvio.md), [L12](../tickets/L12-campana-fragmentacion.md).
-> Código hoy: [`rompepepe/`](../../../rompepepe/) — engines `grid` y `fuzz` contra `POST /audit`. `FirewallClient.chat()` existe y no se usa. Reportes = % PASS (“estabilidad operacional”). Sin Oracle. Sin campañas.
+> Código hoy: [`rompepepe/`](../../../../rompepepe/) — engines `grid` y `fuzz` contra `POST /audit`. `FirewallClient.chat()` existe y no se usa. Reportes = % PASS (“estabilidad operacional”). Sin Oracle. Sin campañas.
 
 ---
 

@@ -123,3 +123,5 @@
 **Oracle** — rompepepe scorer of the text **delivered** to the user. Emits block recall, FPR and egress leakage. Not an LLM-judge and not `trace.passed` from `/audit`.
 
 **Egress leakage** — A planted secret (substring, Luhn PAN, or key regex) present in delivered text. A firewall cut message is not delivery, even if it echoes the prompt.
+
+**Pack L01–L12** — Closed implementation wave (PRs #4–#15, 2026-09). Historical tickets/specs live under `roadmap/archivo/2026-09-pilares-l01-l12/`. Not backlog. Do not retake those IDs.

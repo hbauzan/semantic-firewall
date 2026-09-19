@@ -8,5 +8,5 @@ No es trabajo tomable. No implementes desde acá.
 | [`nivel-2.md`](./nivel-2.md) | Bidireccional, en una página |
 | [`nivel-3.md`](./nivel-3.md) | Firmas / certificación (década) |
 
-Implementación Nivel 2: [`../pilares/README.md`](../pilares/README.md).  
-Nivel 1: [`../nivel-1/README.md`](../nivel-1/README.md).
+Nivel 2 en código (pack **cerrado**): [`../pilares/README.md`](../pilares/README.md) → histórico [`../archivo/2026-09-pilares-l01-l12/`](../archivo/2026-09-pilares-l01-l12/README.md).  
+Nivel 1 (producto, otra línea): [`../nivel-1/README.md`](../nivel-1/README.md).

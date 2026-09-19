@@ -1,8 +1,8 @@
 # Roadmap
 
-> Lista de tareas activas (Nivel 1). Pendientes diferidos: [`roadmap-backlog.md`](./roadmap-backlog.md).
-> Pack paralelo para agentes: [`roadmap/pilares/README.md`](./roadmap/pilares/README.md).
-> Mapa: [`roadmap/`](./roadmap/).
+> Checklist Nivel 1 (Etapa 5). **No es el pack de pilares.**
+> L01–L12 está cerrado: [`AGENTS.md`](./AGENTS.md) y [`roadmap/pilares/README.md`](./roadmap/pilares/README.md).
+> Diferido: [`roadmap-backlog.md`](./roadmap-backlog.md). Mapa: [`roadmap/`](./roadmap/).
 
 ---
 

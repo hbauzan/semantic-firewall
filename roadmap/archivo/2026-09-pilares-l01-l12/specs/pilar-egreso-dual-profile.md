@@ -1,8 +1,10 @@
 # Egreso — dual-profile (Chat vs Compliance)
 
+> **Snapshot histórico del pack L01–L12 (cerrado 2026-09-18/19).** La verdad es el código en `main`. Estas specs describen el destino del pack; varias líneas “código hoy” quedaron viejas a propósito. No reimplementar.
+
 > Fuente: PDF, Documento 4 / Parte 2.2.
 > Tickets: [L07](../tickets/L07-egreso-compliance-hold.md), [L08](../tickets/L08-egreso-chat-sentence-buffer.md).
-> Código hoy: [`backend/app/api/endpoints/chat.py`](../../../backend/app/api/endpoints/chat.py) — `ui_stream_wrapper` / `stream_wrapper` acumulan tokens **para el sniffer** y los reenvían al cliente sin evaluar. No hay corte de egreso.
+> Código hoy: [`backend/app/api/endpoints/chat.py`](../../../../backend/app/api/endpoints/chat.py) — `ui_stream_wrapper` / `stream_wrapper` acumulan tokens **para el sniffer** y los reenvían al cliente sin evaluar. No hay corte de egreso.
 
 ---
 

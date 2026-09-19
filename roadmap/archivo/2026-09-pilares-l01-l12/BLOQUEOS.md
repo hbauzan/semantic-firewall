@@ -1,5 +1,7 @@
 # Bloqueos
 
+> **Histórico (mid-L08).** No es el estado de `main`. Pack L01–L12 cerrado: ver [`README.md`](./README.md).
+
 Actualizado 2026-09-18 (L07 en main, #11).
 
 ## Hecho en main
@@ -17,7 +19,7 @@ L01–L07, L09. PRs #4–#11.
 | Ticket | Hasta |
 | :--- | :--- |
 | **L12** fragmentación | L08 en main |
-| **L10 / L11** | tomables en paralelo *después* de este merge (L07+L09 ya están) |
+| **L10 / L11** | (histórico) se tomaron después de este merge |
 
 ## Producto (no adivinar)
 

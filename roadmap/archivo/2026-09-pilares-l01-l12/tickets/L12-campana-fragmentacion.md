@@ -1,5 +1,7 @@
 # L12 — Campaña fragmentación / piggyback
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 4
 > **Spec:** [`specs/pilar-4-rompepepe.md`](../specs/pilar-4-rompepepe.md) § Campaña 3.
@@ -72,7 +74,10 @@ Cerrado 2026-09-18. `--strategy fragment`. Chat: híbrido 90/10, payload tras `;
 - Medir solo `/audit` ignora el acumulador. Tiene que ser generación + egreso.
 - Un BREACH tardío después de haber streameado el payload es leakage, no éxito.
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L12-campana-fragmentacion.md.

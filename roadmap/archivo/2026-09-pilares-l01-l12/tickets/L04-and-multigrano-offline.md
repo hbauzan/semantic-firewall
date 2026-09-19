@@ -1,5 +1,7 @@
 # L04 — AND multi-grano offline
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 1
 > **Spec:** [`specs/pilar-2-ingesta-fractal.md`](../specs/pilar-2-ingesta-fractal.md) § regla AND.
@@ -26,7 +28,7 @@ Nada crítico una vez L02+L03 cerrados. L05 puede seguir en paralelo.
 
 - Spec Pilar 2
 - Salida de L03 (tabla lab)
-- [`backend/app/core/firewall.py`](../../../backend/app/core/firewall.py) — `sparse_cosine_similarity` (reusar, no mezclar con hybrid α como único gate)
+- [`backend/app/core/firewall.py`](../../../../backend/app/core/firewall.py) — `sparse_cosine_similarity` (reusar, no mezclar con hybrid α como único gate)
 
 ## Archivos a tocar
 
@@ -69,7 +71,10 @@ Cerrado 2026-09-18. Micro = cosine denso (espacio blanqueado si se pasa `Whiteni
 - No “suavices” con α. El PDF pide conjunción.
 - Umbrales de lab pueden ser placeholders calibrados a ojo **si** quedan en config y el test usa fixtures, no magia dispersa.
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L04-and-multigrano-offline.md.

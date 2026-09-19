@@ -1,5 +1,7 @@
 # L03 — Ingesta pirámide (laboratorio)
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 1
 > **Spec:** [`specs/pilar-2-ingesta-fractal.md`](../specs/pilar-2-ingesta-fractal.md)
@@ -23,9 +25,9 @@ Nada.
 
 ## Archivos a leer
 
-- [`backend/app/modules/ingestor.py`](../../../backend/app/modules/ingestor.py) — `_extract_pdf_text`, `chunk_text`, `process_pdf_async`
-- [`backend/app/modules/storage.py`](../../../backend/app/modules/storage.py) — `rabitq_schema`, `KnowledgeNode`
-- [`backend/app/api/endpoints/corpus.py`](../../../backend/app/api/endpoints/corpus.py)
+- [`backend/app/modules/ingestor.py`](../../../../backend/app/modules/ingestor.py) — `_extract_pdf_text`, `chunk_text`, `process_pdf_async`
+- [`backend/app/modules/storage.py`](../../../../backend/app/modules/storage.py) — `rabitq_schema`, `KnowledgeNode`
+- [`backend/app/api/endpoints/corpus.py`](../../../../backend/app/api/endpoints/corpus.py)
 - PDFs: `backend/demo_corpus/automotive_maintenance.pdf`
 
 ## Archivos a tocar
@@ -72,7 +74,10 @@ Cerrado 2026-09-17. Módulo `app.modules.fractal_ingest`. Tabla fija `knowledge_
 - `char_span` contra el texto fuente, no contra el chunk ya cortado.
 - No explotes el índice: un PDF demo de pocas páginas. No indexar un manual de 400 páginas en este ticket.
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L03-ingesta-piramide-laboratorio.md.

@@ -1,6 +1,6 @@
 # Plantilla de ticket
 
-Copiá este esqueleto si se agrega un ticket **dentro de L01–L12** (no para trabajo nuevo fuera del PDF).
+**Histórico.** No creés tickets Lxx acá. El pack L01–L12 está cerrado. Un pack nuevo usa otra carpeta.
 
 ```markdown
 # Lxx — título
@@ -53,7 +53,7 @@ cd backend && uv run pytest -q tests/<archivo>
 ## Prompt copiable
 
 ```
-Usando dev-protocol, tomá roadmap/pilares/tickets/Lxx-….md.
+NO EJECUTAR. Pack cerrado. No copies este prompt.
 Leé la spec citada y 00-alcance.md. No implementes nada fuera de ese ticket.
 TDD. uv run. Al cerrar, marcá el ticket y la fila del README como hecho.
 ```

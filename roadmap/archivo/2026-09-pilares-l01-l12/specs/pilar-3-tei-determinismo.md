@@ -1,8 +1,10 @@
 # Pilar 3 — Determinismo numérico y sidecar TEI
 
+> **Snapshot histórico del pack L01–L12 (cerrado 2026-09-18/19).** La verdad es el código en `main`. Estas specs describen el destino del pack; varias líneas “código hoy” quedaron viejas a propósito. No reimplementar.
+
 > Fuente: PDF, Documento 2.
 > Tickets: [L01](../tickets/L01-determinismo-embedder-actual.md), [L05](../tickets/L05-sidecar-tei.md).
-> Código hoy: [`backend/app/modules/embedder.py`](../../../backend/app/modules/embedder.py), [`backend/app/modules/mlx_embedder.py`](../../../backend/app/modules/mlx_embedder.py), [`backend/app/modules/dispatcher.py`](../../../backend/app/modules/dispatcher.py). Sin Docker/TEI. `setup-fw.sh` declara que Docker no se usa.
+> Código hoy: [`backend/app/modules/embedder.py`](../../../../backend/app/modules/embedder.py), [`backend/app/modules/mlx_embedder.py`](../../../../backend/app/modules/mlx_embedder.py), [`backend/app/modules/dispatcher.py`](../../../../backend/app/modules/dispatcher.py). Sin Docker/TEI. `setup-fw.sh` declara que Docker no se usa.
 
 ---
 

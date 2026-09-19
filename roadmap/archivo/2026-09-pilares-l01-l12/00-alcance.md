@@ -1,6 +1,8 @@
 # Alcance de este pack
 
-Fecha: 2026-09-17. Cubre **solo** lo condensado en el PDF de 4 pilares.
+> **Histórico.** Pack cerrado 2026-09-18/19 (PRs #4–#15). No es backlog. No reimplementar.
+
+Fecha: 2026-09-17. Cubrió **solo** lo condensado en el PDF de 4 pilares.
 
 ---
 

@@ -1,5 +1,7 @@
 # L08 — Egreso perfil Chat (sentence buffering)
 
+> **Ticket histórico (hecho, pack cerrado).** No lo tomes. No corras el prompt copiable. Código en `main`: PRs #4–#15.
+
 > **Estado:** hecho
 > **Ola:** 3
 > **Spec:** [`specs/pilar-egreso-dual-profile.md`](../specs/pilar-egreso-dual-profile.md) § perfil Chat.
@@ -24,7 +26,7 @@ Nada. No empieces L08 si L07 no está `hecho`.
 
 - Spec egreso
 - `chat.py` post-L07
-- [`backend/app/core/firewall.py`](../../../backend/app/core/firewall.py) `segment()` — el acumulador de **salida** es otro objeto; no reuses ciegamente el splitter de prompts si no respeta `. ; ? \n` del PDF
+- [`backend/app/core/firewall.py`](../../../../backend/app/core/firewall.py) `segment()` — el acumulador de **salida** es otro objeto; no reuses ciegamente el splitter de prompts si no respeta `. ; ? \n` del PDF
 
 ## Archivos a tocar
 
@@ -66,7 +68,10 @@ Cerrado 2026-09-18. Acumulador `SentenceBuffer` (`. ; ? \\n`), no el splitter de
 - Emitir tokens “para que se sienta streaming” antes del delimitador viola el spec.
 - No uses el LLM real en el unit test.
 
-## Prompt copiable
+## Prompt copiable (NO EJECUTAR)
+
+> Pack cerrado. Este bloque es registro. No lo copies a un agente.
+
 
 ```
 Usando dev-protocol, tomá roadmap/pilares/tickets/L08-egreso-chat-sentence-buffer.md.
