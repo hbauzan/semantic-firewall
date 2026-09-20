@@ -11,5 +11,6 @@ class BurstDetectionBreach(Exception):
         self.entropy = entropy
         self.limit = limit
         super().__init__(
-            f"BURST_DETECTION_BREACH: entropy={entropy:.4f} < limit={limit:.4f}"
+            f"BURST_DETECTION_BREACH: entropy={float(entropy):.17g} "
+            f"< limit={float(limit):.17g}"
         )

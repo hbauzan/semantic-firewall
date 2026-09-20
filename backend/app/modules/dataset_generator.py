@@ -83,11 +83,12 @@ def _extract_topic_keywords(text_sample: str) -> str:
 
 
 def _cosine_sim(a: list[float], b: list[float]) -> float:
-    q = np.array(a, dtype=np.float32)
-    c = np.array(b, dtype=np.float32)
+    """RAG similarity in float64 — float32 accumulation erases micro-gaps."""
+    q = np.array(a, dtype=np.float64)
+    c = np.array(b, dtype=np.float64)
     q_norm = float(np.linalg.norm(q))
     c_norm = float(np.linalg.norm(c))
-    if q_norm == 0 or c_norm == 0:
+    if q_norm == 0.0 or c_norm == 0.0:
         return 0.0
     return float(np.dot(q, c) / (q_norm * c_norm))
 

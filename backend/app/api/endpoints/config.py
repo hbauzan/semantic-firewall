@@ -143,8 +143,8 @@ async def audit_query(request: Request, req: AuditRequest):
     context = join_rag_context(context_chunks)
 
     c_vec = results[0]["vector"]
-    q_arr = np.array(q_vec, dtype=np.float32)
-    c_arr = np.array(c_vec, dtype=np.float32)
+    q_arr = np.array(q_vec, dtype=np.float64)
+    c_arr = np.array(c_vec, dtype=np.float64)
     word_count = len(req.query.split())
 
     result = SemanticFirewall.evaluate_clause(q_arr, c_arr, cfg, word_count)

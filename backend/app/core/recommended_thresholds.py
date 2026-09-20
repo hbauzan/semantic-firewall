@@ -55,8 +55,9 @@ def slider_bounds(param: str) -> tuple[float, float, float]:
 
 
 def _float_grid(lo: float, hi: float, step: float) -> list[float]:
+    """Exact IEEE 754 grid samples — never re-quantized to decimal steps."""
     values = np.arange(lo, hi + step * 0.5, step)
-    return [round(float(v), 2) for v in values]
+    return [float(v) for v in values]
 
 
 def _int_grid(lo: int, hi: int, step: int) -> list[int]:
@@ -74,7 +75,7 @@ def build_sweep_grid(param: str) -> list[float]:
     if param == "global_noise_limit":
         center = POSITIVE_RECOMMENDED[param]
         values = np.arange(center - 3.0, center + 3.1, 0.5)
-        return [round(float(v), 1) for v in values]
+        return [float(v) for v in values]
     raise KeyError(param)
 
 

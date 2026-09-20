@@ -15,6 +15,14 @@ logger = logging.getLogger(__name__)
 
 from app.core.models import ConfigState
 
+# Scalar similarity must accumulate in float64: embedding coordinates live at
+# |v| ~ 1e-2 with inter-concept gaps of 1e-4..1e-6, and float32 accumulation
+# resolves only ~1e-7 relative — enough to collapse distinct concepts onto 1.0.
+SIMILARITY_DTYPE = np.float64
+
+# Similarity slack that mirrors float32 storage quantisation (~1.19e-7 relative).
+PRECISION_EPSILON_TOLERANCE = float(np.finfo(np.float32).eps) * 8.0
+
 
 class ClauseResult(TypedDict):
     """Typed return value for SemanticFirewall.evaluate_clause().
@@ -172,16 +180,19 @@ class SemanticFirewall:
         if hybrid_score is not None:
             sim = float(np.clip(hybrid_score, -1.0, 1.0))
         else:
-            q_norm = np.linalg.norm(q_arr)
-            c_norm = np.linalg.norm(c_arr)
-            if q_norm == 0 or c_norm == 0:
+            q_sim = np.asarray(q_arr, dtype=SIMILARITY_DTYPE)
+            c_sim = np.asarray(c_arr, dtype=SIMILARITY_DTYPE)
+            q_norm = float(np.linalg.norm(q_sim))
+            c_norm = float(np.linalg.norm(c_sim))
+            if q_norm == 0.0 or c_norm == 0.0:
                 logger.warning(
-                    "Zero-norm vector in cosine filter (q_norm=%.4f, c_norm=%.4f)",
+                    "Zero-norm vector in cosine filter (q_norm=%.17g, c_norm=%.17g)",
                     q_norm, c_norm,
                 )
                 return False, "cosine", {"cosine_sim": 0.0, "error": "zero_norm"}
-            raw = np.dot(q_arr, c_arr) / (q_norm * c_norm)
-            sim = float(np.clip(raw, -1.0, 1.0))
+            # No clipping: a cosine of 1.0 means the vectors are exactly parallel.
+            # Clamping would erase micro-gaps carried in the trailing mantissa.
+            sim = float(np.dot(q_sim, c_sim)) / (q_norm * c_norm)
         if sim < cfg.cosine_threshold:
             return False, "cosine", {"cosine_sim": sim}
         return True, "cosine", {"cosine_sim": sim}
@@ -305,7 +316,7 @@ class SemanticFirewall:
             })
             if not effective_passed:
                 breach_reason = f"negative:{stage_name}" if negative else stage_name
-                logger.info("SHORT_CIRCUIT layer=%s alpha=%.4f", stage_name, alpha_q)
+                logger.info("SHORT_CIRCUIT layer=%s alpha=%.17g", stage_name, alpha_q)
                 return {
                     "passed": False,
                     "breach_reason": breach_reason,
