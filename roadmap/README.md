@@ -1,39 +1,38 @@
-# Roadmap
+# Roadmap Directory — Three-Headed Semantic Firewall
 
-> Índice. Pack **Sello** es el vivo. L01–L12 está cerrado en `main`.
+> **Operational Hub for Autonomous AI Coding Agents**  
+> **Master Specification:** [`../roadmap.md`](../roadmap.md)  
+> **Legacy Archive:** [`./archive_v2.34.0/`](./archive_v2.34.0/README.md)
 
-Handoff para agentes: [`../AGENTS.md`](../AGENTS.md).
+---
 
-## Qué está vivo vs qué es histórico
-
-| Archivo | Qué es |
-| :--- | :--- |
-| **[`../AGENTS.md`](../AGENTS.md)** | Estado real para otra IA. Empezá acá. |
-| **[`sello/README.md`](./sello/README.md)** | **Vivo.** Herramienta hija (hoja 1024 + corte duro). Tickets S01–S06. |
-| **[`pilares/README.md`](./pilares/README.md)** | **Cerrado.** Puerta; no tickets Lxx. |
-| **[`archivo/2026-09-pilares-l01-l12/`](./archivo/2026-09-pilares-l01-l12/README.md)** | Registro del pack L01–L12. No se ejecuta. |
-| **[`../roadmap.md`](../roadmap.md)** | Checklist Nivel 1 (Etapa 5, 2026-07). Distinta de Sello y de pilares. Fechas viejas. |
-| **[`../roadmap-backlog.md`](../roadmap-backlog.md)** | Diferido: etapas 6–9, Nivel 3, opciones B/C. |
-| **[`nivel-1/`](./nivel-1/README.md)** | Producto / evidencia. No es Lxx ni Sxx. |
-| **[`vision/`](./vision/README.md)** | Para qué. No se implementa. |
-| **[`archivo/`](./archivo/README.md)** | Estudios 2026-09 + pack cerrado. No se implementa. |
+## Directory Organization
 
 ```
 roadmap/
-├── README.md
-├── sello/            ← VIVO (S01–S06)
-├── pilares/          ← stub CERRADO (no tomes Lxx)
-├── nivel-1/          ← producto; no es Sello ni pilares
-├── vision/           ← no se implementa
-└── archivo/
-    ├── 2026-09-*-estudio.md
-    └── 2026-09-pilares-l01-l12/   ← tickets/specs históricos
+├── README.md                      <- You are here (AI Agent dispatch guide)
+├── tickets/                       <- Atomic actionable implementation tickets (TK-01 to TK-06)
+│   ├── README.md                  <- Ticket index & execution protocol
+│   ├── TK01-numerical-purity-enforcement.md
+│   ├── TK02-head1-cosine-difference-gate.md
+│   ├── TK03-head2-excited-dimensions-counter.md
+│   ├── TK04-head3-fine-harmonic-resonance.md
+│   ├── TK05-config-state-and-telemetry-parity.md
+│   └── TK06-empirical-benchmark-validation.md
+└── archive_v2.34.0/               <- Complete historical archive of all pre-v2.34.0 work
 ```
 
-## Estado
+---
 
-- **Sello (2026-09-19):** pack vivo. Herramienta hija. Puerta [`sello/README.md`](./sello/README.md). No toca `evaluate_clause`.
-- **Pilares L01–L12 (2026-09-18/19):** mergeados, PRs #4–#15. Histórico en [`archivo/2026-09-pilares-l01-l12/`](./archivo/2026-09-pilares-l01-l12/README.md). **No reabrir.**
-- **Nivel 1 (última alineación 2026-07-04):** etapas 1–4 hechas; Etapa 5 listada en [`roadmap.md`](../roadmap.md). No es backlog de Sello ni de pilares. No arranques Etapa 5 “porque el markdown lo dice” sin un pedido nuevo.
+## Instructions for AI Agents Taking a Ticket
 
-Prod ingress sigue Noise / Cosine / Excitation. Lab (whitening / pirámide / AND / INLP) no está en `evaluate_clause`. Sello tampoco.
+When you (an autonomous AI coding assistant) are instructed to implement a step from this roadmap:
+
+1. **Claim Exactly One Ticket:**
+   Read the target ticket in `tickets/` in full before modifying any source code.
+2. **Review the Mathematical Axioms:**
+   Consult [`../ddi-fw/rfc-numerical-purity-catastrophe.md`](../ddi-fw/rfc-numerical-purity-catastrophe.md) and [`../ddi-fw/universal-remediation-directive.md`](../ddi-fw/universal-remediation-directive.md). Absolute precision without rounding is the law of this repository.
+3. **Follow Strict TDD:**
+   Write failing unit tests first under `backend/tests/`, implement the minimal clean code to make them pass, and ensure no regressions occur across the existing 118 unit tests.
+4. **Enforce DoD:**
+   Each ticket specifies explicit Definition of Done checklists. Never mark a ticket complete unless all automated tests pass.
