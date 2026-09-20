@@ -41,14 +41,20 @@ Three independent filters — Noise, Cosine, and Excitation — execute in a use
 >
 > Putting this project on temporary pause because, frankly, life has caught up with me and I just can't keep up with everything right now.
 >
-> Also, let's be real: this "Three-Headed" beast might not actually have three heads anymore. Empirical benchmarks showed that maybe it's only one or two heads doing the actual heavy lifting—or maybe I'll end up renaming/rebranding the whole thing once the dust settles.
+> **The Mystery of the "Three Heads" — Solved:**  
+> Previously, empirical benchmarks suggested that only one or two heads were doing the actual heavy lifting, as the legacy excitation filter ("la abuela") seemed to drop in-domain accuracy to 64% without rescuing attacks over cosine.  
+> 
+> Through subsequent laboratory research in [`ddi-fw`](./ddi-fw/rfc-numerical-purity-catastrophe.md) (RFC-003), the root cause was exposed: **silent sub-epsilon decimal truncation (`round(x, 4)`, `:.4f`, float16 downcasting)** was obliterating coordinate micro-gaps ($10^{-4}$ to $10^{-6}$) in $\mathbb{R}^{1024}$. When evaluated with full IEEE 754 precision (17 digits, zero rounding), true **Harmonic Resonance** emerges.
 >
-> **The Core Vision (What I intend to build once I get some breathing room):**  
-> A local LLM (fine-tuned, customized, or whatever runtime you prefer to run) working hand-in-hand with a vector database (in this case, LanceDB) that stores and enforces *everything the chatbot/agent/LLM is actually permitted to know and touch*. Upstream can be anything: Ollama, OpenAI, Anthropic, Google, Groq, or whatever comes next.  
-> 
-> It's an approach geared toward the closest possible mathematical determinism, built so that an individual, a private enterprise, or a sovereign state entity can truly safeguard their data sovereignty and autodetermination.
-> 
-> Maybe I'm flying way too high here and should take a break from AI and the flowers I legally pick up at Pepe Mujica's neighborhood pharmacy... *pero ta*, the latest deep-dive evaluations carried out by Gemini and Cursor (since Claude decided to ban me) mapped out a really interesting path that I genuinely believe is worth traveling down the road.
+> The Three-Headed architecture is mathematically vindicated and ready to be re-implemented:
+> 1. **Head 1 — Cosine Difference Gate:** Macro-angular hypersphere orientation.
+> 2. **Head 2 — Excited Coordinate Mass Counter:** Coarse integer activation mass across coordinates.
+> 3. **Head 3 — Harmonic Resonance Gate:** Microscopic 17-digit fine-tuning sieve across all 1024 dimensions ($solo\_b == 0 \land solo\_a \ge \tau_{\text{floor}}$).
+>
+> A deterministic, AI-actionable implementation roadmap is prepared in [`roadmap.md`](./roadmap.md) and [`roadmap/`](./roadmap/) for whenever execution resumes.
+>
+> **The Core Vision:**  
+> A local LLM working hand-in-hand with a vector database (LanceDB) enforcing *everything the model is permitted to know and touch*. An approach geared toward mathematical determinism for sovereign AI deployments.
 > 
 > For now: *goodbye, so on, and thanks for all the fish.*  
 > *Remember, remember, the 5th of November.*  
