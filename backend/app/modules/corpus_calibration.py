@@ -215,13 +215,24 @@ def _effective_excitation_threshold(
     return float(excitation_threshold)
 
 
+def _rag_context_similarity(query_vec: list[float], chunk_vec: list[float]) -> float:
+    """Chat-path RAG similarity in float64 — float32 accumulation erases micro-gaps."""
+    q = np.asarray(query_vec, dtype=np.float64)
+    c = np.asarray(chunk_vec, dtype=np.float64)
+    q_norm = float(np.linalg.norm(q))
+    c_norm = float(np.linalg.norm(c))
+    if q_norm == 0.0 or c_norm == 0.0:
+        return 0.0
+    return float(np.dot(q, c) / (q_norm * c_norm))
+
+
 def _measure_calibration_clause(
     clause: str,
     pack_filename: str,
     cfg_probe: ConfigState,
 ) -> dict[str, Any]:
     cl_vec = embedder.embed(clause)
-    q = np.asarray(cl_vec, dtype=np.float32)
+    q = np.asarray(cl_vec, dtype=np.float64)
     word_count = len(clause.split())
     results = storage.search_nearest_for_pack(cl_vec, pack_filename, k=cfg_probe.rag_top_k)
     if not results:
@@ -234,7 +245,7 @@ def _measure_calibration_clause(
             "word_count": word_count,
         }
 
-    c = np.asarray(results[0]["vector"], dtype=np.float32).reshape(-1)
+    c = np.asarray(results[0]["vector"], dtype=np.float64).reshape(-1)
     _, _, noise_details = SemanticFirewall.run_noise_filter(q, c, cfg_probe)
     _, _, cosine_details = SemanticFirewall.run_cosine_filter(q, c, cfg_probe)
     _, _, excitation_details = SemanticFirewall.run_excitation_filter(
@@ -321,8 +332,8 @@ def _evaluate_prompt_positive(
         if not results:
             return False, "no_context"
         db_vec = results[0]["vector"]
-        q_arr = np.array(cl_vec, dtype=np.float32)
-        c_arr = np.array(db_vec, dtype=np.float32)
+        q_arr = np.array(cl_vec, dtype=np.float64)
+        c_arr = np.array(db_vec, dtype=np.float64)
         word_count = len(clause.split())
         result = SemanticFirewall.evaluate_clause(q_arr, c_arr, cfg, word_count)
         if not result["passed"]:
@@ -478,7 +489,7 @@ def calibrate_positive_for_pack(
         fn=joint_winner.fn,
     )
     logger.info(
-        "Calibration %s 2D joint: cos=%.2f exc=%d noise=%.1f (fixed) youden=%.3f",
+        "Calibration %s 2D joint: cos=%.17g exc=%d noise=%.17g (fixed) youden=%.17g",
         filename,
         winner.cosine_threshold,
         winner.excitation_threshold,
@@ -495,8 +506,8 @@ def calibrate_positive_for_pack(
             "excitation_threshold": winner.excitation_threshold,
             "global_noise_limit": winner.global_noise_limit,
             "noise_swept": False,
-            "f1": round(winner.f1, 4),
-            "youden": round(winner.youden, 4),
+            "f1": float(winner.f1),
+            "youden": float(winner.youden),
             "grid_pairs": len(triple_points),
         },
     }

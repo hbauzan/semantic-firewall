@@ -6,6 +6,8 @@ Partitioned from perform_tests.py (Finding Q5).
 import pytest
 import io
 import json
+import math
+import re
 import httpx
 import numpy as np
 from app.main import app
@@ -776,8 +778,8 @@ def test_audit_uses_full_pipeline():
     assert "text" in data
 
 
-def test_tuning_hint_rounding():
-    """Verify _format_block_message floors Noise and Cosine values in tuning recommendations."""
+def test_tuning_hint_keeps_full_precision_targets():
+    """Tuning targets floor to 3 decimals but must serialize the full mantissa."""
     from app.api.endpoints.chat import _format_block_message
     from app.core.models import ConfigState
 
@@ -787,5 +789,17 @@ def test_tuning_hint_rounding():
         {"stage": "cosine", "passed": False, "cosine_sim": 0.6538},
     ]
     msg = _format_block_message("test clause", "noise", {}, cfg, traces)
-    assert "[TUNING HINT] To PASS: Cosine <= 0.653, Noise <= 9.548" in msg
+    assert "[TUNING HINT] To PASS:" in msg
+
+    cosine_match = re.search(r"Cosine <= ([0-9.eE+-]+)", msg)
+    noise_match = re.search(r"Noise <= ([0-9.eE+-]+)", msg)
+    assert cosine_match is not None and noise_match is not None
+
+    cosine_target = math.floor(0.6538 * 1000.0) / 1000.0
+    noise_target = math.floor(9.5485 * 1000.0) / 1000.0
+    assert float(cosine_match.group(1)) == pytest.approx(cosine_target, rel=1e-12)
+    assert float(noise_match.group(1)) == pytest.approx(noise_target, rel=1e-12)
+    # Full mantissa, not the lossy `:.3f` rendering.
+    assert cosine_match.group(1) == f"{float(cosine_target):.17g}"
+    assert noise_match.group(1) == f"{float(noise_target):.17g}"
 
