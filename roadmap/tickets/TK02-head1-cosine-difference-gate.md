@@ -1,7 +1,7 @@
 # TK-02: Head 1 — Cosine Difference Macro Gate
 
 > **Ticket ID:** `TK-02`  
-> **Status:** `PENDING`  
+> **Status:** `DONE`  
 > **Pre-requisites:** `TK-01`  
 > **Target Subsystem:** Sequential Pipeline — Head 1 (`run_cosine_filter`)  
 > **Reference Specs:** [`roadmap.md`](../../roadmap.md) & [`architecture_spec.md`](../../architecture_spec.md)
@@ -60,7 +60,7 @@ If a prompt falls below the cosine threshold, it is immediately discarded in $O(
 
 ## 5. Definition of Done (DoD)
 
-- [ ] `run_cosine_filter` executes as the first stage (`order = 1`).
-- [ ] Metric calculations preserve exact unrounded floats.
-- [ ] Telemetry includes both `cosine_sim` and `cosine_distance`.
-- [ ] 100% unit tests pass for Head 1.
+- [x] `run_cosine_filter` executes as the first stage (`order = 1`).
+- [x] Metric calculations preserve exact unrounded floats.
+- [x] Telemetry includes both `cosine_sim` and `cosine_distance`.
+- [x] 100% unit tests pass for Head 1 (`uv run pytest` from `backend/`: 247 passed, 6 skipped).
