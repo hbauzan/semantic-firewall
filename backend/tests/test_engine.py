@@ -158,15 +158,20 @@ def test_engine_positive_mode_identical_vectors_pass():
 
 # --- Adaptive Inversion ---
 
-def test_adaptive_inversion_negative_mode():
-    """Verify that Negative Mode increases strictness (1.15x) for short queries."""
-    set_config(firewall_mode="negative", excitation_threshold=100, adaptive_factor=0.85)
-    q = np.random.rand(1024).astype(np.float32)
-    c = q.copy()
-    c[110:] = q[110:] + 1.0
+def test_short_query_tightens_epsilon_without_stepping_tau():
+    """Short clauses shrink ε continuously. The mass threshold stays τ."""
+    set_config(
+        firewall_mode="negative",
+        excitation_threshold=100,
+        noise_tolerance=0.015,
+        adaptive_factor=0.85,
+    )
+    q = np.zeros(1024, dtype=np.float32)
+    c = np.zeros(1024, dtype=np.float32)
     from app.core.state import config_state
     result = SemanticFirewall.run_excitation_filter(q, c, config_state, word_count=2)
-    assert abs(result[2]["threshold"] - 115.0) < 0.001
+    assert result[2]["threshold"] == 100.0
+    assert result[2]["epsilon_tolerance"] < 0.015
 
 
 # --- Shannon Entropy ---

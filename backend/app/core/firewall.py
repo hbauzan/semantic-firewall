@@ -34,11 +34,25 @@ def _cosine_reading(sim: float) -> dict[str, float]:
     return {"cosine_sim": similarity, "cosine_distance": float(1.0 - similarity)}
 
 
-def _breach_reason(stage_name: str, details: dict, negative: bool) -> str:
-    reason = "zero_norm" if details.get("error") == "zero_norm" else stage_name
+def _breach_reason(
+    stage_name: str,
+    details: dict,
+    negative: bool,
+    *,
+    raw_passed: bool = True,
+) -> str:
+    if details.get("error") == "zero_norm":
+        reason = "zero_norm"
+    elif stage_name == "excitation" and not raw_passed:
+        reason = "excitation_mass"
+    else:
+        reason = stage_name
     if negative:
         return f"negative:{reason}"
     return reason
+
+
+_SHORT_QUERY_WORDS = 6
 
 
 # Lightweight POS proxy — no external NLP dependency.
@@ -217,29 +231,37 @@ class SemanticFirewall:
         epsilon_tolerance: float | None = None,
         **_kw: Any,
     ) -> tuple[bool, str, dict]:
-        """Dimensional resonance with Mode-Aware Adaptive Polarity."""
-        tolerance = epsilon_tolerance if epsilon_tolerance is not None else cfg.noise_tolerance
-        delta = np.abs(q_arr - c_arr)
-        activations = int(np.sum(delta <= tolerance))
-        is_short = word_count < 6
+        """Count coordinates inside the coarse delta tolerance.
 
-        if is_short:
-            if cfg.firewall_mode == "positive":
-                factor = cfg.adaptive_factor
-            else:
-                factor = 1.15
-        else:
-            factor = 1.0
-
-        threshold = float(cfg.excitation_threshold) * factor
+        Short clauses (L(q) < 6) shrink ε by exp(-(6-L)/6). The mass threshold
+        stays τ_coarse. A miss returns the caller to breach_reason excitation_mass.
+        """
+        base = float(epsilon_tolerance) if epsilon_tolerance is not None else float(cfg.noise_tolerance)
+        tolerance = SemanticFirewall.coarse_epsilon(base, word_count)
+        query = np.asarray(q_arr, dtype=np.float32).ravel()
+        corpus = np.asarray(c_arr, dtype=np.float32).ravel()
+        delta = np.abs(query - corpus)
+        active = delta <= np.float32(tolerance)
+        activations = int(np.count_nonzero(active))
+        threshold = float(cfg.excitation_threshold)
         passed = activations >= threshold
+        ratio = tolerance / base if base > 0.0 else 1.0
         return passed, "excitation", {
             "activations": activations,
             "threshold": threshold,
-            "adaptive_applied": is_short,
-            "adaptive_factor": factor,
-            "epsilon_tolerance": tolerance,
+            "adaptive_applied": word_count < _SHORT_QUERY_WORDS,
+            "adaptive_factor": float(ratio),
+            "epsilon_tolerance": float(tolerance),
         }
+
+    @staticmethod
+    def coarse_epsilon(base_tolerance: float, word_count: int) -> float:
+        """ε for a clause. Full tolerance at L(q) >= 6; exponential decay below."""
+        base = float(base_tolerance)
+        if word_count >= _SHORT_QUERY_WORDS:
+            return base
+        deficit = (_SHORT_QUERY_WORDS - word_count) / _SHORT_QUERY_WORDS
+        return base * math.exp(-deficit)
 
     @staticmethod
     def run_sparse_short_circuit(
@@ -311,8 +333,6 @@ class SemanticFirewall:
         else:
             hybrid_score = None
 
-        epsilon_q = SemanticFirewall.compute_epsilon(query_text, cfg.noise_tolerance) if query_text else cfg.noise_tolerance
-
         # Sparse short-circuit (Phase 4.3)
         if q_sparse is not None and c_sparse is not None:
             raw_passed, stage_name, details = SemanticFirewall.run_sparse_short_circuit(
@@ -348,8 +368,6 @@ class SemanticFirewall:
             extra: dict[str, Any] = {"word_count": word_count}
             if stage_name == "cosine" and hybrid_score is not None:
                 extra["hybrid_score"] = hybrid_score
-            if stage_name == "excitation":
-                extra["epsilon_tolerance"] = epsilon_q
 
             raw_passed, _name, details = stage_fn(q_arr, c_arr, cfg, **extra)
 
@@ -373,7 +391,9 @@ class SemanticFirewall:
                 last_cosine = details["cosine_sim"]
 
             if not effective_passed:
-                breach_reason = _breach_reason(stage_name, details, negative)
+                breach_reason = _breach_reason(
+                    stage_name, details, negative, raw_passed=raw_passed
+                )
                 logger.info("SHORT_CIRCUIT layer=%s", breach_reason)
                 return {
                     "passed": False,

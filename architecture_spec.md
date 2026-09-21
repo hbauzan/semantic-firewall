@@ -89,17 +89,17 @@ The firewall executes three distinct validation stages in a **user-defined seque
 
 | Stage | Filter | Config Key | Default Order |
 |-------|--------|------------|---------------|
-| A | **Noise Pre-Filter** | `noise_order` | 1 |
-| B | **Cosine Filter** | `cosine_order` | 2 |
-| C | **Excitation Filter** | `excitation_order` | 3 |
+| A | **Cosine Filter** | `cosine_order` | 1 |
+| B | **Excitation Filter** | `excitation_order` | 2 |
+| C | **Noise Pre-Filter** | `noise_order` | 3 |
 
-**Stage A — Noise Pre-Filter (Entropy Analysis):** Replaces Variance analysis. Computes the Shannon Entropy of the Query Vector ($Q$) to detect GCG (Greedy Coordinate Gradient) artifacts. Math: $H(Q) = -\sum p_i \log_2(p_i)$, where $p_i$ is the normalized distribution of the 1024D embedding (L1-normalized absolute values). Natural language embeddings exhibit high entropy (distributed information). Adversarial "bursts" (e.g., "! ! ! !") collapse the embedding into low-entropy clusters. If $H(Q) < global\_noise\_limit$ (Default: 4.5), the query is blocked as a `Burst Detection Breach`. This is corpus-independent — the filter does not require a context vector.
+**Stage A — Cosine Filter:** Cosine similarity gate. Computes `cos(Q, C) = dot(Q, C) / (‖Q‖ × ‖C‖)` on raw vectors. Includes a zero-norm guard and `np.clip(raw, -1.0, 1.0)`. Blocks if `cos(Q, C) < cosine_threshold`. Details include `cosine_distance = 1 - cos`.
 
-**Stage B — Cosine Filter:** Traditional cosine similarity gate. Computes `cos(Q, C) = dot(Q, C) / (‖Q‖ × ‖C‖)` using **raw vectors** (no normalization). Includes zero-norm guard and `np.clip(raw, -1.0, 1.0)` for floating-point safety. Blocks if `cos(Q, C) < cosine_threshold`.
+**Stage B — Excitation Filter:** Dimensional mass count on raw float32 coordinates. A dimension is active when `|Q_d - C_d| <= noise_tolerance` (`coarse_delta_tolerance`, default `0.015`). Blocks in positive mode when `N_act < excitation_threshold` with `breach_reason = "excitation_mass"`. Default `excitation_threshold` is `150` (inside the coarse band 120–200).
 
-**Stage C — Excitation Filter:** Dimensional resonance count. For each of 1024 dimensions, counts activations where `|Q_i - C_i| <= noise_tolerance`. Uses **raw vectors**. Applies the adaptive threshold (see Section 4). Blocks if `activations < threshold`.
+**Stage C — Noise Pre-Filter (Entropy Analysis):** Computes the Shannon Entropy of the Query Vector ($Q$) to detect GCG artifacts. Math: $H(Q) = -\sum p_i \log_2(p_i)$, where $p_i$ is the normalized distribution of the 1024D embedding (L1-normalized absolute values). Natural language embeddings exhibit high entropy. Adversarial bursts collapse the embedding into low-entropy clusters. If $H(Q) < global\_noise\_limit$ (Default: 4.5), the query is blocked as a `Burst Detection Breach`. This is corpus-independent — the filter does not require a context vector.
 
-**Execution semantics:** Stages are sorted by their `_order` integer (ascending). If Stage N returns BREACH, Stages N+1..3 are **never evaluated**. Each clause from the segmentation defense (Section 5) must independently pass the **entire** ordered pipeline. Telemetry trace format: `Pipeline: [cosine:OK → excitation:OK → noise:OK]` or `[cosine:OK → excitation:BREACH]`.
+**Execution semantics:** Stages are sorted by their `_order` integer (ascending). Default order is cosine, then excitation, then noise. If Stage N returns BREACH, later stages are **never evaluated**. Each clause from the segmentation defense (Section 5) must independently pass the **entire** ordered pipeline. Telemetry trace format: `Pipeline: [cosine:OK → excitation:OK → noise:OK]` or `[cosine:OK → excitation:BREACH]`.
 
 ### 3.1 Firewall Mode: Positive / Negative (Allowlist vs Denylist)
 
@@ -129,16 +129,13 @@ The pipeline supports two operating modes controlled by `firewall_mode` (default
 
 **Breach reason prefix:** In negative mode, `breach_reason` is prefixed with `negative:` (e.g. `"negative:cosine"`) to distinguish from positive-mode breaches in telemetry and sniffer traces.
 
-## 4. Adaptive Clause Logic (Polarity Inversion)
-When the hybrid segmentation engine (Section 6.1) splits a prompt into clauses, short clauses receive a logic-inverted threshold multiplier based on mode.
+## 4. Adaptive Clause Logic (Short-Query Epsilon)
 
-- **Config:** `adaptive_factor` (float, default 0.85, range 0.01–1.00). User-adjustable via HUD slider.
-- **Rule:** If a clause contains **fewer than 6 words**, logic inversion applies:
-  - **Positive Mode:** `threshold = excitation_threshold * adaptive_factor` (Default 0.85x). Provides forgiveness for short, terse queries.
-  - **Negative Mode:** `threshold = excitation_threshold * (1.15)`. Increases the similarity requirement for short queries to prevent "diluted" danger signals from triggering false negatives on brief malicious prompts.
-- **Scope:** This adaptive reduction applies **only** within the Excitation Filter stage of the pipeline. Cosine and Noise filters use their full thresholds regardless of clause length.
-- **HUD Feedback:** The ControlPanel displays real-time dimension requirements: `Short Query Req: {threshold × factor} dims` and `Full Query Req: {threshold} dims`.
-- **Telemetry:** When a short clause triggers the adaptive path, the BREACH message includes: `[ADAPTIVE] Short Clause Detected. Applying {factor}x factor.`
+When a clause has fewer than 6 words, Head 2 shrinks the coarse tolerance. The mass threshold stays `excitation_threshold`.
+
+- **Rule:** `L(q) >= 6` uses `ε = noise_tolerance`. `L(q) < 6` uses `ε = noise_tolerance * exp(-(6 - L(q)) / 6)`.
+- **Scope:** The decay applies only inside the excitation filter. Cosine and noise keep their own thresholds.
+- **`adaptive_factor`:** Still a config field (default 0.85) for the HUD. The excitation gate does not multiply `τ` by it.
 
 ## 5. Frontend Control Logic
 - **State Management:** Overarched by **Zustand** React 19 Store using a **4-slice architecture**: `FirewallSlice` (config, modes, pipeline orders), `ChatSlice` (messages, input state), `SystemSlice` (telemetry, ingestion, global status), `SnifferSlice` (logs, filters). Telemetry is isolated in the System slice to prevent 1Hz poll updates from re-rendering the chat message list. The exported `useStore` hook composes all slices — no consumer-facing API change.

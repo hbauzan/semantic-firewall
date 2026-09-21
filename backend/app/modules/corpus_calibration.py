@@ -206,16 +206,6 @@ def _calibration_base_cfg() -> ConfigState:
     return state_mod.config_state.model_copy(update={"firewall_mode": "positive"})
 
 
-def _effective_excitation_threshold(
-    excitation_threshold: float,
-    word_count: int,
-    adaptive_factor: float,
-) -> float:
-    if word_count < 6:
-        return float(excitation_threshold) * adaptive_factor
-    return float(excitation_threshold)
-
-
 def _measure_calibration_clause(
     clause: str,
     pack_filename: str,
@@ -278,12 +268,8 @@ def _clause_blocked_from_cache(clause: dict[str, Any], cfg: ConfigState) -> bool
         return True
     if cfg.cosine_enabled and clause["cosine_sim"] < cfg.cosine_threshold:
         return True
-    if cfg.excitation_enabled:
-        exc_th = _effective_excitation_threshold(
-            cfg.excitation_threshold, clause["word_count"], cfg.adaptive_factor
-        )
-        if clause["activations"] < exc_th:
-            return True
+    if cfg.excitation_enabled and clause["activations"] < cfg.excitation_threshold:
+        return True
     return False
 
 
