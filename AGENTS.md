@@ -42,3 +42,20 @@ Puerta: [`roadmap/pilares/README.md`](./roadmap/pilares/README.md).
 ## Invariantes
 
 Consultá [`.agents/skills/dev-protocol/lessons-learned.md`](./.agents/skills/dev-protocol/lessons-learned.md) si está en el clone. Commits/PRs: autor Murray o Héctor; nunca footer `Made with Cursor`.
+
+## TK-01 — pureza numérica (aprendido en PR #18)
+
+- **Coseno:** el clip `np.clip(dot/(|u||v|), -1.0, 1.0)` en `firewall.py` **se queda**. La división
+  flotante puede dar `1.0000000000000002` y eso rompe cualquier trigonometría aguas abajo. Los
+  micro-gaps viven en `1.0 - ε` (estrictamente < 1.0), así que el clip no los borra.
+- **Presentación ≠ cálculo (Invariante 4):** el mantissa completo (`.17g`) aplica a tensores,
+  telemetría y calibración. Los hints al usuario (`[TUNING HINT]`) son texto cosmético: se renderizan
+  con el repr más corto (`str(float(v))`), porque `.17g` de un valor floored muestra `0.65299999999999991`.
+  El guard repo-wide `test_no_lossy_fixed_decimal_formatting_in_backend_app` prohíbe `:.Nf` en todo
+  `backend/app`, incluido el hint; por eso se usa `str(float(...))`, no `.3f`.
+- **Sin helpers de paso:** `chat.py` consume el `last_cosine` (float64) que ya devuelve
+  `evaluate_clause`. No re-importar helpers de `corpus_calibration` inline en endpoints.
+- **Tests dependientes de arquitectura:** no asumir que float32 colapsa exactamente a `1.0`. En ARM64
+  con FMA da `> 1.0` (ej. `1.000000238418579`). Asertar el contrato real (gap no representable,
+  score no estrictamente < 1.0), no el bit-pattern de un host.
+
