@@ -28,6 +28,19 @@ class ClauseResult(TypedDict):
     last_cosine: float
 
 
+def _cosine_reading(sim: float) -> dict[str, float]:
+    """Similarity and angular distance, both native floats."""
+    similarity = float(sim)
+    return {"cosine_sim": similarity, "cosine_distance": float(1.0 - similarity)}
+
+
+def _breach_reason(stage_name: str, details: dict, negative: bool) -> str:
+    reason = "zero_norm" if details.get("error") == "zero_norm" else stage_name
+    if negative:
+        return f"negative:{reason}"
+    return reason
+
+
 # Lightweight POS proxy — no external NLP dependency.
 _CONTENT_WORD_RE = re.compile(r"^[A-Za-zÁÉÍÓÚáéíóúÑñ]{4,}$")
 _VERB_SUFFIX_RE = re.compile(r"(ar|er|ir|ed|ing|ión|mente)$", re.IGNORECASE)
@@ -169,24 +182,31 @@ class SemanticFirewall:
         hybrid_score: float | None = None,
         **_kw: Any,
     ) -> tuple[bool, str, dict]:
-        """Cosine similarity gate using raw vectors or a precomputed hybrid score."""
+        """Cosine similarity gate using raw vectors or a precomputed hybrid score.
+
+        Pass when cos(Q, C) >= tau_cos. Details carry cosine_distance = 1 - cos.
+        A zero norm breaches before any downstream head runs.
+        """
         if hybrid_score is not None:
             sim = float(np.clip(hybrid_score, -1.0, 1.0))
         else:
-            q_norm = np.linalg.norm(q_arr)
-            c_norm = np.linalg.norm(c_arr)
-            if q_norm == 0 or c_norm == 0:
+            query = np.asarray(q_arr, dtype=np.float64).ravel()
+            corpus = np.asarray(c_arr, dtype=np.float64).ravel()
+            q_norm = float(np.sqrt(np.dot(query, query)))
+            c_norm = float(np.sqrt(np.dot(corpus, corpus)))
+            if q_norm == 0.0 or c_norm == 0.0:
                 logger.warning(
                     "Zero-norm vector in cosine filter (q_norm=%s, c_norm=%s)",
-                    format_float(float(q_norm)),
-                    format_float(float(c_norm)),
+                    format_float(q_norm),
+                    format_float(c_norm),
                 )
-                return False, "cosine", {"cosine_sim": 0.0, "error": "zero_norm"}
-            raw = np.dot(q_arr, c_arr) / (q_norm * c_norm)
+                return False, "cosine", {**_cosine_reading(0.0), "error": "zero_norm"}
+            raw = float(np.dot(query, corpus) / (q_norm * c_norm))
             sim = float(np.clip(raw, -1.0, 1.0))
+        reading = _cosine_reading(sim)
         if sim < cfg.cosine_threshold:
-            return False, "cosine", {"cosine_sim": sim}
-        return True, "cosine", {"cosine_sim": sim}
+            return False, "cosine", reading
+        return True, "cosine", reading
 
     @staticmethod
     def run_excitation_filter(
@@ -353,8 +373,8 @@ class SemanticFirewall:
                 last_cosine = details["cosine_sim"]
 
             if not effective_passed:
-                breach_reason = f"negative:{stage_name}" if negative else stage_name
-                logger.info("SHORT_CIRCUIT layer=%s", stage_name)
+                breach_reason = _breach_reason(stage_name, details, negative)
+                logger.info("SHORT_CIRCUIT layer=%s", breach_reason)
                 return {
                     "passed": False,
                     "breach_reason": breach_reason,
