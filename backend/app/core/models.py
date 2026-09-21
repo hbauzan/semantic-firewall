@@ -4,7 +4,7 @@ All schema validation, field constraints, and business rules live here.
 Zero framework dependencies — portable across FastAPI, CLI, or any runtime.
 """
 from typing import Literal
-from pydantic import BaseModel, Field, model_validator, ConfigDict
+from pydantic import AliasChoices, BaseModel, Field, model_validator, ConfigDict
 
 
 class ConfigState(BaseModel):
@@ -13,10 +13,16 @@ class ConfigState(BaseModel):
     Frozen after construction — any update creates a new instance.
     The model_validator enforces that pipeline order values are always unique.
     """
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, populate_by_name=True)
 
     excitation_threshold: int = Field(default=150, ge=0, le=1024)
-    noise_tolerance: float = Field(default=0.005, ge=0.0, le=1.0)
+    noise_tolerance: float = Field(
+        default=0.015,
+        ge=0.0,
+        le=1.0,
+        validation_alias=AliasChoices("noise_tolerance", "coarse_delta_tolerance"),
+        description="Coarse coordinate tolerance ε. Alias: coarse_delta_tolerance.",
+    )
     # Optimized Youden Threshold (0.5315) for Negative Mode default
     cosine_threshold: float = Field(default=0.5315, ge=0.0, le=1.0)
     # Global Noise Limit — Shannon Entropy Floor (corpus-independent, embedding space)
@@ -24,8 +30,8 @@ class ConfigState(BaseModel):
     # Raw character entropy floor — CPU pre-filter before embedding (character scale ~0–5)
     raw_entropy_limit: float = Field(default=3.0, ge=0.0, le=10.0)
     cosine_order: int = Field(default=1, ge=1, le=3)
-    excitation_order: int = Field(default=3, ge=1, le=3)
-    noise_order: int = Field(default=2, ge=1, le=3)
+    excitation_order: int = Field(default=2, ge=1, le=3)
+    noise_order: int = Field(default=3, ge=1, le=3)
     adaptive_factor: float = Field(default=0.85, ge=0.01, le=1.0)
     rag_top_k: int = Field(default=12, ge=1, le=32)
     sniffer_view_limit: int = Field(default=10, ge=1, le=1000)
@@ -80,14 +86,20 @@ class ConfigState(BaseModel):
 
 class ConfigUpdate(BaseModel):
     """Inbound payload for POST /galaxy/config. Validated on arrival."""
+    model_config = ConfigDict(populate_by_name=True)
+
     excitation_threshold: int = Field(ge=0, le=1024)
-    noise_tolerance: float = Field(ge=0.0, le=1.0)
+    noise_tolerance: float = Field(
+        ge=0.0,
+        le=1.0,
+        validation_alias=AliasChoices("noise_tolerance", "coarse_delta_tolerance"),
+    )
     cosine_threshold: float = Field(ge=0.0, le=1.0)
     global_noise_limit: float = Field(default=4.5, ge=0.0, le=10.0)
     raw_entropy_limit: float = Field(default=3.0, ge=0.0, le=10.0)
     cosine_order: int = Field(default=1, ge=1, le=3)
-    excitation_order: int = Field(default=3, ge=1, le=3)
-    noise_order: int = Field(default=2, ge=1, le=3)
+    excitation_order: int = Field(default=2, ge=1, le=3)
+    noise_order: int = Field(default=3, ge=1, le=3)
     adaptive_factor: float = Field(default=0.85, ge=0.01, le=1.0)
     rag_top_k: int = Field(default=12, ge=1, le=32)
     sniffer_view_limit: int = Field(default=10, ge=1, le=1000)

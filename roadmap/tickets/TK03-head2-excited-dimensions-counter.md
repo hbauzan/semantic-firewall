@@ -1,7 +1,7 @@
 # TK-03: Head 2 — Excited Dimension Mass Counter
 
 > **Ticket ID:** `TK-03`  
-> **Status:** `PENDING`  
+> **Status:** `DONE`  
 > **Pre-requisites:** `TK-01`, `TK-02`  
 > **Target Subsystem:** Sequential Pipeline — Head 2 (`run_excitation_filter`)  
 > **Reference Specs:** [`roadmap.md`](../../roadmap.md) & [`ddi-fw/rfc-numerical-purity-catastrophe.md`](../../ddi-fw/rfc-numerical-purity-catastrophe.md)
@@ -61,7 +61,7 @@ This guarantees that the alignment is physically distributed across a broad mani
 
 ## 5. Definition of Done (DoD)
 
-- [ ] `run_excitation_filter` runs in position 2 (`order = 2`).
-- [ ] Deltas are computed directly on Float32 arrays without intermediate rounding.
-- [ ] Synthetic spiky injection test passes, confirming adversarial catch capability.
-- [ ] Unit tests pass with 100% success.
+- [x] `run_excitation_filter` runs in position 2 (`order = 2`).
+- [x] Deltas are computed directly on Float32 arrays without intermediate rounding.
+- [x] Synthetic spiky injection test passes, confirming adversarial catch capability.
+- [x] Unit tests pass with 100% success (`uv run pytest` from `backend/`: 252 passed, 6 skipped).
