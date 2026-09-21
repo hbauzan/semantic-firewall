@@ -418,8 +418,8 @@ def effective_excitation_threshold(
     word_count: int,
     adaptive_factor: float = DEFAULT_ADAPTIVE_FACTOR,
 ) -> float:
-    if word_count < 6:
-        return float(excitation_threshold) * adaptive_factor
+    """Mass threshold is τ. Short-query decay is already inside the activation count."""
+    del word_count, adaptive_factor
     return float(excitation_threshold)
 
 
