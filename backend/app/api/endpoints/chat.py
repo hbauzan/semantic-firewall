@@ -47,6 +47,16 @@ def _fmt_float(value: float) -> str:
     return f"{float(value):.17g}"
 
 
+def _fmt_compact(value: float) -> str:
+    """Human-facing rendering for values already floored to 3 decimals.
+
+    ``str(float)`` yields the shortest round-tripping decimal, so a clean 0.653
+    stays ``0.653`` instead of the ``:.17g`` mantissa dump. This is cosmetic
+    text for the user, not exported vector data.
+    """
+    return str(float(value))
+
+
 # --- Firewall helpers ---
 
 def _enforce_raw_entropy(clause: str, cfg: ConfigState) -> None:
@@ -130,12 +140,10 @@ async def _evaluate_clauses(
             block_reason = result["breach_reason"]
             block_details = result["breach_details"] or {}
             if results:
-                from app.modules.corpus_calibration import _rag_context_similarity
-
+                # last_cosine already carries this clause's exact float64 score,
+                # computed against the very same top-1 vector c_arr was built from.
                 block_details["top_hit_text"] = results[0].get("text", "")
-                block_details["top_hit_score"] = _rag_context_similarity(
-                    cl_vec, results[0]["vector"]
-                )
+                block_details["top_hit_score"] = last_cosine
             break
 
     return (
@@ -624,12 +632,13 @@ def _format_block_message(
             f"| Adaptive({_fmt_float(cfg.adaptive_factor)})"
         )
 
-    # Tuning hints for manual calibration
+    # Tuning hints for manual calibration. Cosmetic user text: the 3-decimal
+    # floor is the whole point, so it is rendered compactly, not as raw mantissa.
     tuning_targets = []
     if cos_trace:
         c_val = cos_trace.get("cosine_sim", 0.0)
         rec_cos = math.floor(c_val * 1000.0) / 1000.0
-        tuning_targets.append(f"Cosine <= {_fmt_float(rec_cos)}")
+        tuning_targets.append(f"Cosine <= {_fmt_compact(rec_cos)}")
     if exc_trace:
         act = exc_trace.get("activations", 0)
         factor = exc_trace.get("adaptive_factor", 1.0)
@@ -638,7 +647,7 @@ def _format_block_message(
     if noise_trace:
         ent = noise_trace.get("entropy", 0.0)
         rec_noise = math.floor(ent * 1000.0) / 1000.0
-        tuning_targets.append(f"Noise <= {_fmt_float(rec_noise)}")
+        tuning_targets.append(f"Noise <= {_fmt_compact(rec_noise)}")
 
     hint_line = f"[TUNING HINT] To PASS: {', '.join(tuning_targets)}" if tuning_targets else ""
 

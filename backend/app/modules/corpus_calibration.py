@@ -215,17 +215,6 @@ def _effective_excitation_threshold(
     return float(excitation_threshold)
 
 
-def _rag_context_similarity(query_vec: list[float], chunk_vec: list[float]) -> float:
-    """Chat-path RAG similarity in float64 — float32 accumulation erases micro-gaps."""
-    q = np.asarray(query_vec, dtype=np.float64)
-    c = np.asarray(chunk_vec, dtype=np.float64)
-    q_norm = float(np.linalg.norm(q))
-    c_norm = float(np.linalg.norm(c))
-    if q_norm == 0.0 or c_norm == 0.0:
-        return 0.0
-    return float(np.dot(q, c) / (q_norm * c_norm))
-
-
 def _measure_calibration_clause(
     clause: str,
     pack_filename: str,

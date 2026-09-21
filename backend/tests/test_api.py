@@ -778,8 +778,12 @@ def test_audit_uses_full_pipeline():
     assert "text" in data
 
 
-def test_tuning_hint_keeps_full_precision_targets():
-    """Tuning targets floor to 3 decimals but must serialize the full mantissa."""
+def test_tuning_hint_targets_are_rendered_compactly():
+    """Tuning targets floor to 3 decimals and are cosmetic human text.
+
+    The hint is not exported vector data: rendering the floored value with the
+    full mantissa would show the user ``0.65300000000000002`` for a clean 0.653.
+    """
     from app.api.endpoints.chat import _format_block_message
     from app.core.models import ConfigState
 
@@ -797,9 +801,9 @@ def test_tuning_hint_keeps_full_precision_targets():
 
     cosine_target = math.floor(0.6538 * 1000.0) / 1000.0
     noise_target = math.floor(9.5485 * 1000.0) / 1000.0
-    assert float(cosine_match.group(1)) == pytest.approx(cosine_target, rel=1e-12)
-    assert float(noise_match.group(1)) == pytest.approx(noise_target, rel=1e-12)
-    # Full mantissa, not the lossy `:.3f` rendering.
-    assert cosine_match.group(1) == f"{float(cosine_target):.17g}"
-    assert noise_match.group(1) == f"{float(noise_target):.17g}"
+    assert float(cosine_match.group(1)) == cosine_target
+    assert float(noise_match.group(1)) == noise_target
+    # Shortest round-tripping rendering, not the raw mantissa of the floored value.
+    assert cosine_match.group(1) == str(float(cosine_target))
+    assert noise_match.group(1) == str(float(noise_target))
 

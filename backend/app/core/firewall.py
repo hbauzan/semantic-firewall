@@ -190,9 +190,11 @@ class SemanticFirewall:
                     q_norm, c_norm,
                 )
                 return False, "cosine", {"cosine_sim": 0.0, "error": "zero_norm"}
-            # No clipping: a cosine of 1.0 means the vectors are exactly parallel.
-            # Clamping would erase micro-gaps carried in the trailing mantissa.
-            sim = float(np.dot(q_sim, c_sim)) / (q_norm * c_norm)
+            # Clip to the mathematical codomain of cosine. Floating-point division
+            # can yield 1.0000000000000002, which then feeds acos()/atan2() and
+            # every downstream trig consumer. Micro-gaps live strictly below 1.0,
+            # so clamping only removes the aberration, never real separation.
+            sim = float(np.clip(np.dot(q_sim, c_sim) / (q_norm * c_norm), -1.0, 1.0))
         if sim < cfg.cosine_threshold:
             return False, "cosine", {"cosine_sim": sim}
         return True, "cosine", {"cosine_sim": sim}

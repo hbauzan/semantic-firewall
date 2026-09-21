@@ -284,8 +284,14 @@ def test_exceptions_render_full_mantissa():
     assert float(f"{entropy:.17g}") == entropy
 
 
-def test_block_message_tuning_hint_keeps_micro_gap_resolution():
-    """Tuning hints are exported data, not cosmetic: no decimal truncation."""
+def test_block_message_tuning_hint_is_rendered_compactly():
+    """Tuning hints are cosmetic user text, not exported vector data.
+
+    The hint value is intentionally floored to 3 decimals; re-applying the full
+    17-digit mantissa to it shows the user ``0.65299999999999991`` for what is a
+    clean ``0.653``. Full-mantissa serialization applies to tensors, telemetry
+    and calibration, not to a human-facing hint.
+    """
     from app.api.endpoints.chat import _format_block_message
     from app.core.models import ConfigState
 
@@ -297,8 +303,27 @@ def test_block_message_tuning_hint_keeps_micro_gap_resolution():
     msg = _format_block_message("test clause", "noise", {}, cfg, traces)
     assert "[TUNING HINT]" in msg
     cosine_target = math.floor(0.6538 * 1000.0) / 1000.0
-    assert f"Cosine <= {float(cosine_target):.17g}" in msg
-    assert "Cosine <= 0.653 " not in msg
+    assert cosine_target == 0.653
+    assert "Cosine <= 0.653" in msg
+    # The raw mantissa rendering of the floored value must never leak out.
+    assert f"{float(cosine_target):.17g}" not in msg
+    # Round-trip the rendered hint back to a float for an exact comparison.
+    rendered = float(msg.split("Cosine <= ", 1)[1].split(",", 1)[0])
+    assert rendered == cosine_target
+
+
+def test_block_message_telemetry_still_keeps_full_mantissa():
+    """The cosmetic hint must not cost telemetry its full-mantissa fidelity."""
+    from app.api.endpoints.chat import _format_block_message
+    from app.core.models import ConfigState
+
+    cfg = ConfigState()
+    cosine_value = 0.6538000000000123
+    traces = [
+        {"stage": "cosine", "passed": False, "cosine_sim": cosine_value},
+    ]
+    msg = _format_block_message("test clause", "cosine", {}, cfg, traces)
+    assert f"Cosine({cosine_value:.17g} /" in msg
 
 
 # --- Regression: float32 scalar accumulation erases micro-gaps ---
@@ -321,12 +346,36 @@ def _trailing_gap_pair(gap: float) -> tuple[np.ndarray, np.ndarray]:
 
 
 def test_trailing_micro_gap_is_erased_by_float32_scoring():
-    """Documents the disease: float32 accumulation collapses the gap to 1.0."""
+    """Documents the disease: float32 accumulation loses the gap.
+
+    The exact collapse value is architecture-dependent. x86-64 SSE accumulates
+    the dot product so the ratio lands on exactly 1.0; on ARM64 the compiler is
+    free to contract multiply-adds into FMA, so the same inputs can evaluate to
+    1.000000238418579 (float32 1+ulp) or just below 1.0. Asserting equality with
+    1.0 would only pin the x86 result and break every FMA-capable host, so the
+    contract is: the gap is gone, i.e. the score is indistinguishable from 1.0
+    within float32 resolution and *not* strictly below it as float64 would be.
+    """
     a, b = _trailing_gap_pair(MICRO_GAP)
     a32 = a.astype(np.float32)
     b32 = b.astype(np.float32)
     sim32 = float(np.dot(b32, a32) / (np.linalg.norm(a32) * np.linalg.norm(b32)))
-    assert sim32 == 1.0
+
+    # float32 ulp at 1.0 is 2 ** -23 ~ 1.19e-7; landing within a few ulps of the
+    # unity means the 1e-5 coordinate gap has left no representable trace. On
+    # x86 the ratio is exactly 1.0; under FMA it overshoots by at most one ulp.
+    assert abs(sim32 - 1.0) <= 4 * float(np.finfo(np.float32).eps)
+    # The disease is the sign flip: float32 no longer stays strictly below 1.0
+    # the way a healthy, gap-resolving score must.
+    assert sim32 >= 1.0
+    # Contrast with float64, which keeps the separation strictly observable.
+    a64 = np.asarray(a, dtype=np.float64)
+    b64 = np.asarray(b, dtype=np.float64)
+    sim64 = float(np.dot(b64, a64) / (np.linalg.norm(a64) * np.linalg.norm(b64)))
+    assert sim64 < 1.0
+    assert 1.0 - sim64 > 1e-12
+    # float32 is at least as close to unity as float64, i.e. it erased the gap.
+    assert abs(sim32 - 1.0) <= abs(sim64 - 1.0)
 
 
 def test_trailing_micro_gap_survives_float64_scoring():
@@ -348,27 +397,82 @@ def test_precision_pair_constant_tracks_machine_epsilon():
     assert PRECISION_EPSILON_TOLERANCE >= float(np.finfo(np.float32).eps)
 
 
+def _float32_dtype_reference(expr: ast.AST) -> bool:
+    """True when the expression is a real float32 dtype reference.
+
+    ``float32`` may legitimately appear as an attribute name (``pa.float32()``)
+    or as an unbacked string, neither of which is an accumulation claim. Only an
+    actual dtype token — ``np.float32`` or a bare ``float32`` name — counts.
+    """
+    if isinstance(expr, ast.Name):
+        return expr.id == "float32"
+    return (
+        isinstance(expr, ast.Attribute)
+        and expr.attr == "float32"
+        and isinstance(expr.value, ast.Name)
+        and expr.value.id in {"np", "numpy", "torch"}
+    )
+
+
+def _dot_product_segments(node: ast.FunctionDef) -> list[str]:
+    """Unparsed bodies of the function, plus any nested dot-product helpers."""
+    segments = [
+        ast.unparse(ast.Module(body=[statement for statement in node.body if not _is_docstring(statement)], type_ignores=[]))
+    ]
+    for child in ast.walk(node):
+        if isinstance(child, ast.FunctionDef) and child is not node:
+            segments.append(ast.unparse(ast.Module(body=child.body, type_ignores=[])))
+    return segments
+
+
 def test_all_similarity_helpers_compute_in_float64():
-    """Every RAG/similarity helper must upcast before the dot product."""
-    targets = (
+    """Every standalone RAG similarity helper must upcast before the dot product.
+
+    The chat path no longer carries one: it consumes ``evaluate_clause``'s
+    float64 ``last_cosine`` directly, and ``corpus_calibration`` scores through
+    ``SemanticFirewall.run_cosine_filter``, which upcasts via ``SIMILARITY_DTYPE``.
+    ``_cosine_sim`` in ``dataset_generator`` is the one helper that computes its
+    own dot product, so it is the one policed here.
+    """
+    paths = (
         APP_DIR / "modules" / "dataset_generator.py",
         APP_DIR / "modules" / "corpus_calibration.py",
     )
-    helpers = {"_cosine_sim", "_rag_context_similarity"}
+    helper_name = "_cosine_sim"
     checked = 0
-    for path in targets:
+    offender_modules: list[str] = []
+    for path in paths:
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
         for node in ast.walk(tree):
-            if not isinstance(node, ast.FunctionDef) or node.name not in helpers:
+            if not isinstance(node, ast.FunctionDef) or node.name != helper_name:
                 continue
             checked += 1
-            body = [statement for statement in node.body if not _is_docstring(statement)]
-            segment = ast.unparse(ast.Module(body=body, type_ignores=[]))
-            assert "float32" not in segment, (
-                f"{path.name}:{node.name} still accumulates in float32"
-            )
-            assert "float64" in segment, (
+            segments = _dot_product_segments(node)
+            joined = "\n".join(segments)
+            assert "float64" in joined, (
                 f"{path.name}:{node.name} does not upcast to float64"
             )
-    assert checked == 2, f"expected 2 similarity helpers, inspected {checked}"
+            for segment in segments:
+                for expr in ast.walk(ast.parse(segment)):
+                    if _float32_dtype_reference(expr):
+                        offender_modules.append(f"{path.name}:{node.name}")
+                        raise AssertionError(
+                            f"{path.name}:{node.name} still accumulates in float32"
+                        )
+    assert not offender_modules
+    assert checked == 1, f"expected 1 similarity helper, inspected {checked}"
+
+    # No module under app/ may define a second, un-guarded similarity helper:
+    # a new one would silently bypass this test unless it is added here.
+    defined_elsewhere = set()
+    for path in _iter_source_files(APP_DIR):
+        if path in paths:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == helper_name:
+                defined_elsewhere.add(str(path.relative_to(BACKEND_DIR)))
+    assert not defined_elsewhere, (
+        f"duplicate similarity helper outside the audited modules: {sorted(defined_elsewhere)}"
+    )
