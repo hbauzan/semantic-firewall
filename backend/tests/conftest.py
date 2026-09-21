@@ -85,4 +85,7 @@ def reset_config_after_test():
         active_corpus_file=None,
         calibration_coverage="recommended",
         egress_profile="chat",
+        harmonic_enabled=True,
+        harmonic_order=3,
+        harmonic_tau_floor=15,
     )

@@ -135,6 +135,14 @@ def _normalize_row(row: dict) -> dict:
     return out
 
 
+def coordinate_bounds(vectors: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Elementwise min and max of a float32 matrix. No decimal rounding."""
+    matrix = np.asarray(vectors, dtype=np.float32)
+    if matrix.ndim != 2 or matrix.shape[0] == 0:
+        raise ValueError("coordinate bounds require at least one vector")
+    return np.min(matrix, axis=0), np.max(matrix, axis=0)
+
+
 class Storage:
     def __init__(self):
         self.db = lancedb.connect(DB_PATH)
@@ -153,6 +161,7 @@ class Storage:
         else:
             self.table = self.db.open_table(self.table_name)
             self._ensure_schema_compatibility()
+        self._bounds_cache: dict[str, tuple[np.ndarray, np.ndarray]] = {}
 
     def _ensure_schema_compatibility(self):
         """Ensure all fields defined in rabitq_schema exist in the table on disk."""
@@ -179,6 +188,7 @@ class Storage:
         if nodes:
             enriched = [self._enrich_node(dict(n)) for n in nodes]
             self.table.add(enriched)
+            self._drop_bounds_cache()
 
     def get_max_id(self) -> int:
         if self.table.count_rows() == 0:
@@ -325,6 +335,40 @@ class Storage:
         safe_name = filename.replace("'", "''")
         filter_str = f"metadata LIKE '%\"filename\": \"{safe_name}\"%'"
         self.table.delete(filter_str)
+        self._drop_bounds_cache()
+
+    def _drop_bounds_cache(self) -> None:
+        self._bounds_cache.clear()
+
+    def _pack_vectors(self, filename: str) -> np.ndarray:
+        """Float32 matrix of dense vectors belonging to one pack."""
+        if self.table.count_rows() == 0:
+            return np.empty((0, RABITQ_VECTOR_DIM), dtype=np.float32)
+        if not filename or not _SAFE_FILENAME_RE.match(filename):
+            logger.warning("Rejected unsafe filename for pack bounds: %r", filename)
+            return np.empty((0, RABITQ_VECTOR_DIM), dtype=np.float32)
+        safe_name = filename.replace("'", "''")
+        filter_str = f"metadata LIKE '%\"filename\": \"{safe_name}\"%'"
+        try:
+            rows = self.table.search().where(filter_str).select(["vector"]).to_list()
+        except Exception as e:
+            logger.warning("Pack vector fetch failed for %r: %s", filename, e)
+            return np.empty((0, RABITQ_VECTOR_DIM), dtype=np.float32)
+        if not rows:
+            return np.empty((0, RABITQ_VECTOR_DIM), dtype=np.float32)
+        return np.stack(
+            [np.asarray(row["vector"], dtype=np.float32).reshape(-1) for row in rows],
+            axis=0,
+        )
+
+    def get_pack_coordinate_bounds(self, pack_name: str) -> tuple[np.ndarray, np.ndarray]:
+        """Cached float32 [lo, hi] envelope for every coordinate in a pack."""
+        cached = self._bounds_cache.get(pack_name)
+        if cached is not None:
+            return cached
+        bounds = coordinate_bounds(self._pack_vectors(pack_name))
+        self._bounds_cache[pack_name] = bounds
+        return bounds
 
     def _pack_rows(self, filename: str) -> list[dict]:
         """Return all rows whose metadata matches ``filename``."""

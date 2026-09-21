@@ -1,7 +1,7 @@
 # TK-04: Head 3 — Microscopic 17-Digit Fine Harmonic Resonance Gate
 
 > **Ticket ID:** `TK-04`  
-> **Status:** `PENDING`  
+> **Status:** `DONE`  
 > **Pre-requisites:** `TK-01`, `TK-03`  
 > **Target Subsystem:** Sequential Pipeline — Head 3 (`run_harmonic_resonance_filter`)  
 > **Reference Specs:** [`ddi-fw/rfc-numerical-purity-catastrophe.md`](../../ddi-fw/rfc-numerical-purity-catastrophe.md) & [`ddi-fw/dual-gate-spectral-quorum.md`](../../ddi-fw/dual-gate-spectral-quorum.md)
@@ -73,7 +73,7 @@ $$I_{\text{native}}(d) = [lo_d, hi_d], \quad I_{\text{foreign}}(d) = [lo_{B, d},
 
 ## 5. Definition of Done (DoD)
 
-- [ ] `run_harmonic_resonance_filter` operates as Head 3 (`order = 3`).
-- [ ] LanceDB pack bounds are computed and cached losslessly in Float32.
-- [ ] Dual-gate voting ($solo\_b == 0 \land solo\_a \ge \tau_{\text{floor}}$) is enforced.
-- [ ] All synthetic and corpus tests pass with 100% success.
+- [x] `run_harmonic_resonance_filter` operates as Head 3 (`order = 3`).
+- [x] LanceDB pack bounds are computed and cached losslessly in Float32.
+- [x] Dual-gate voting ($solo\_b == 0 \land solo\_a \ge \tau_{\text{floor}}$) is enforced.
+- [x] All synthetic and corpus tests pass with 100% success (`uv run pytest` from `backend/`: 258 passed, 6 skipped).
