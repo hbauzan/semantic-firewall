@@ -125,4 +125,4 @@ def test_head2_is_the_second_stage_and_defaults_match_coordinate_scale():
     aliased = ConfigState(coarse_delta_tolerance=0.02)
     assert aliased.noise_tolerance == 0.02
     names = [name for _order, name, _fn in SemanticFirewall.build_pipeline(cfg)]
-    assert names == ["cosine", "excitation", "noise"]
+    assert names == ["cosine", "excitation", "noise", "harmonic"]

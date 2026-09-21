@@ -43,6 +43,11 @@ def _breach_reason(
 ) -> str:
     if details.get("error") == "zero_norm":
         reason = "zero_norm"
+    elif details.get("error") in {
+        "foreign_band_contamination",
+        "insufficient_harmonic_resonance",
+    }:
+        reason = details["error"]
     elif stage_name == "excitation" and not raw_passed:
         reason = "excitation_mass"
     else:
@@ -264,6 +269,62 @@ class SemanticFirewall:
         return base * math.exp(-deficit)
 
     @staticmethod
+    def run_harmonic_resonance_filter(
+        q_arr: np.ndarray,
+        c_arr: np.ndarray,
+        native_bounds: tuple[np.ndarray, np.ndarray],
+        foreign_bounds: tuple[np.ndarray, np.ndarray] | None,
+        tau_floor: int,
+        cfg: ConfigState,
+    ) -> tuple[bool, str, dict]:
+        """Per-coordinate vote against native and foreign envelopes.
+
+        solo_b > 0 is foreign contamination. solo_a < tau_floor is not enough
+        native resonance. Intervals stay on float32; membership is closed.
+        """
+        del cfg
+        query = np.asarray(q_arr, dtype=np.float32).ravel()
+        corpus = np.asarray(c_arr, dtype=np.float32).ravel()
+        if corpus.shape != query.shape:
+            raise ValueError("query and corpus vectors must share a dimension")
+        lo_n = np.asarray(native_bounds[0], dtype=np.float32).ravel()
+        hi_n = np.asarray(native_bounds[1], dtype=np.float32).ravel()
+        if lo_n.shape != query.shape or hi_n.shape != query.shape:
+            raise ValueError("native bounds must match the query dimension")
+        in_native = (query >= lo_n) & (query <= hi_n)
+        if foreign_bounds is None:
+            in_foreign = np.zeros(query.shape, dtype=bool)
+        else:
+            lo_f = np.asarray(foreign_bounds[0], dtype=np.float32).ravel()
+            hi_f = np.asarray(foreign_bounds[1], dtype=np.float32).ravel()
+            if lo_f.shape != query.shape or hi_f.shape != query.shape:
+                raise ValueError("foreign bounds must match the query dimension")
+            in_foreign = (query >= lo_f) & (query <= hi_f)
+        solo_a_mask = in_native & ~in_foreign
+        solo_b_mask = ~in_native & in_foreign
+        ambas_mask = in_native & in_foreign
+        ninguna_mask = ~in_native & ~in_foreign
+        solo_a = int(np.count_nonzero(solo_a_mask))
+        solo_b = int(np.count_nonzero(solo_b_mask))
+        ambas = int(np.count_nonzero(ambas_mask))
+        ninguna = int(np.count_nonzero(ninguna_mask))
+        details = {
+            "solo_a": solo_a,
+            "solo_b": solo_b,
+            "ambas": ambas,
+            "ninguna": ninguna,
+            "tau_floor": int(tau_floor),
+        }
+        if solo_b > 0:
+            details["error"] = "foreign_band_contamination"
+            return False, "harmonic", details
+        if solo_a < int(tau_floor):
+            details["error"] = "insufficient_harmonic_resonance"
+            return False, "harmonic", details
+        details["status"] = "harmonic_resonance_validated"
+        return True, "harmonic", details
+
+    @staticmethod
     def run_sparse_short_circuit(
         q_sparse: Mapping[int, float] | None,
         c_sparse: Mapping[int, float] | None,
@@ -293,6 +354,8 @@ class SemanticFirewall:
             stages.append((cfg.excitation_order, "excitation", SemanticFirewall.run_excitation_filter))
         if cfg.noise_enabled:
             stages.append((cfg.noise_order, "noise", SemanticFirewall.run_noise_filter))
+        if cfg.harmonic_enabled:
+            stages.append((cfg.harmonic_order, "harmonic", SemanticFirewall.run_harmonic_resonance_filter))
         return sorted(stages, key=lambda x: x[0])
 
     @staticmethod
@@ -305,6 +368,8 @@ class SemanticFirewall:
         query_text: str = "",
         q_sparse: Mapping[int, float] | None = None,
         c_sparse: Mapping[int, float] | None = None,
+        native_bounds: tuple[np.ndarray, np.ndarray] | None = None,
+        foreign_bounds: tuple[np.ndarray, np.ndarray] | None = None,
     ) -> ClauseResult:
         """Run the full ordered pipeline on a single clause's vectors.
 
@@ -369,7 +434,19 @@ class SemanticFirewall:
             if stage_name == "cosine" and hybrid_score is not None:
                 extra["hybrid_score"] = hybrid_score
 
-            raw_passed, _name, details = stage_fn(q_arr, c_arr, cfg, **extra)
+            if stage_name == "harmonic":
+                if native_bounds is None:
+                    continue
+                raw_passed, _name, details = SemanticFirewall.run_harmonic_resonance_filter(
+                    q_arr,
+                    c_arr,
+                    native_bounds,
+                    foreign_bounds,
+                    cfg.harmonic_tau_floor,
+                    cfg,
+                )
+            else:
+                raw_passed, _name, details = stage_fn(q_arr, c_arr, cfg, **extra)
 
             if negative and stage_name != "noise":
                 effective_passed = not raw_passed

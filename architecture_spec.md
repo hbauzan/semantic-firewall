@@ -99,6 +99,8 @@ The firewall executes three distinct validation stages in a **user-defined seque
 
 **Stage C — Noise Pre-Filter (Entropy Analysis):** Computes the Shannon Entropy of the Query Vector ($Q$) to detect GCG artifacts. Math: $H(Q) = -\sum p_i \log_2(p_i)$, where $p_i$ is the normalized distribution of the 1024D embedding (L1-normalized absolute values). Natural language embeddings exhibit high entropy. Adversarial bursts collapse the embedding into low-entropy clusters. If $H(Q) < global\_noise\_limit$ (Default: 4.5), the query is blocked as a `Burst Detection Breach`. This is corpus-independent — the filter does not require a context vector.
 
+**Head 3 — Harmonic Resonance:** When `native_bounds` are supplied, each coordinate votes against the native envelope `[lo_d, hi_d]` and an optional foreign envelope. `solo_b > 0` breaches with `foreign_band_contamination`. `solo_a < harmonic_tau_floor` (default 15) breaches with `insufficient_harmonic_resonance`. Bounds are float32 extrema with no decimal rounding. Default `harmonic_order` is 3. Without pack bounds the stage is not applied, so callers that have not loaded an envelope keep the cosine and excitation decision.
+
 **Execution semantics:** Stages are sorted by their `_order` integer (ascending). Default order is cosine, then excitation, then noise. If Stage N returns BREACH, later stages are **never evaluated**. Each clause from the segmentation defense (Section 5) must independently pass the **entire** ordered pipeline. Telemetry trace format: `Pipeline: [cosine:OK → excitation:OK → noise:OK]` or `[cosine:OK → excitation:BREACH]`.
 
 ### 3.1 Firewall Mode: Positive / Negative (Allowlist vs Denylist)
