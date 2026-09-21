@@ -21,6 +21,7 @@ from app.modules.sniffer import emit_trace, update_trace, subscribe, unsubscribe
 from app.core.models import ConfigState, ChatRequest, OpenAIConfig
 from app.core.firewall import SemanticFirewall
 from app.core.exceptions import BurstDetectionBreach
+from app.core.numerical import format_float
 from app.core.settings import settings
 from app.modules.providers.ollama import OllamaProvider
 from app.modules.providers.google import GoogleGeminiProvider
@@ -46,8 +47,9 @@ def _enforce_raw_entropy(clause: str, cfg: ConfigState) -> None:
     entropy = SemanticFirewall.calculate_raw_entropy(clause)
     if entropy < cfg.raw_entropy_limit:
         logger.info(
-            "SHORT_CIRCUIT layer=raw_entropy entropy=%.4f limit=%.4f",
-            entropy, cfg.raw_entropy_limit,
+            "SHORT_CIRCUIT layer=raw_entropy entropy=%s limit=%s",
+            format_float(entropy),
+            format_float(cfg.raw_entropy_limit),
         )
         raise BurstDetectionBreach(clause, entropy, cfg.raw_entropy_limit)
 
@@ -308,11 +310,11 @@ async def chat_endpoint(request: Request, req: ChatRequest):
             f"[FW_PASS]\n"
             f"Engine: {cfg.upstream_provider.upper()} | {model_id}\n"
             f"Mode: {cfg.firewall_mode.upper()}\n"
-            f"Metrics: Entropy({entropy:.2f} / Limit: {cfg.global_noise_limit:.2f}) | "
-            f"Cosine({last_cosine:.3f} / Limit: {cfg.cosine_threshold:.3f}) | "
+            f"Metrics: Entropy({format_float(entropy)} / Limit: {format_float(cfg.global_noise_limit)}) | "
+            f"Cosine({format_float(last_cosine)} / Limit: {format_float(cfg.cosine_threshold)}) | "
             f"Excitation({last_activations} / Limit: {cfg.excitation_threshold}) | "
-            f"Noise Tolerance({cfg.noise_tolerance}) | "
-            f"Adaptive({cfg.adaptive_factor:.2f}) | "
+            f"Noise Tolerance({format_float(cfg.noise_tolerance)}) | "
+            f"Adaptive({format_float(cfg.adaptive_factor)}) | "
             f"RAG Context({rag_chunk_count} chunks, k={cfg.rag_top_k})\n"
             f"RAG: {rag_chunk_count} chunks injected "
             f"(k={cfg.rag_top_k}, clauses={clauses_with_hits}, unique={rag_chunk_count})\n"
@@ -578,7 +580,7 @@ def _format_block_message(
         val = cos_trace.get("cosine_sim", 0.0)
         req = cfg.cosine_threshold
         st = "OK" if cos_trace.get("passed", False) else "FAIL"
-        metric_parts.append(f"Cosine({val:.3f} / Limit: {req:.3f}) [{st}]")
+        metric_parts.append(f"Cosine({format_float(val)} / Limit: {format_float(req)}) [{st}]")
 
     if exc_trace:
         act = exc_trace.get("activations", 0)
@@ -588,28 +590,33 @@ def _format_block_message(
         factor = exc_trace.get("adaptive_factor", 1.0)
         base_thr = cfg.excitation_threshold
         if adaptive_applied and factor != 1.0:
-            exc_desc = f"Excitation({act} / Limit: {thr:.0f} [Adaptive {factor:.2f}x: Base {base_thr} -> {thr:.0f}]) [{st}]"
+            exc_desc = (
+                f"Excitation({act} / Limit: {format_float(thr)} "
+                f"[Adaptive {format_float(factor)}x: Base {base_thr} -> {format_float(thr)}]) [{st}]"
+            )
         else:
-            exc_desc = f"Excitation({act} / Limit: {thr:.0f}) [{st}]"
+            exc_desc = f"Excitation({act} / Limit: {format_float(thr)}) [{st}]"
         metric_parts.append(exc_desc)
 
     if noise_trace:
         ent = noise_trace.get("entropy", 0.0)
         limit = cfg.global_noise_limit
         st = "OK" if noise_trace.get("passed", False) else "FAIL"
-        metric_parts.append(f"Entropy({ent:.4f} / Limit: {limit:.3f}) [{st}]")
+        metric_parts.append(f"Entropy({format_float(ent)} / Limit: {format_float(limit)}) [{st}]")
 
     if metric_parts:
         metric_line = f"Metrics: {' | '.join(metric_parts)}"
     else:
-        metric_line = f"Reason: {reason} | Noise Tolerance({cfg.noise_tolerance}) | Adaptive({cfg.adaptive_factor:.2f})"
+        metric_line = (
+            f"Reason: {reason} | Noise Tolerance({format_float(cfg.noise_tolerance)}) | "
+            f"Adaptive({format_float(cfg.adaptive_factor)})"
+        )
 
     # Tuning hints for manual calibration
     tuning_targets = []
     if cos_trace:
         c_val = cos_trace.get("cosine_sim", 0.0)
-        rec_cos = math.floor(c_val * 1000.0) / 1000.0
-        tuning_targets.append(f"Cosine <= {rec_cos:.3f}")
+        tuning_targets.append(f"Cosine <= {format_float(c_val)}")
     if exc_trace:
         act = exc_trace.get("activations", 0)
         factor = exc_trace.get("adaptive_factor", 1.0)
@@ -617,8 +624,7 @@ def _format_block_message(
         tuning_targets.append(f"Excitation <= {rec_exc}")
     if noise_trace:
         ent = noise_trace.get("entropy", 0.0)
-        rec_noise = math.floor(ent * 1000.0) / 1000.0
-        tuning_targets.append(f"Noise <= {rec_noise:.3f}")
+        tuning_targets.append(f"Noise <= {format_float(ent)}")
 
     hint_line = f"[TUNING HINT] To PASS: {', '.join(tuning_targets)}" if tuning_targets else ""
 
@@ -629,7 +635,7 @@ def _format_block_message(
         snippet = top_hit_text.strip().replace("\n", " ")
         if len(snippet) > 120:
             snippet = snippet[:117] + "..."
-        score_fmt = f"{top_hit_score:.3f}" if top_hit_score else "N/A"
+        score_fmt = format_float(top_hit_score) if top_hit_score else "N/A"
         rag_match_line = f"RAG Match ({score_fmt}): \"{snippet}\""
 
     pipeline = " -> ".join([f"{r['stage']}:{'OK' if r['passed'] else 'FAIL'}" for r in traces])

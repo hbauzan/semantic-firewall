@@ -776,16 +776,19 @@ def test_audit_uses_full_pipeline():
     assert "text" in data
 
 
-def test_tuning_hint_rounding():
-    """Verify _format_block_message floors Noise and Cosine values in tuning recommendations."""
+def test_tuning_hint_keeps_full_mantissa():
+    """Tuning hints echo measured cosine and entropy with a full IEEE 754 mantissa."""
     from app.api.endpoints.chat import _format_block_message
     from app.core.models import ConfigState
+    from app.core.numerical import format_float
 
     cfg = ConfigState()
+    entropy = 9.5485
+    cosine = 0.6538
     traces = [
-        {"stage": "noise", "passed": False, "entropy": 9.5485},
-        {"stage": "cosine", "passed": False, "cosine_sim": 0.6538},
+        {"stage": "noise", "passed": False, "entropy": entropy},
+        {"stage": "cosine", "passed": False, "cosine_sim": cosine},
     ]
     msg = _format_block_message("test clause", "noise", {}, cfg, traces)
-    assert "[TUNING HINT] To PASS: Cosine <= 0.653, Noise <= 9.548" in msg
+    assert f"[TUNING HINT] To PASS: Cosine <= {format_float(cosine)}, Noise <= {format_float(entropy)}" in msg
 
