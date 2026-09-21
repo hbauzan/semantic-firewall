@@ -14,6 +14,7 @@ import numpy as np
 
 from app.core.firewall import SemanticFirewall
 from app.core.models import ConfigState
+from app.core.numerical import format_float
 from app.core.recommended_thresholds import build_data_driven_grids
 from app.modules.embedder import embedder
 from app.modules.storage import storage
@@ -478,12 +479,12 @@ def calibrate_positive_for_pack(
         fn=joint_winner.fn,
     )
     logger.info(
-        "Calibration %s 2D joint: cos=%.2f exc=%d noise=%.1f (fixed) youden=%.3f",
+        "Calibration %s 2D joint: cos=%s exc=%d noise=%s (fixed) youden=%s",
         filename,
-        winner.cosine_threshold,
+        format_float(winner.cosine_threshold),
         winner.excitation_threshold,
-        winner.global_noise_limit,
-        winner.youden,
+        format_float(winner.global_noise_limit),
+        format_float(winner.youden),
     )
 
     if progress_cb:
@@ -495,8 +496,8 @@ def calibrate_positive_for_pack(
             "excitation_threshold": winner.excitation_threshold,
             "global_noise_limit": winner.global_noise_limit,
             "noise_swept": False,
-            "f1": round(winner.f1, 4),
-            "youden": round(winner.youden, 4),
+            "f1": float(winner.f1),
+            "youden": float(winner.youden),
             "grid_pairs": len(triple_points),
         },
     }

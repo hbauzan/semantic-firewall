@@ -1,7 +1,7 @@
 # TK-01: Universal Numerical Purity & Decimal Truncation Remediation
 
 > **Ticket ID:** `TK-01`  
-> **Status:** `PENDING`  
+> **Status:** `DONE`  
 > **Pre-requisites:** None  
 > **Target Subsystem:** Mathematical Foundations & Serialization  
 > **Reference Specs:** [`ddi-fw/rfc-numerical-purity-catastrophe.md`](../../ddi-fw/rfc-numerical-purity-catastrophe.md) & [`ddi-fw/universal-remediation-directive.md`](../../ddi-fw/universal-remediation-directive.md)
@@ -50,7 +50,7 @@ Applying `round(x, 4)`, `f"{val:.4f}"`, or downcasting to `float16` acts as a ca
 
 ## 5. Definition of Done (DoD)
 
-- [ ] Zero occurrences of `round(` or `np.round(` in `backend/app/core/` and `backend/app/modules/`.
-- [ ] String serializations in telemetry and exports use `%.17g`.
-- [ ] `backend/tests/test_numerical_purity.py` passes with 100% success.
-- [ ] All 118 existing unit tests pass without errors.
+- [x] Zero occurrences of `round(` or `np.round(` in `backend/app/core/` and `backend/app/modules/`.
+- [x] String serializations in telemetry and exports use `%.17g`.
+- [x] `backend/tests/test_numerical_purity.py` passes with 100% success.
+- [x] Existing unit tests pass without errors (`uv run pytest` from `backend/`: 239 passed, 6 skipped).

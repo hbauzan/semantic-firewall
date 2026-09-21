@@ -14,6 +14,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 from app.core.models import ConfigState
+from app.core.numerical import format_float
 
 
 class ClauseResult(TypedDict):
@@ -176,8 +177,9 @@ class SemanticFirewall:
             c_norm = np.linalg.norm(c_arr)
             if q_norm == 0 or c_norm == 0:
                 logger.warning(
-                    "Zero-norm vector in cosine filter (q_norm=%.4f, c_norm=%.4f)",
-                    q_norm, c_norm,
+                    "Zero-norm vector in cosine filter (q_norm=%s, c_norm=%s)",
+                    format_float(float(q_norm)),
+                    format_float(float(c_norm)),
                 )
                 return False, "cosine", {"cosine_sim": 0.0, "error": "zero_norm"}
             raw = np.dot(q_arr, c_arr) / (q_norm * c_norm)
@@ -305,7 +307,11 @@ class SemanticFirewall:
             })
             if not effective_passed:
                 breach_reason = f"negative:{stage_name}" if negative else stage_name
-                logger.info("SHORT_CIRCUIT layer=%s alpha=%.4f", stage_name, alpha_q)
+                logger.info(
+                    "SHORT_CIRCUIT layer=%s alpha=%s",
+                    stage_name,
+                    format_float(alpha_q),
+                )
                 return {
                     "passed": False,
                     "breach_reason": breach_reason,

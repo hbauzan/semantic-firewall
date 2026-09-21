@@ -86,7 +86,7 @@ def _run_calibration_sync(filename: str, task_id: str, coverage_mode: str = "rec
         "corpus_id": result.corpus_id,
         "dataset": result.dataset_file,
         "generation_method": result.generation_method,
-        "accuracy": round(result.accuracy, 4),
+        "accuracy": float(result.accuracy),
         "sweep": result.sweep_summary,
         "cosine_threshold": result.cosine_threshold,
         "excitation_threshold": result.excitation_threshold,
